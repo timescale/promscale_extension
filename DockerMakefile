@@ -7,7 +7,7 @@ include dependencies.makefile
 EXT_VERSION = $(shell cat promscale.control | grep 'default' | sed "s/^.*'\(.*\)'$\/\1/g")
 
 PG_VER ?= pg12
-TIMESCALEDB_VER ?= 1.7.0
+TIMESCALEDB_VER ?= 1.7.4
 
 DOCKER_IMAGE_NAME?=promscale-extension
 ORGANIZATION?=timescaledev
