@@ -15,5 +15,5 @@ branch = "master"
 lto = true
 
 [features]
-default = []
+default = ["parse_headers"]
 parse_headers = ["timescale-extension-utils/parse_headers"]
