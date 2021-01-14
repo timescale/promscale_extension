@@ -7,17 +7,28 @@ include dependencies.makefile
 EXT_VERSION = $(shell cat promscale.control | grep 'default' | sed "s/^.*'\(.*\)'$\/\1/g")
 
 PG_VER ?= pg12
-TIMESCALEDB_VER ?= 1.7.4
-
+PUSH ?= TRUE
 DOCKER_IMAGE_NAME?=promscale-extension
 ORGANIZATION?=timescaledev
 
-docker-image: Dockerfile $(SQL_FILES) $(SRCS) Cargo.toml Cargo.lock $(RUST_SRCS)
-	docker build --build-arg TIMESCALEDB_VERSION=$(TIMESCALEDB_VER) --build-arg PG_VERSION_TAG=$(PG_VER) -t $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):latest-$(PG_VER) .
-	docker tag $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):latest-$(PG_VER) $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):${EXT_VERSION}-$(PG_VER)
+docker-image-build-1 docker-image-build-2: Dockerfile $(SQL_FILES) $(SRCS) Cargo.toml Cargo.lock $(RUST_SRCS)
+	docker build --build-arg TIMESCALEDB_VERSION=$(TIMESCALEDB_VER) --build-arg PG_VERSION_TAG=$(PG_VER) -t $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):$(EXT_VERSION)-$(TIMESCALEDB_VER)-$(PG_VER) .
+	docker tag $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):$(EXT_VERSION)-$(TIMESCALEDB_VER)-$(PG_VER) $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):${EXT_VERSION}-ts$(TIMESCALEDB_MAJOR)-$(PG_VER)
+	docker tag $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):$(EXT_VERSION)-$(TIMESCALEDB_VER)-$(PG_VER) $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):latest-ts$(TIMESCALEDB_MAJOR)-$(PG_VER)
+ifeq ($(PUSH), TRUE)
+	docker push $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):$(EXT_VERSION)-$(TIMESCALEDB_VER)-$(PG_VER)
+	docker push $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):${EXT_VERSION}-ts$(TIMESCALEDB_MAJOR)-$(PG_VER)
+	docker push $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):latest-ts$(TIMESCALEDB_MAJOR)-$(PG_VER)
+endif
 
-docker-push: docker-image
-	docker push $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):latest-$(PG_VER)
-	docker push $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):${EXT_VERSION}-$(PG_VER)
+docker-image-ts1: TIMESCALEDB_MAJOR=1
+docker-image-ts1: TIMESCALEDB_VER=1.7.4
+docker-image-ts1: docker-image-build-1
 
-.PHONY: docker-image docker-push
+docker-image-ts2: TIMESCALEDB_MAJOR=2
+docker-image-ts2: TIMESCALEDB_VER=2.0.0
+docker-image-ts2: docker-image-build-2
+
+docker-image: docker-image-ts2 docker-image-ts1
+
+.PHONY: docker-image-build docker-image-ts1 docker-image-ts2 docker-image
