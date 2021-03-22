@@ -17,3 +17,5 @@ lto = true
 [features]
 default = ["parse_headers"]
 parse_headers = ["timescale-extension-utils/parse_headers"]
+pg12 = ["timescale-extension-utils/pg12"]
+pg13 = ["timescale-extension-utils/pg13"]

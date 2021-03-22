@@ -117,7 +117,7 @@ checksum = "19b17cddbe7ec3f8bc800887bab5e717348c95ea2ca0b1bf0837fb964dc67099"
 [[package]]
 name = "postgres-headers-rs"
 version = "0.1.0"
-source = "git+https://github.com/timescale/timescale-extension-utils#098962027183e1cd36acd6e1a47390f1caedbd33"
+source = "git+https://github.com/timescale/timescale-extension-utils?branch=master#bc3bdd2f0e0bcd59c5d2a8fa23ae6cd0959e28bc"
 dependencies = [
  "bindgen",
 ]
@@ -177,7 +177,7 @@ checksum = "7fdf1b9db47230893d76faad238fd6097fd6d6a9245cd7a4d90dbd639536bbd2"
 [[package]]
 name = "timescale-extension-utils"
 version = "0.1.0"
-source = "git+https://github.com/timescale/timescale-extension-utils#098962027183e1cd36acd6e1a47390f1caedbd33"
+source = "git+https://github.com/timescale/timescale-extension-utils?branch=master#bc3bdd2f0e0bcd59c5d2a8fa23ae6cd0959e28bc"
 dependencies = [
  "postgres-headers-rs",
 ]

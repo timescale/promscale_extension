@@ -6,6 +6,7 @@ PG_CONFIG?=pg_config
 EXTENSION=promscale
 
 EXT_VERSION = $(shell cat promscale.control | grep 'default' | sed "s/^.*'\(.*\)'$\/\1/g")
+PG_VERSION = $(shell ${PG_CONFIG} --version | awk -F'[ \.]' '{print $$2}')
 
 DATA = $(SQL_FILES)
 MODULE_big = $(EXTENSION)
@@ -51,7 +52,7 @@ rust: target/release/libpromscale_rs.a
 promscale.so: target/release/libpromscale_rs.a
 
 target/release/libpromscale_rs.a: Cargo.toml Cargo.lock $(RUST_SRCS)
-	cargo build --release $(EXTRA_RUST_ARGS)
+	cargo build --release --features pg${PG_VERSION} $(EXTRA_RUST_ARGS)
 
 clean:
 	rm -f $(OBJS) $(patsubst %.o,%.bc, $(OBJS))
