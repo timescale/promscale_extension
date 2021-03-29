@@ -21,14 +21,21 @@ ifeq ($(PUSH), TRUE)
 	docker push $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):latest-ts$(TIMESCALEDB_MAJOR)-$(PG_VER)
 endif
 
+docker-image-ts1: PG_VER=pg12
 docker-image-ts1: TIMESCALEDB_MAJOR=1
 docker-image-ts1: TIMESCALEDB_VER=1.7.4
 docker-image-ts1: docker-image-build-1
 
-docker-image-ts2: TIMESCALEDB_MAJOR=2
-docker-image-ts2: TIMESCALEDB_VER=2.0.0
-docker-image-ts2: docker-image-build-2
+docker-image-ts2-12: PG_VER=pg12
+docker-image-ts2-12: TIMESCALEDB_MAJOR=2
+docker-image-ts2-12: TIMESCALEDB_VER=2.1.0
+docker-image-ts2-12: docker-image-build-2
 
-docker-image: docker-image-ts2 docker-image-ts1
+docker-image-ts2-13: PG_VER=pg13
+docker-image-ts2-13: TIMESCALEDB_MAJOR=2
+docker-image-ts2-13: TIMESCALEDB_VER=2.1.0
+docker-image-ts2-13: docker-image-build-2
+
+docker-image: docker-image-ts2-13 docker-image-ts2-12 docker-image-ts1
 
 .PHONY: docker-image-build docker-image-ts1 docker-image-ts2 docker-image

@@ -19,7 +19,7 @@ RUN set -ex \
                 rust cargo
 
 RUN set -ex \
-    && git clone  --branch v1.9 --depth 1 \
+    && git clone  --branch v1.11 --depth 1 \
          https://github.com/dimitri/pgextwlist.git /pgextwlist \
     && cd /pgextwlist \
     && make \
