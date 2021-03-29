@@ -23,7 +23,7 @@ endif
 
 docker-image-ts1: PG_VER=pg12
 docker-image-ts1: TIMESCALEDB_MAJOR=1
-docker-image-ts1: TIMESCALEDB_VER=1.7.4
+docker-image-ts1: TIMESCALEDB_VER=1.7.5
 docker-image-ts1: docker-image-build-1
 
 docker-image-ts2-12: PG_VER=pg12
