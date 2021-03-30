@@ -11,7 +11,7 @@ PUSH ?= FALSE
 DOCKER_IMAGE_NAME?=promscale-extension
 ORGANIZATION?=timescaledev
 
-docker-image-build-1 docker-image-build-2: Dockerfile $(SQL_FILES) $(SRCS) Cargo.toml Cargo.lock $(RUST_SRCS)
+docker-image-build-1 docker-image-build-2-12 docker-image-build-2-13: Dockerfile $(SQL_FILES) $(SRCS) Cargo.toml Cargo.lock $(RUST_SRCS)
 	docker build --build-arg TIMESCALEDB_VERSION=$(TIMESCALEDB_VER) --build-arg PG_VERSION_TAG=$(PG_VER) -t $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):$(EXT_VERSION)-$(TIMESCALEDB_VER)-$(PG_VER) .
 	docker tag $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):$(EXT_VERSION)-$(TIMESCALEDB_VER)-$(PG_VER) $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):${EXT_VERSION}-ts$(TIMESCALEDB_MAJOR)-$(PG_VER)
 	docker tag $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):$(EXT_VERSION)-$(TIMESCALEDB_VER)-$(PG_VER) $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):latest-ts$(TIMESCALEDB_MAJOR)-$(PG_VER)
@@ -29,13 +29,13 @@ docker-image-ts1: docker-image-build-1
 docker-image-ts2-12: PG_VER=pg12
 docker-image-ts2-12: TIMESCALEDB_MAJOR=2
 docker-image-ts2-12: TIMESCALEDB_VER=2.1.0
-docker-image-ts2-12: docker-image-build-2
+docker-image-ts2-12: docker-image-build-2-12
 
 docker-image-ts2-13: PG_VER=pg13
 docker-image-ts2-13: TIMESCALEDB_MAJOR=2
 docker-image-ts2-13: TIMESCALEDB_VER=2.1.0
-docker-image-ts2-13: docker-image-build-2
+docker-image-ts2-13: docker-image-build-2-13
 
 docker-image: docker-image-ts2-13 docker-image-ts2-12 docker-image-ts1
 
-.PHONY: docker-image-build docker-image-ts1 docker-image-ts2 docker-image
+.PHONY: docker-image-build docker-image-ts1 docker-image-ts2-12 docker-image-ts2-13 docker-image docker-image-build-2-12 docker-image-build-2-13 docker-image-build-1
