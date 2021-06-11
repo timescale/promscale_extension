@@ -1,21 +1,25 @@
 [package]
 name = "promscale_rs"
-version = "0.1.0"
+version = "0.1.3"
 authors = ["Joshua Lockerman <josh@timescale.com>"]
 edition = "2018"
 
 [lib]
 crate-type = ["staticlib"]
 
-[dependencies.timescale-extension-utils]
-git = "https://github.com/timescale/timescale-extension-utils"
-branch = "master"
-
 [profile.release]
 lto = true
 
 [features]
-default = ["parse_headers"]
-parse_headers = ["timescale-extension-utils/parse_headers"]
-pg12 = ["timescale-extension-utils/pg12"]
-pg13 = ["timescale-extension-utils/pg13"]
+default = []
+pg12 = ["pgx/pg12", "pgx-tests/pg12"]
+pg13 = ["pgx/pg13", "pgx-tests/pg13"]
+
+[dependencies]
+bincode = "1.3.1"
+serde = { version = "1.0", features = ["derive"] }
+pgx = {git="https://github.com/JLockerman/pgx.git", branch="timescale"}
+pgx-macros = {git="https://github.com/JLockerman/pgx.git", branch="timescale"}
+
+[dev-dependencies]
+pgx-tests = {git="https://github.com/JLockerman/pgx.git", branch="timescale"}
