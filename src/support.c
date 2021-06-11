@@ -16,21 +16,55 @@ PG_MODULE_MAGIC;
 #endif
 
 PG_FUNCTION_INFO_V1(make_call_subquery_support);
-PG_FUNCTION_INFO_V1(gapfill_delta_transition);
-PG_FUNCTION_INFO_V1(gapfill_increase_transition);
-PG_FUNCTION_INFO_V1(gapfill_rate_transition);
-PG_FUNCTION_INFO_V1(gapfill_delta_final);
+Datum prom_delta_transition_wrapper(PG_FUNCTION_ARGS);
+Datum prom_increase_transition_wrapper(PG_FUNCTION_ARGS);
+Datum prom_rate_transition_wrapper(PG_FUNCTION_ARGS);
+Datum prom_delta_final_wrapper(PG_FUNCTION_ARGS);
+
 
 /* linker hack to make sure the rust code is actually linked in */
 Datum _ensure_functions_link(PG_FUNCTION_ARGS);
 Datum
 _ensure_functions_link(PG_FUNCTION_ARGS)
 {
-	gapfill_delta_transition(fcinfo);
-	gapfill_increase_transition(fcinfo);
-	gapfill_rate_transition(fcinfo);
-	return gapfill_delta_final(fcinfo);
+	prom_delta_transition_wrapper(fcinfo);
+	prom_increase_transition_wrapper(fcinfo);
+	prom_rate_transition_wrapper(fcinfo);
+	return prom_delta_final_wrapper(fcinfo);
 }
+
+/* Backward compatible functions before & after transition to PGX
+   this lets extensions <=0.1.2 continue working */
+PG_FUNCTION_INFO_V1(gapfill_delta_transition);
+PG_FUNCTION_INFO_V1(gapfill_increase_transition);
+PG_FUNCTION_INFO_V1(gapfill_rate_transition);
+PG_FUNCTION_INFO_V1(gapfill_delta_final);
+
+
+Datum
+gapfill_delta_transition(PG_FUNCTION_ARGS)
+{
+	return prom_delta_transition_wrapper(fcinfo);
+}
+
+Datum
+gapfill_increase_transition(PG_FUNCTION_ARGS)
+{
+	return prom_increase_transition_wrapper(fcinfo);
+}
+
+Datum
+gapfill_rate_transition(PG_FUNCTION_ARGS)
+{
+	return prom_rate_transition_wrapper(fcinfo);
+}
+
+Datum
+gapfill_delta_final(PG_FUNCTION_ARGS)
+{
+	return prom_delta_final_wrapper(fcinfo);
+}
+
 
 static bool
 arg_can_be_put_into_subquery(Node *arg) {
