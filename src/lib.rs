@@ -6,6 +6,7 @@ use pgx::{error, pg_sys::TimestampTz};
 
 mod aggregate_utils;
 mod palloc;
+mod type_builder;
 
 use aggregate_utils::in_aggregate_context;
 
@@ -301,3 +302,262 @@ impl GapfillDeltaTransition {
         return self.deltas.clone();
     }
 }
+
+//a vector selector aggregate has the same semantics as parse.VectorSelector processing
+//in Prometheus. Namely, for all timestamps ts in the series:
+//     ts := ev.startTimestamp; ts <= ev.endTimestamp; ts += ev.interval
+// we return the last sample.value such that the time sample.time <= ts and sample.time >= ts-lookback.
+// if such a sample doesn't exist return NULL (None).
+// thus, the vector selector returns a regular series of values corresponding to all the points in the
+// ts series above.
+// Note that for performance, this aggregate is parallel-izable, combinable, and does not expect ordered inputs.
+#[pg_extern(immutable, parallel_safe)]
+pub fn vector_selector_transition(
+    state: Option<Internal<VectorSelector>>,
+    start_time: TimestampTz,
+    end_time: TimestampTz,
+    bucket_width: Milliseconds,
+    lookback: Milliseconds,
+    time: TimestampTz,
+    val: f64,
+    fc: pg_sys::FunctionCallInfo,
+) -> Option<Internal<VectorSelector>> {
+    unsafe {
+        in_aggregate_context(fc, || {
+            let mut state = state.unwrap_or_else(|| {
+                let state: Internal<_> =
+                    VectorSelector::new(start_time, end_time, bucket_width, lookback).into();
+                state
+            });
+
+            state.insert(time, val);
+
+            Some(state)
+        })
+    }
+}
+
+#[pg_extern(immutable, parallel_safe)]
+pub fn vector_selector_final(state: Option<Internal<VectorSelector>>) -> Option<Vec<Option<f64>>> {
+    state.map(|s| s.to_pg_array())
+}
+
+#[allow(non_camel_case_types)]
+type bytea = pg_sys::Datum;
+
+#[pg_extern(immutable, parallel_safe)]
+pub fn vector_selector_serialize(state: Internal<VectorSelector>) -> bytea {
+    crate::do_serialize!(state)
+}
+
+#[pg_extern(immutable, parallel_safe)]
+pub fn vector_selector_deserialize(
+    bytes: bytea,
+    _internal: Option<Internal<()>>,
+) -> Internal<VectorSelector> {
+    crate::do_deserialize!(bytes, VectorSelector)
+}
+
+#[pg_extern(immutable, parallel_safe)]
+pub fn vector_selector_combine(
+    state1: Option<Internal<VectorSelector>>,
+    state2: Option<Internal<VectorSelector>>,
+    fcinfo: pg_sys::FunctionCallInfo,
+) -> Option<Internal<VectorSelector>> {
+    unsafe {
+        in_aggregate_context(fcinfo, || {
+            match (state1, state2) {
+                (None, None) => None,
+                (None, Some(state2)) => {
+                    let s = state2.clone();
+                    Some(s.into())
+                }
+                (Some(state1), None) => {
+                    let s = state1.clone();
+                    Some(s.into())
+                } //should I make these return themselves?
+                (Some(state1), Some(state2)) => {
+                    let mut s1 = state1.clone(); // is there a way to avoid if it doesn't need it
+                    s1.combine(&state2);
+                    Some(s1.into())
+                }
+            }
+        })
+    }
+}
+
+//The internal state consists of a vector non-overlapping sample buckets. Each bucket
+//has a corresponding (virtual) timestamp corresponding to the ts series
+//described above. The timestamp represents the maximum value stored in the
+//bucket (inclusive). The minimum value is defined by the maximum value of
+//the previous bucket (exclusive).
+//the value stored inside the bucket is the last sample in the bucket (sample with highest timestamp)
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct VectorSelector {
+    first_bucket_max_time: TimestampTz,
+    last_bucket_max_time: TimestampTz,
+    end_time: TimestampTz, //only used for error checking
+    bucket_width: Milliseconds,
+    lookback: Milliseconds,
+    elements: Vec<Option<(TimestampTz, f64)>>,
+}
+
+impl VectorSelector {
+    pub fn new(
+        start_time: TimestampTz,
+        end_time: TimestampTz,
+        bucket_width: Milliseconds,
+        lookback: Milliseconds,
+    ) -> Self {
+        let num_buckets = ((end_time - start_time) / (bucket_width * USECS_PER_MS)) + 1;
+
+        let last_bucket_max_time =
+            end_time - ((end_time - start_time) % (bucket_width * USECS_PER_MS));
+
+        VectorSelector {
+            first_bucket_max_time: start_time,
+            last_bucket_max_time: last_bucket_max_time,
+            end_time: end_time,
+            bucket_width: bucket_width,
+            lookback: lookback,
+            elements: vec![None; num_buckets as usize],
+        }
+    }
+
+    fn combine(&mut self, other: &Internal<VectorSelector>) {
+        if self.first_bucket_max_time != other.first_bucket_max_time
+            || self.last_bucket_max_time != other.last_bucket_max_time
+            || self.end_time != other.end_time
+            || self.bucket_width != other.bucket_width
+            || self.lookback != other.lookback
+            || self.elements.len() != other.elements.len()
+        {
+            error!("trying to combine incomptible vector selectors")
+        }
+
+        for it in self.elements.iter_mut().zip(other.elements.iter()) {
+            let (s, o) = it;
+            match (*s, o) {
+                (None, None) => (),
+                (Some(_), None) => (),
+                (None, Some(other)) => *s = Some(*other),
+                (Some(mine), Some(other)) => {
+                    let (my_t, _): (TimestampTz, f64) = mine;
+                    let (other_t, _): (TimestampTz, f64) = *other;
+                    if other_t > my_t {
+                        *s = Some(*other)
+                    }
+                }
+            }
+        }
+    }
+
+    fn insert(&mut self, time: TimestampTz, val: f64) {
+        if time > self.end_time {
+            error!("input time greater than expected")
+        }
+        if time > self.last_bucket_max_time {
+            return;
+        }
+
+        let bucket_idx = self.get_bucket(time);
+        let contents = self.elements[bucket_idx];
+
+        match contents {
+            Some(x) => {
+                let (exising_time, _) = x;
+                if exising_time < time {
+                    self.elements[bucket_idx] = Some((time, val))
+                }
+            }
+            None => self.elements[bucket_idx] = Some((time, val)),
+        }
+    }
+
+    fn get_bucket(&self, time: TimestampTz) -> usize {
+        if time < self.first_bucket_max_time - (self.lookback * USECS_PER_MS) {
+            error!("input time less than expected")
+        }
+
+        if time > self.last_bucket_max_time {
+            error!("input time greater than the last bucket's time")
+        }
+
+        if time <= self.first_bucket_max_time {
+            return 0;
+        }
+
+        let offset = time - self.first_bucket_max_time;
+        let mut bucket = (offset / (self.bucket_width * USECS_PER_MS)) + 1;
+        if offset % (self.bucket_width * USECS_PER_MS) == 0 {
+            bucket -= 1
+        }
+        bucket as usize
+    }
+
+    pub fn results(&self) -> Vec<Option<f64>> {
+        let mut vals: Vec<Option<f64>> = Vec::with_capacity(self.elements.capacity());
+
+        //last value found in any bucket
+        let mut last = None;
+
+        let mut ts = self.first_bucket_max_time;
+        for content in &self.elements {
+            let mut pushed = false;
+            match content {
+                /* if current bucket is empty, last value may still apply */
+                None => match last {
+                    Some(tuple) => {
+                        let (t, v): (TimestampTz, f64) = tuple;
+                        if t >= ts - (self.lookback * USECS_PER_MS) {
+                            pushed = true;
+                            vals.push(Some(v));
+                        }
+                    }
+                    None => (),
+                },
+                Some(tuple) => {
+                    let (t, v2): &(TimestampTz, f64) = tuple;
+                    //if buckets > lookback, timestamp in bucket may still be out of lookback
+                    if *t >= ts - (self.lookback * USECS_PER_MS) {
+                        pushed = true;
+                        vals.push(Some(*v2));
+                    }
+                    last = *content
+                }
+            }
+            if !pushed {
+                //push a null
+                vals.push(None);
+            }
+            ts = ts + (self.bucket_width * USECS_PER_MS)
+        }
+
+        vals
+    }
+
+    pub fn to_pg_array(&self) -> Vec<Option<f64>> {
+        self.results()
+    }
+}
+
+extension_sql!(
+    r#"
+CREATE AGGREGATE vector_selector(
+    start_time timestamptz,
+    end_time timestamptz,
+    bucket_width bigint,
+    lookback bigint,
+    sample_time timestamptz,
+    sample_value DOUBLE PRECISION)
+(
+    sfunc = vector_selector_transition,
+    stype = internal,
+    finalfunc = vector_selector_final,
+    combinefunc = vector_selector_combine,
+    serialfunc = vector_selector_serialize,
+    deserialfunc = vector_selector_deserialize,
+    parallel = safe
+);
+"#
+);
