@@ -314,24 +314,45 @@ impl GapfillDeltaTransition {
 // Note that for performance, this aggregate is parallel-izable, combinable, and does not expect ordered inputs.
 #[pg_extern(immutable, parallel_safe)]
 pub fn vector_selector_transition(
-    state: Option<Internal<VectorSelector>>,
-    start_time: TimestampTz,
-    end_time: TimestampTz,
-    bucket_width: Milliseconds,
-    lookback: Milliseconds,
-    time: TimestampTz,
-    val: f64,
-    fc: pg_sys::FunctionCallInfo,
+    fcinfo: pg_sys::FunctionCallInfo,
 ) -> Option<Internal<VectorSelector>> {
+    let fcinfo = unsafe { fcinfo.as_mut() }.unwrap();
+    let nargs = fcinfo.nargs;
+    let len = std::mem::size_of::<pg_sys::NullableDatum>() * nargs as usize;
+    let args = unsafe { fcinfo.args.as_slice(len) };
+
+    let state = unsafe { Internal::from_datum(args[0].value, args[0].isnull, pg_sys::INTERNALOID) };
+    let start_time =
+        unsafe { TimestampTz::from_datum(args[1].value, args[1].isnull, pg_sys::TIMESTAMPTZOID) }
+            .unwrap_or_else(|| error!("start_time is null"));
+    let end_time =
+        unsafe { TimestampTz::from_datum(args[2].value, args[2].isnull, pg_sys::TIMESTAMPTZOID) }
+            .unwrap_or_else(|| error!("end_time is null"));
+
+    let bucket_width =
+        unsafe { Milliseconds::from_datum(args[3].value, args[3].isnull, pg_sys::INT8OID) }
+            .unwrap_or_else(|| error!("bucket_width is null"));
+
+    let lookback =
+        unsafe { Milliseconds::from_datum(args[4].value, args[4].isnull, pg_sys::INT8OID) }
+            .unwrap_or_else(|| error!("lookback is null"));
+
+    let time =
+        unsafe { TimestampTz::from_datum(args[5].value, args[5].isnull, pg_sys::TIMESTAMPTZOID) }
+            .unwrap_or_else(|| error!("time is null"));
+
+    let value = unsafe { f64::from_datum(args[6].value, args[6].isnull, pg_sys::FLOAT8OID) }
+        .unwrap_or_else(|| error!("value is null"));
+
     unsafe {
-        in_aggregate_context(fc, || {
+        in_aggregate_context(fcinfo, || {
             let mut state = state.unwrap_or_else(|| {
                 let state: Internal<_> =
                     VectorSelector::new(start_time, end_time, bucket_width, lookback).into();
                 state
             });
 
-            state.insert(time, val);
+            state.insert(time, value);
 
             Some(state)
         })
