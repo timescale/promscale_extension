@@ -1,34 +1,64 @@
-ARG PG_VERSION=12
+ARG PG_VERSION_TAG=pg12
 ARG TIMESCALEDB_VERSION=1.7.5
-FROM timescale/timescaledb-ha:pg${PG_VERSION}-ts${TIMESCALEDB_VERSION}-latest AS analytics-tools
-ARG PG_VERSION
+FROM timescale/timescaledb:${TIMESCALEDB_VERSION}-${PG_VERSION_TAG} as builder
 
-USER root
-
-RUN mkdir rust
+MAINTAINER Timescale https://www.timescale.com
+ARG PG_VERSION_TAG
 
 RUN set -ex \
-    && apt-get update \
-    && apt-get install -y \
-        clang \
-        gcc \
-        git \
-        libssl-dev \
-        pkg-config \
-        postgresql-server-dev-${PG_VERSION} \
-        make
+    && apk add --no-cache --virtual .build-deps \
+                coreutils \
+                dpkg-dev dpkg \
+                gcc \
+                libc-dev \
+                make \
+                util-linux-dev \
+                clang \
+		llvm \
+                git \
+                llvm-dev clang-libs \
+		bison \
+		dpkg-dev dpkg \
+		flex \
+		gcc \
+		libc-dev \
+		libedit-dev \
+		libxml2-dev \
+		libxslt-dev \
+		linux-headers \
+	 	clang g++ \
+		make \
+		openssl-dev \
+		perl-utils \
+		perl-ipc-run \
+		util-linux-dev \
+		zlib-dev \
+		icu-dev
 
-ENV CARGO_HOME=/build/.cargo
-ENV RUSTUP_HOME=/build/.rustup
-RUN curl https://sh.rustup.rs -sSf | bash -s -- -y --profile=minimal -c rustfmt
-ENV PATH="/build/.cargo/bin:${PATH}"
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH \
+    RUST_VERSION=1.53.0 \
+    # prevents some issues with openssl
+    RUSTFLAGS="-C target-feature=-crt-static"
 
-#install pgx
-RUN set -ex \
-    && rm -rf "${CARGO_HOME}/registry" "${CARGO_HOME}/git" \
-    && chown postgres:postgres -R "${CARGO_HOME}" \
-    && cargo install --git https://github.com/JLockerman/pgx.git --branch timescale cargo-pgx \
-    && cargo pgx init --pg${PG_VERSION} /usr/lib/postgresql/${PG_VERSION}/bin/pg_config
+RUN set -eux; \
+    apkArch="$(apk --print-arch)"; \
+    case "$apkArch" in \
+        x86_64) rustArch='x86_64-unknown-linux-musl'; rustupSha256='bdf022eb7cba403d0285bb62cbc47211f610caec24589a72af70e1e900663be9' ;; \
+        aarch64) rustArch='aarch64-unknown-linux-musl'; rustupSha256='89ce657fe41e83186f5a6cdca4e0fd40edab4fd41b0f9161ac6241d49fbdbbbe' ;; \
+        *) echo >&2 "unsupported architecture: $apkArch"; exit 1 ;; \
+    esac; \
+    url="https://static.rust-lang.org/rustup/archive/1.24.3/${rustArch}/rustup-init"; \
+    wget "$url"; \
+    echo "${rustupSha256} *rustup-init" | sha256sum -c -; \
+    chmod +x rustup-init; \
+    ./rustup-init -y --no-modify-path --profile minimal  --component rustfmt --default-toolchain $RUST_VERSION --default-host ${rustArch}; \
+    rm rustup-init; \
+    chmod -R a+w $RUSTUP_HOME $CARGO_HOME; \
+    rustup --version; \
+    cargo --version; \
+    rustc --version;
 
 RUN set -ex \
     && git clone  --branch v1.11 --depth 1 \
@@ -36,54 +66,33 @@ RUN set -ex \
     && cd /pgextwlist \
     && make \
     && make install \
+    && mkdir `pg_config --pkglibdir`/plugins \
     && cp /pgextwlist/pgextwlist.so `pg_config --pkglibdir`/plugins \
     && rm -rf /pgextwlist
 
-COPY promscale.control Makefile dependencies.makefile /rust/promscale/
-COPY src/*.c src/*.h /rust/promscale/src/
-COPY Cargo.* /rust/promscale/
-COPY src/*.rs /rust/promscale/src/
-COPY sql/*.sql /rust/promscale/sql/
+USER postgres
 
 RUN set -ex \
-    && chown -R postgres:postgres /rust \
-    && chown postgres:postgres -R "${CARGO_HOME}" \
-    && chown postgres:postgres -R /usr/share/postgresql \
-    && chown postgres:postgres -R /usr/lib/postgresql \
-    && cd /rust/promscale \
-        && cargo build --release --features pg${PG_VERSION} \
-        && make -C /rust/promscale install
+    && cargo install --git https://github.com/JLockerman/pgx.git --branch timescale cargo-pgx \
+    && cargo pgx init --pg13 /usr/local/bin/pg_config
 
-FROM timescale/timescaledb-ha:pg${PG_VERSION}-ts${TIMESCALEDB_VERSION}-latest as su-exec-builder
+COPY --chown=postgres promscale.control Makefile dependencies.makefile /build/promscale/
+COPY --chown=postgres src/*.c src/*.h /build/promscale/src/
+COPY --chown=postgres Cargo.* /build/promscale/
+COPY --chown=postgres src/*.rs /build/promscale/src/
+COPY --chown=postgres sql/*.sql /build/promscale/sql/
+
+RUN set -ex \
+    && make -C /build/promscale rust
 
 USER root
-RUN  set -ex; \
-     \
-     curl -o /usr/local/bin/su-exec.c https://raw.githubusercontent.com/ncopa/su-exec/master/su-exec.c; \
-     \
-     fetch_deps='gcc libc-dev'; \
-     apt-get update; \
-     apt-get install -y --no-install-recommends $fetch_deps; \
-     rm -rf /var/lib/apt/lists/*; \
-     gcc -Wall \
-         /usr/local/bin/su-exec.c -o/usr/local/bin/su-exec; \
-     chown root:root /usr/local/bin/su-exec; \
-     chmod 0755 /usr/local/bin/su-exec; \
-     rm /usr/local/bin/su-exec.c; \
-     \
-     apt-get purge -y --auto-remove $fetch_deps
 
+RUN set -ex \
+    && make -C /build/promscale install
 
 # COPY over the new files to the image. Done as a seperate stage so we don't
 # ship the build tools.
-FROM timescale/timescaledb-ha:pg${PG_VERSION}-ts${TIMESCALEDB_VERSION}-latest
+FROM timescale/timescaledb:${TIMESCALEDB_VERSION}-${PG_VERSION_TAG}
 
-
-USER root
-
-ENV LANG=en_US.utf8 \
-    LC_ALL=en_US.utf8
-
-COPY --from=analytics-tools /usr/share/postgresql /usr/share/postgresql
-COPY --from=analytics-tools /usr/lib/postgresql /usr/lib/postgresql
-COPY --from=su-exec-builder /usr/local/bin/su-exec /usr/local/bin/su-exec
+COPY --from=builder /usr/local/lib/postgresql /usr/local/lib/postgresql
+COPY --from=builder /usr/local/share/postgresql /usr/local/share/postgresql
