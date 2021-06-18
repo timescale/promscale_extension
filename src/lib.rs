@@ -17,6 +17,8 @@ type Microseconds = i64;
 const USECS_PER_SEC: i64 = 1_000_000;
 const USECS_PER_MS: i64 = 1_000;
 
+const STALE_NAN: u64 = 0x7ff0000000000002;
+
 // prom divides time into sliding windows of fixed size, e.g.
 // |  5 seconds  |  5 seconds  |  5 seconds  |  5 seconds  |  5 seconds  |
 // we take the first and last values in that bucket and uses `last-first` as the
@@ -183,7 +185,6 @@ impl GapfillDeltaTransition {
 
     fn add_data_point(&mut self, time: TimestampTz, val: f64) {
         // skip stale NaNs
-        const STALE_NAN: u64 = 0x7ff0000000000002;
         if val.to_bits() == STALE_NAN {
             return;
         }
@@ -501,6 +502,11 @@ impl VectorSelector {
         //last value found in any bucket
         let mut last = None;
 
+        /* staleNaN check happens after the bucket/last item is retrieved.
+        * if the value is a staleNaN, then the result is a NULL
+        * see vectorSelectorSingle in engine.go
+        */
+
         let mut ts = self.first_bucket_max_time;
         for content in &self.elements {
             let mut pushed = false;
@@ -509,7 +515,7 @@ impl VectorSelector {
                 None => match last {
                     Some(tuple) => {
                         let (t, v): (TimestampTz, f64) = tuple;
-                        if t >= ts - (self.lookback * USECS_PER_MS) {
+                        if t >= ts - (self.lookback * USECS_PER_MS) && v.to_bits() != STALE_NAN  {
                             pushed = true;
                             vals.push(Some(v));
                         }
@@ -519,7 +525,7 @@ impl VectorSelector {
                 Some(tuple) => {
                     let (t, v2): &(TimestampTz, f64) = tuple;
                     //if buckets > lookback, timestamp in bucket may still be out of lookback
-                    if *t >= ts - (self.lookback * USECS_PER_MS) {
+                    if *t >= ts - (self.lookback * USECS_PER_MS) && v2.to_bits() != STALE_NAN {
                         pushed = true;
                         vals.push(Some(*v2));
                     }
