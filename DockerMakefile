@@ -9,7 +9,7 @@ EXT_VERSION = $(shell cat promscale.control | grep 'default' | sed "s/^.*'\(.*\)
 PG_VER ?= pg12
 PUSH ?= FALSE
 DOCKER_IMAGE_NAME?=promscale-extension
-ORGANIZATION?=cevian
+ORGANIZATION?=timescaledev
 
 docker-image-build-1 docker-image-build-2-12 docker-image-build-2-13: Dockerfile $(SQL_FILES) $(SRCS) Cargo.toml Cargo.lock $(RUST_SRCS)
 	docker build --build-arg TIMESCALEDB_VERSION=$(TIMESCALEDB_VER) --build-arg PG_VERSION_TAG=$(PG_VER) -t $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):$(EXT_VERSION)-$(TIMESCALEDB_VER)-$(PG_VER) .
