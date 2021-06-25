@@ -151,7 +151,7 @@ pub struct GapfillDeltaTransition {
     current_window_max: TimestampTz,
     current_window_min: TimestampTz,
     step_size: Microseconds,
-    range: Milliseconds,
+    range: Microseconds,
     greatest_time: TimestampTz,
     is_counter: bool,
     is_rate: bool,
@@ -290,7 +290,7 @@ impl GapfillDeltaTransition {
         result_val = result_val * (extrapolate_to_interval / sampled_interval);
 
         if self.is_rate {
-            result_val = result_val / self.range as f64
+            result_val = result_val / (self.range / USECS_PER_SEC ) as f64
         }
 
         self.deltas.push(Some(result_val));
