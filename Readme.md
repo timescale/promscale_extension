@@ -71,13 +71,10 @@ sudo make install
 sudo -u postgres psql -c "CREATE USER promscale SUPERUSER PASSWORD 'promscale';"
 sudo -u postgres psql -c "CREATE DATABASE promscale OWNER promscale;"
 ```
-1) Download promscale
+1) [Download and run promscale (it will install the extension in the PostgreSQL database)](https://github.com/timescale/promscale/blob/master/docs/bare-metal-promscale-stack.md#2-deploying-promscale)
 ```bash
 LATEST_VERSION=$(curl -s https://api.github.com/repos/timescale/promscale/releases/latest | grep "tag_name" | cut -d'"' -f4)
 curl -L -o promscale "https://github.com/timescale/promscale/releases/download/${LATEST_VERSION}/promscale_${LATEST_VERSION}_Linux_x86_64"
-```
-1) Run promscale (it will install the extension in the PostgreSQL database)
-```bash
 chmod +x promscale
 ./promscale --db-name promscale --db-password promscale --db-user promscale --db-ssl-mode allow --install-extensions
 ```
