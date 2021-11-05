@@ -7,6 +7,7 @@ use pgx::{error, pg_sys::TimestampTz};
 mod aggregate_utils;
 mod palloc;
 mod type_builder;
+mod support;
 
 use aggregate_utils::in_aggregate_context;
 
