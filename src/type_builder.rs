@@ -30,20 +30,24 @@ macro_rules! do_serialize {
             unsafe {
                 ::pgx::set_varsize(bytes.as_mut_ptr() as *mut _, bytes.len() as i32);
             }
-            bytes.leak().as_mut_ptr() as pg_sys::Datum
+            bytea::from(bytes.leak().as_mut_ptr() as pg_sys::Datum)
         }
     };
 }
 #[macro_export]
 macro_rules! do_deserialize {
-    ($bytes: ident, $t: ty) => {{
+    ($bytes: expr, $t: ty) => {{
+        use std::slice;
         use $crate::type_builder::SerializationType;
 
         let state: $t = unsafe {
-            let detoasted = pg_sys::pg_detoast_datum_packed($bytes as *mut _);
+            let input: bytea = $bytes;
+            let input: pgx::pg_sys::Datum = input.into();
+            let detoasted = pg_sys::pg_detoast_datum_packed(input as *mut _);
             let len = pgx::varsize_any_exhdr(detoasted);
             let data = pgx::vardata_any(detoasted);
-            let bytes = std::slice::from_raw_parts(data as *mut u8, len);
+
+            let bytes = slice::from_raw_parts(data as *mut u8, len);
             if bytes.len() < 1 {
                 pgx::error!("deserialization error, no bytes")
             }
