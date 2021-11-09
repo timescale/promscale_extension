@@ -586,5 +586,6 @@ CREATE AGGREGATE vector_selector(
     deserialfunc = vector_selector_deserialize,
     parallel = safe
 );
-"#
+"#,
+    name="create_aggregate_vector_selector"
 );
