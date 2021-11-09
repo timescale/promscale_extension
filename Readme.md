@@ -46,20 +46,20 @@ sudo apt-get install build-essential clang libssl-dev pkg-config libreadline-dev
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source $HOME/.cargo/env
 ```
-1) Install our fork of the PGX framework
+1) Install the PGX framework
 ```bash
-cargo install --git https://github.com/JLockerman/pgx.git --branch timescale cargo-pgx
+cargo install cargo-pgx
 ```
-1) Initialize the PGX framework using the PostgreSQL 13 installation
+1) Initialize the PGX framework using the PostgreSQL 14 installation
 ```bash
-cargo pgx init --pg13=/usr/lib/postgresql/13/bin/pg_config
+cargo pgx init --pg14=/usr/lib/postgresql/14/bin/pg_config
 ```
 1) Download this repo and change directory into it
 ```bash
-curl -L -o "promscale_extension.zip" "https://github.com/timescale/promscale_extension/archive/refs/tags/0.2.0.zip"
+curl -L -o "promscale_extension.zip" "https://github.com/timescale/promscale_extension/archive/refs/tags/0.3.0.zip"
 sudo apt-get install unzip
 unzip promscale_extension.zip
-cd promscale_extension-0.2.0
+cd promscale_extension-0.3.0
 ```
 1) Compile and install
 ```bash
