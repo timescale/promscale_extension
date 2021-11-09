@@ -61,7 +61,7 @@ RUN set -eux; \
     rustc --version;
 
 RUN set -ex \
-    && git clone  --branch v1.11 --depth 1 \
+    && git clone  --branch v1.12 --depth 1 \
          https://github.com/dimitri/pgextwlist.git /pgextwlist \
     && cd /pgextwlist \
     && make \
@@ -74,7 +74,7 @@ USER postgres
 
 RUN set -ex \
     && cargo install cargo-pgx \
-    && cargo pgx init --pg13 /usr/local/bin/pg_config
+    && cargo pgx init --pg14 /usr/local/bin/pg_config
 
 COPY --chown=postgres promscale.control Makefile dependencies.makefile /build/promscale/
 COPY --chown=postgres src/*.c src/*.h /build/promscale/src/
