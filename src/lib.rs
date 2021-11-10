@@ -290,7 +290,7 @@ impl GapfillDeltaTransition {
         result_val = result_val * (extrapolate_to_interval / sampled_interval);
 
         if self.is_rate {
-            result_val = result_val / (self.range / USECS_PER_SEC ) as f64
+            result_val = result_val / (self.range / USECS_PER_SEC) as f64
         }
 
         self.deltas.push(Some(result_val));
@@ -365,7 +365,7 @@ pub fn vector_selector_final(state: Option<Internal<VectorSelector>>) -> Option<
 }
 
 #[allow(non_camel_case_types)]
-type bytea = pg_sys::Datum;
+pub type bytea = pg_sys::Datum;
 
 #[pg_extern(immutable, parallel_safe)]
 pub fn vector_selector_serialize(state: Internal<VectorSelector>) -> bytea {
@@ -524,9 +524,9 @@ impl VectorSelector {
         let mut last = None;
 
         /* staleNaN check happens after the bucket/last item is retrieved.
-        * if the value is a staleNaN, then the result is a NULL
-        * see vectorSelectorSingle in engine.go
-        */
+         * if the value is a staleNaN, then the result is a NULL
+         * see vectorSelectorSingle in engine.go
+         */
 
         let mut ts = self.first_bucket_max_time;
         for content in &self.elements {
@@ -536,7 +536,7 @@ impl VectorSelector {
                 None => match last {
                     Some(tuple) => {
                         let (t, v): (TimestampTz, f64) = tuple;
-                        if t >= ts - (self.lookback * USECS_PER_MS) && v.to_bits() != STALE_NAN  {
+                        if t >= ts - (self.lookback * USECS_PER_MS) && v.to_bits() != STALE_NAN {
                             pushed = true;
                             vals.push(Some(v));
                         }
@@ -586,5 +586,6 @@ CREATE AGGREGATE vector_selector(
     deserialfunc = vector_selector_deserialize,
     parallel = safe
 );
-"#
+"#,
+    name = "create_aggregate_vector_selector"
 );
