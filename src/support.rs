@@ -1,14 +1,20 @@
+use crate::palloc::{Inner, InternalAsValue, ToInternal};
 use pgx::*;
-use crate::palloc::Internal;
 
 // FIXME: This rough translation from C to Rust is _untested_ and probably broken
 
 #[pg_extern(immutable, strict)]
 #[search_path(@extschema@)]
-pub unsafe fn make_call_subquery_support(input: Internal<*mut pg_sys::Node>) -> Internal<*mut pg_sys::Node> {
-    let input: *mut pg_sys::Node = input.cast();
+pub unsafe fn make_call_subquery_support(input: Internal) -> Internal {
+    make_call_subquery_support_inner(input.to_inner()).internal()
+}
+
+pub unsafe fn make_call_subquery_support_inner(
+    input: Option<Inner<*mut pg_sys::Node>>,
+) -> Inner<*mut pg_sys::Node> {
+    let input: *mut pg_sys::Node = input.unwrap().cast();
     if !pgx::is_a(input, pg_sys::NodeTag_T_SupportRequestSimplify) {
-        return (0 as *mut pg_sys::Node).into()
+        return (0 as *mut pg_sys::Node).into();
     }
 
     let req: *mut pg_sys::SupportRequestSimplify = input.cast();
@@ -16,7 +22,7 @@ pub unsafe fn make_call_subquery_support(input: Internal<*mut pg_sys::Node>) -> 
     let root = (*req).root;
 
     if root.is_null() {
-        return (0 as *mut pg_sys::Node).into()
+        return (0 as *mut pg_sys::Node).into();
     }
 
     /*
@@ -24,7 +30,7 @@ pub unsafe fn make_call_subquery_support(input: Internal<*mut pg_sys::Node>) -> 
      * planned
      */
     if (*root).query_level > 1 {
-        return (0 as *mut pg_sys::Node).into()
+        return (0 as *mut pg_sys::Node).into();
     }
 
     let expr = (*req).fcall;
@@ -33,15 +39,17 @@ pub unsafe fn make_call_subquery_support(input: Internal<*mut pg_sys::Node>) -> 
 
     /* Check that these are expressions that don't reference
     any vars, i.e. they are constants or expressions of constants */
-    if !original_args.iter_ptr().all(|arg| {
-        arg_can_be_put_into_subquery(arg)
-    }) {
-        return (0 as *mut pg_sys::Node).into()
+    if !original_args
+        .iter_ptr()
+        .all(|arg| arg_can_be_put_into_subquery(arg))
+    {
+        return (0 as *mut pg_sys::Node).into();
     }
 
     (*(*root).parse).hasSubLinks = true;
 
-    let f2: *mut pg_sys::FuncExpr = pg_sys::copyObjectImpl(expr as  *const ::std::os::raw::c_void) as *mut pg_sys::FuncExpr;
+    let f2: *mut pg_sys::FuncExpr =
+        pg_sys::copyObjectImpl(expr as *const ::std::os::raw::c_void) as *mut pg_sys::FuncExpr;
 
     let mut te = PgBox::<pg_sys::TargetEntry>::alloc0();
     te.expr = f2 as *mut pg_sys::Expr;
@@ -62,18 +70,18 @@ pub unsafe fn make_call_subquery_support(input: Internal<*mut pg_sys::Node>) -> 
     sublink.subLinkId = 0;
     sublink.subselect = query.into_pg() as *mut pg_sys::Node;
 
-    return (sublink.into_pg() as *mut pg_sys::Node).into()
+    return (sublink.into_pg() as *mut pg_sys::Node).into();
 }
 
 pub unsafe fn arg_can_be_put_into_subquery(arg: *mut pg_sys::Node) -> bool {
     if pgx::is_a(arg, pg_sys::NodeTag_T_Const) {
-        return true
+        return true;
     }
 
     if pgx::is_a(arg, pg_sys::NodeTag_T_CoerceToDomain) {
-        let domain  = arg.cast::<pg_sys::CoerceToDomain>();
+        let domain = arg.cast::<pg_sys::CoerceToDomain>();
         return arg_can_be_put_into_subquery((*domain).arg as *mut pg_sys::Node);
     }
 
-    return false
+    return false;
 }
