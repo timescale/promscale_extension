@@ -3,11 +3,9 @@ use pgx::*;
 use pgx::error;
 
 use crate::aggregate_utils::in_aggregate_context;
-use crate::aggregates::Milliseconds;
+use crate::aggregates::{GapfillDeltaTransition, Milliseconds};
 use crate::palloc::{Inner, InternalAsValue, ToInternal};
 use crate::raw::TimestampTz;
-use crate::GapfillDeltaTransition;
-
 
 // prom divides time into sliding windows of fixed size, e.g.
 // |  5 seconds  |  5 seconds  |  5 seconds  |  5 seconds  |  5 seconds  |
