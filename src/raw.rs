@@ -3,11 +3,8 @@
 use pgx::*;
 
 // TODO: Is this the right approach to declaring `bytea` and `TimestampTz`?
-extension_sql!(
-    r#"
-        SELECT 1;
-    "#,
-    name = "create_experimental_schema",
+extension_sql!("",
+    name = "pseudo_create_types",
     creates = [Type(bytea), Type(TimestampTz),],
     bootstrap,
 );

@@ -7,9 +7,14 @@ edition = "2018"
 crate-type = ["cdylib", "rlib"]
 
 [profile.release]
-lto = true
+panic = "unwind" # Ensures that we don't abort a Postgres process
+opt-level = 3
+lto = "fat"
+debug = true
+codegen-units = 1
 
 [profile.dev]
+panic = "unwind"
 lto = "thin"
 
 [features]

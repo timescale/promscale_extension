@@ -107,49 +107,69 @@ CREATE AGGREGATE @extschema@.prom_delta(
 mod tests {
     use pgx::*;
 
-    // This somewhat hacky solution adds this SQL to the extension's schema definition when
-    // running tests.
-    // TODO: There is no isolation of this data, or namespacing.
-    extension_sql!(
-        r#"
-        CREATE TABLE gfd_test_table(t TIMESTAMPTZ, v DOUBLE PRECISION);
-        INSERT INTO gfd_test_table (t, v) VALUES
-            ('2000-01-02 15:00:00 UTC', 0),
-            ('2000-01-02 15:05:00 UTC', 50),
-            ('2000-01-02 15:10:00 UTC', 100),
-            ('2000-01-02 15:15:00 UTC', 150),
-            ('2000-01-02 15:20:00 UTC', 200),
-            ('2000-01-02 15:25:00 UTC', 200),
-            ('2000-01-02 15:30:00 UTC', 150),
-            ('2000-01-02 15:35:00 UTC', 100),
-            ('2000-01-02 15:40:00 UTC', 50),
-            ('2000-01-02 15:45:00 UTC', 0);
-    "#,
-        name = "initialize_prom_agg_test_setup"
-    );
+    fn setup() {
+        Spi::run(
+            r#"
+            CREATE TABLE gfd_test_table(t TIMESTAMPTZ, v DOUBLE PRECISION);
+            INSERT INTO gfd_test_table (t, v) VALUES
+                ('2000-01-02 15:00:00 UTC', 0),
+                ('2000-01-02 15:05:00 UTC', 50),
+                ('2000-01-02 15:10:00 UTC', 100),
+                ('2000-01-02 15:15:00 UTC', 150),
+                ('2000-01-02 15:20:00 UTC', 200),
+                ('2000-01-02 15:25:00 UTC', 200),
+                ('2000-01-02 15:30:00 UTC', 150),
+                ('2000-01-02 15:35:00 UTC', 100),
+                ('2000-01-02 15:40:00 UTC', 50),
+                ('2000-01-02 15:45:00 UTC', 0);
+            "#,
+        );
+    }
+
+    fn prepare_query(start: &str, sample_time: &str) -> String {
+        format!(
+            r#"
+            SELECT
+                prom_delta(
+                    {}::TIMESTAMPTZ
+                  , '2000-01-02 15:45:00 UTC'::TIMESTAMPTZ
+                  , 20 * 60 * 1000
+                  , 20 * 60 * 1000
+                  , {}::TIMESTAMPTZ
+                  , v order by t)
+            FROM gfd_test_table;"#,
+            start, sample_time
+        )
+    }
 
     #[pg_test(error = "time is null")]
     fn test_prom_delta_with_null_time_fails() {
-        Spi::get_one::<Vec<f64>>("SELECT prom_delta('2000-01-02 15:00:00 UTC'::TIMESTAMPTZ, '2000-01-02 15:45:00 UTC'::TIMESTAMPTZ, 20 * 60 * 1000, 20 * 60 * 1000, NULL, v order by t) FROM gfd_test_table;");
+        setup();
+        Spi::get_one::<Vec<f64>>(&*prepare_query("'2000-01-02 15:00:00 UTC'", "NULL"));
     }
 
     #[pg_test(error = "input time less than lowest time")]
     fn test_prom_delta_with_input_time_less_than_lowest_time_fails() {
-        Spi::get_one::<Vec<f64>>("SELECT prom_delta('2000-01-02 15:00:00 UTC'::TIMESTAMPTZ, '2000-01-02 15:45:00 UTC'::TIMESTAMPTZ, 20 * 60 * 1000, 20 * 60 * 1000, '2020-01-02 15:00:00 UTC'::TIMESTAMPTZ, v order by t) FROM gfd_test_table;");
+        setup();
+        Spi::get_one::<Vec<f64>>(&*prepare_query(
+            "'2000-01-02 15:00:00 UTC'",
+            "'2020-01-02 15:00:00 UTC'",
+        ));
     }
 
     #[pg_test]
-    fn test_prom_delta_success_case_one() {
-        let retval =
-            Spi::get_one::<Vec<f64>>("SELECT prom_delta('2000-01-02 15:00:00 UTC'::TIMESTAMPTZ, '2000-01-02 15:45:00 UTC'::TIMESTAMPTZ, 20 * 60 * 1000, 20 * 60 * 1000, t, v order by t) FROM gfd_test_table;")
-                .expect("SQL select failed");
+    fn test_prom_delta_success() {
+        setup();
+        let retval = Spi::get_one::<Vec<f64>>(&*prepare_query("'2000-01-02 15:00:00 UTC'", "t"))
+            .expect("SQL select failed");
         assert_eq!(retval, vec![200_f64, -150_f64]);
     }
 
     #[pg_test]
-    fn test_prom_delta_success_case_two() {
+    fn test_prom_delta_success_two() {
+        setup();
         let retval =
-            Spi::get_one::<Vec<Option<f64>>>("SELECT prom_delta('2000-01-02 14:15:00 UTC'::TIMESTAMPTZ, '2000-01-02 15:45:00 UTC'::TIMESTAMPTZ, 20 * 60 * 1000, 20 * 60 * 1000, t, v order by t) FROM gfd_test_table;")
+            Spi::get_one::<Vec<Option<f64>>>(&*prepare_query("'2000-01-02 14:15:00 UTC'", "t"))
                 .expect("SQL select failed");
         assert_eq!(retval, vec![None, None, Some(200_f64), Some(-50_f64)]);
     }

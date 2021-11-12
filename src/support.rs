@@ -1,20 +1,37 @@
-use crate::palloc::{Inner, InternalAsValue, ToInternal};
+use crate::palloc::ToInternal;
 use pgx::*;
+use std::ptr;
 
 // FIXME: This rough translation from C to Rust is _untested_ and probably broken
 
+/// This [support function] optimizes calls to the supported function if it's
+/// called with constant-like arguments. Such calls are transformed into a
+/// subquery of the function call. This allows the planner to make this call an
+/// InitPlan which is evaluated once per query instead of multiple times
+/// (e.g. on every tuple when the function is used in a WHERE clause).
+///
+/// An example of such a call is:
+///
+/// ```sql
+/// NOT(labels && ('namespace' !== 'dev'))
+/// ```
+///
+/// Which this support function transforms into:
+///
+/// ```sql
+/// NOT(labels && (SELECT 'namespace' !== 'dev'))
+/// ```
+///
+/// This should be used on any stable function that is often called with constant-like
+/// arguments.
+///
+/// [support function]: https://www.postgresql.org/docs/current/xfunc-optimization.html
 #[pg_extern(immutable, strict)]
 #[search_path(@extschema@)]
 pub unsafe fn make_call_subquery_support(input: Internal) -> Internal {
-    make_call_subquery_support_inner(input.to_inner()).internal()
-}
-
-pub unsafe fn make_call_subquery_support_inner(
-    input: Option<Inner<*mut pg_sys::Node>>,
-) -> Inner<*mut pg_sys::Node> {
-    let input: *mut pg_sys::Node = input.unwrap().cast();
+    let input: *mut pg_sys::Node = input.unwrap().unwrap() as _;
     if !pgx::is_a(input, pg_sys::NodeTag_T_SupportRequestSimplify) {
-        return (0 as *mut pg_sys::Node).into();
+        return ptr::null_mut::<pg_sys::Node>().internal();
     }
 
     let req: *mut pg_sys::SupportRequestSimplify = input.cast();
@@ -22,28 +39,25 @@ pub unsafe fn make_call_subquery_support_inner(
     let root = (*req).root;
 
     if root.is_null() {
-        return (0 as *mut pg_sys::Node).into();
+        return (ptr::null_mut::<pg_sys::Node>()).internal();
     }
 
-    /*
-     * This prevents recursion of this optimization when the subselect is
-     * planned
-     */
+    // This prevents recursion of this optimization when the subselect is planned
     if (*root).query_level > 1 {
-        return (0 as *mut pg_sys::Node).into();
+        return ptr::null_mut::<pg_sys::Node>().internal();
     }
 
     let expr = (*req).fcall;
 
     let original_args = PgList::<pg_sys::Node>::from_pg((*expr).args);
 
-    /* Check that these are expressions that don't reference
-    any vars, i.e. they are constants or expressions of constants */
-    if !original_args
+    // Check that these are expressions that don't reference any vars,
+    // i.e. they are constants or expressions of constants
+    let args_are_constants = original_args
         .iter_ptr()
-        .all(|arg| arg_can_be_put_into_subquery(arg))
-    {
-        return (0 as *mut pg_sys::Node).into();
+        .all(|arg| arg_can_be_put_into_subquery(arg));
+    if !args_are_constants {
+        return ptr::null_mut::<pg_sys::Node>().internal();
     }
 
     (*(*root).parse).hasSubLinks = true;
@@ -70,7 +84,7 @@ pub unsafe fn make_call_subquery_support_inner(
     sublink.subLinkId = 0;
     sublink.subselect = query.into_pg() as *mut pg_sys::Node;
 
-    return (sublink.into_pg() as *mut pg_sys::Node).into();
+    return (sublink.into_pg() as *mut pg_sys::Node).internal();
 }
 
 pub unsafe fn arg_can_be_put_into_subquery(arg: *mut pg_sys::Node) -> bool {
