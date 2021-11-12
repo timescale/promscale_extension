@@ -3,12 +3,19 @@ use pgx::*;
 use pgx::Internal;
 use serde::{Deserialize, Serialize};
 
-use crate::{Microseconds, Milliseconds, STALE_NAN, USECS_PER_MS, USECS_PER_SEC};
 use crate::palloc::{Inner, InternalAsValue};
 
 mod prom_delta;
 mod prom_increase;
 mod prom_rate;
+mod vector_selector;
+
+pub type Milliseconds = i64;
+pub type Microseconds = i64;
+
+pub const STALE_NAN: u64 = 0x7ff0000000000002;
+pub const USECS_PER_SEC: i64 = 1_000_000;
+pub const USECS_PER_MS: i64 = 1_000;
 
 #[pg_extern()]
 pub fn prom_delta_final(state: Internal) -> Option<Vec<Option<f64>>> {
