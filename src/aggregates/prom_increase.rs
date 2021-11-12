@@ -3,10 +3,9 @@ use pgx::Internal;
 use pgx::*;
 
 use crate::aggregate_utils::in_aggregate_context;
-use crate::aggregates::Milliseconds;
+use crate::aggregates::{GapfillDeltaTransition, Milliseconds};
 use crate::palloc::{Inner, InternalAsValue, ToInternal};
 use crate::raw::TimestampTz;
-use crate::GapfillDeltaTransition;
 
 #[allow(clippy:too_many_arguments)]
 #[pg_extern(immutable, parallel_safe)]
