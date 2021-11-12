@@ -11,8 +11,8 @@ use crate::palloc::{Inner, InternalAsValue, ToInternal};
 use crate::raw::{bytea, TimestampTz};
 
 mod aggregate_utils;
+mod aggregates;
 mod palloc;
-mod prom_agg;
 mod raw;
 mod support;
 mod type_builder;
@@ -75,66 +75,6 @@ pub fn prom_rate_transition_inner(
                     step_size,
                     true,
                     true,
-                )
-                .into();
-                state
-            });
-
-            state.add_data_point(time, val);
-
-            Some(state)
-        })
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-#[pg_extern(immutable, parallel_safe)]
-pub fn prom_increase_transition(
-    state: Internal,
-    lowest_time: TimestampTz,
-    greatest_time: TimestampTz,
-    step_size: Milliseconds, // `prev_now - step` is where the next window starts
-    range: Milliseconds,     // the size of a window to delta over
-    time: TimestampTz,
-    val: f64,
-    fc: pg_sys::FunctionCallInfo,
-) -> Internal {
-    prom_increase_transition_inner(
-        unsafe { state.to_inner() },
-        lowest_time.into(),
-        greatest_time.into(),
-        step_size,
-        range,
-        time.into(),
-        val,
-        fc,
-    )
-    .internal()
-}
-pub fn prom_increase_transition_inner(
-    state: Option<Inner<GapfillDeltaTransition>>,
-    lowest_time: pg_sys::TimestampTz,
-    greatest_time: pg_sys::TimestampTz,
-    step_size: Milliseconds, // `prev_now - step` is where the next window starts
-    range: Milliseconds,     // the size of a window to delta over
-    time: pg_sys::TimestampTz,
-    val: f64,
-    fc: pg_sys::FunctionCallInfo,
-) -> Option<Inner<GapfillDeltaTransition>> {
-    unsafe {
-        in_aggregate_context(fc, || {
-            if time < lowest_time || time > greatest_time {
-                error!("input time less than lowest time")
-            }
-
-            let mut state = state.unwrap_or_else(|| {
-                let state: Inner<_> = GapfillDeltaTransition::new(
-                    lowest_time,
-                    greatest_time,
-                    range,
-                    step_size,
-                    true,
-                    false,
                 )
                 .into();
                 state

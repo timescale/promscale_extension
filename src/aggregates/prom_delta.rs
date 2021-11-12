@@ -3,11 +3,11 @@ use pgx::*;
 use pgx::error;
 
 use crate::aggregate_utils::in_aggregate_context;
+use crate::aggregates::Milliseconds;
 use crate::palloc::{Inner, InternalAsValue, ToInternal};
 use crate::raw::TimestampTz;
 use crate::GapfillDeltaTransition;
 
-type Milliseconds = i64;
 
 // prom divides time into sliding windows of fixed size, e.g.
 // |  5 seconds  |  5 seconds  |  5 seconds  |  5 seconds  |  5 seconds  |
@@ -15,6 +15,7 @@ type Milliseconds = i64;
 // value for that bucket.
 //  | a b c d e | f g h i | j   k |   m    |
 //  |   e - a   |  i - f  | k - j | <null> |
+#[allow(clippy:too_many_arguments)]
 #[pg_extern(immutable, parallel_safe)]
 pub fn prom_delta_transition(
     state: Internal,
@@ -74,16 +75,8 @@ pub fn prom_delta_transition_inner(
     }
 }
 
-#[pg_extern()]
-pub fn prom_delta_final(state: Internal) -> Option<Vec<Option<f64>>> {
-    prom_delta_final_inner(unsafe { state.to_inner() })
-}
-pub fn prom_delta_final_inner(
-    state: Option<Inner<GapfillDeltaTransition>>,
-) -> Option<Vec<Option<f64>>> {
-    state.map(|mut s| s.to_vec())
-}
-
+// implementation of prometheus delta function
+// for proper behavior the input must be ORDER BY sample_time
 extension_sql!(
     r#"
 CREATE AGGREGATE @extschema@.prom_delta(
