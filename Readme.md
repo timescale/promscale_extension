@@ -23,7 +23,7 @@ For bare-metal installations, the full instructions for setting up PostgreSQL, T
 
 1) Install some necessary dependencies
     ```bash
-    sudo apt-get install -y wget gnupg2 lsb-release
+    sudo apt-get install -y wget curl gnupg2 lsb-release
     ```
 1) [Add the PostgreSQL APT repository (Ubuntu)](https://www.postgresql.org/download/linux/ubuntu/)
     ```bash
@@ -33,7 +33,7 @@ For bare-metal installations, the full instructions for setting up PostgreSQL, T
 1) Add the TimescaleDB APT repository
     ```bash
     echo "deb [signed-by=/usr/share/keyrings/timescale.keyring] https://packagecloud.io/timescale/timescaledb/ubuntu/ $(lsb_release -c -s) main" | sudo tee /etc/apt/sources.list.d/timescaledb.list
-    wget --quiet -O - https://packagecloud.io/timescale/timescaledb/gpgkey | sudo apt-key add -
+    wget --quiet -O - https://packagecloud.io/timescale/timescaledb/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/timescale.keyring
     ```
 1) Install PostgreSQL with TimescaleDB
     ```bash
@@ -51,7 +51,7 @@ For bare-metal installations, the full instructions for setting up PostgreSQL, T
     ```
 1) [Install rust](https://www.rust-lang.org/tools/install).
     ```bash
-    wget --quiet -O - https://sh.rustup.rs | sh
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
     source $HOME/.cargo/env
     ```
 1) Install the PGX framework
@@ -64,7 +64,7 @@ For bare-metal installations, the full instructions for setting up PostgreSQL, T
     ```
 1) Download this repo and change directory into it
     ```bash
-    wget --quiet -o "promscale_extension.zip" "https://github.com/timescale/promscale_extension/archive/refs/tags/0.3.0.zip"
+    curl -L -o "promscale_extension.zip" "https://github.com/timescale/promscale_extension/archive/refs/tags/0.3.0.zip"
     sudo apt-get install unzip
     unzip promscale_extension.zip
     cd promscale_extension-0.3.0
@@ -81,8 +81,8 @@ For bare-metal installations, the full instructions for setting up PostgreSQL, T
     ```
 1) [Download and run promscale (it will install the extension in the PostgreSQL database)](https://github.com/timescale/promscale/blob/master/docs/bare-metal-promscale-stack.md#2-deploying-promscale)
     ```bash
-    LATEST_VERSION=$(wget --quiet -O - https://api.github.com/repos/timescale/promscale/releases/latest | grep "tag_name" | cut -d'"' -f4)
-    wget --quiet -O promscale "https://github.com/timescale/promscale/releases/download/${LATEST_VERSION}/promscale_${LATEST_VERSION}_Linux_x86_64"
+    LATEST_VERSION=$(curl -s https://api.github.com/repos/timescale/promscale/releases/latest | grep "tag_name" | cut -d'"' -f4)
+    curl -L -o promscale "https://github.com/timescale/promscale/releases/download/${LATEST_VERSION}/promscale_${LATEST_VERSION}_Linux_x86_64"
     chmod +x promscale
     ./promscale --db-name promscale --db-password promscale --db-user promscale --db-ssl-mode allow --install-extensions
     ```
