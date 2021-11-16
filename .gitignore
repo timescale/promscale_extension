@@ -4,3 +4,4 @@ src/*.bc
 src/*.d
 promscale.so
 /target
+.idea/
