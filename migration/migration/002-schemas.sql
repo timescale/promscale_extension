@@ -1,6 +1,5 @@
 CALL SCHEMA_CATALOG.execute_everywhere('create_schemas', $ee$ DO $$ BEGIN
-
-    CREATE SCHEMA IF NOT EXISTS SCHEMA_CATALOG; -- catalog tables + internal functions
+    CREATE SCHEMA IF NOT EXISTS SCHEMA_CATALOG; -- this will be limited to metric and probably renamed in future
     GRANT USAGE ON SCHEMA SCHEMA_CATALOG TO prom_reader;
 
     CREATE SCHEMA IF NOT EXISTS SCHEMA_PROM; -- public functions
