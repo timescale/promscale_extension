@@ -104,70 +104,7 @@ pub unsafe fn arg_can_be_put_into_subquery(arg: *mut pg_sys::Node) -> bool {
 mod tests {
 
     use pgx::*;
-    use serde_json::{Value};
-
-    const CREATE_UNSUPPORTED_FUNCTION: &str = r#"
-        CREATE OR REPLACE FUNCTION arbitrary_function(key text, value text)
-        RETURNS text
-        AS $func$
-            SELECT key || value
-        $func$
-        LANGUAGE SQL STABLE PARALLEL SAFE;
-    "#;
-
-    // Note: This output can be obtained directly from postgres
-    const EXPECTED_PLAN_UNSUPPORTED: &str = r#"
-        [{
-            "Plan": {
-                "Alias": "gfs_test_table",
-                "Async Capable": false,
-                "Node Type": "Seq Scan",
-                "Parallel Aware": false,
-                "Relation Name": "gfs_test_table"
-            }
-        }]
-    "#;
-
-    const CREATE_SUPPORTED_FUNCTION: &str = r#"
-        CREATE OR REPLACE FUNCTION arbitrary_function(key text, value text)
-        RETURNS text
-        AS $func$
-            SELECT key || value
-        $func$
-        LANGUAGE SQL STABLE PARALLEL SAFE
-        SUPPORT make_call_subquery_support;
-    "#;
-
-    // Note: This output can be obtained directly from postgres
-    const EXPECTED_PLAN_SUPPORTED: &str = r#"
-        [
-          {
-            "Plan": {
-              "Node Type": "Result",
-              "Parallel Aware": false,
-              "Async Capable": false,
-              "One-Time Filter": "($0 = 'constvalue'::text)",
-              "Plans": [
-                {
-                  "Node Type": "Result",
-                  "Parent Relationship": "InitPlan",
-                  "Subplan Name": "InitPlan 1 (returns $0)",
-                  "Parallel Aware": false,
-                  "Async Capable": false
-                },
-                {
-                  "Node Type": "Seq Scan",
-                  "Parent Relationship": "Outer",
-                  "Parallel Aware": false,
-                  "Async Capable": false,
-                  "Relation Name": "gfs_test_table",
-                  "Alias": "gfs_test_table"
-                }
-              ]
-            }
-          }
-        ]
-    "#;
+    use serde_json::Value;
 
     fn setup() {
         Spi::run(
@@ -193,34 +130,101 @@ mod tests {
     #[pg_test]
     fn test_unsupported_function_output_as_expected() {
         setup();
-        Spi::run(CREATE_UNSUPPORTED_FUNCTION);
+        Spi::run(
+            r#"
+                CREATE OR REPLACE FUNCTION arbitrary_function(key text, value text)
+                RETURNS text
+                AS $func$
+                    SELECT key || value
+                $func$
+                LANGUAGE SQL STABLE PARALLEL SAFE;
+            "#,
+        );
         let result = Spi::get_one::<Json>(
             r#"
-            EXPLAIN (COSTS OFF, FORMAT JSON)
-                SELECT * FROM gfs_test_table WHERE arbitrary_function('const','value') = 'constvalue';
-            ;"#,
+                EXPLAIN (COSTS OFF, FORMAT JSON)
+                    SELECT * FROM gfs_test_table WHERE arbitrary_function('const','value') = 'constvalue';
+            "#,
         )
         .expect("SQL query failed");
+
         assert_eq!(
             result.0,
-            serde_json::from_str::<Value>(EXPECTED_PLAN_UNSUPPORTED).unwrap()
+            serde_json::from_str::<Value>(
+                // Note: This output can be obtained directly from postgres
+                r#"
+                    [{
+                        "Plan": {
+                            "Alias": "gfs_test_table",
+                            "Async Capable": false,
+                            "Node Type": "Seq Scan",
+                            "Parallel Aware": false,
+                            "Relation Name": "gfs_test_table"
+                        }
+                    }]
+                "#
+            )
+            .unwrap()
         );
     }
 
     #[pg_test]
     fn test_supported_function_output_as_expected() {
         setup();
-        Spi::run(CREATE_SUPPORTED_FUNCTION);
+        Spi::run(
+            r#"
+                CREATE OR REPLACE FUNCTION arbitrary_function(key text, value text)
+                RETURNS text
+                AS $func$
+                    SELECT key || value
+                $func$
+                LANGUAGE SQL STABLE PARALLEL SAFE
+                SUPPORT make_call_subquery_support;
+            "#,
+        );
         let result = Spi::get_one::<Json>(
             r#"
-            EXPLAIN (COSTS OFF, FORMAT JSON)
-                SELECT * FROM gfs_test_table WHERE arbitrary_function('const','value') = 'constvalue';
-            ;"#,
+                EXPLAIN (COSTS OFF, FORMAT JSON)
+                    SELECT * FROM gfs_test_table WHERE arbitrary_function('const','value') = 'constvalue';
+            "#,
         )
             .expect("SQL query failed");
+
         assert_eq!(
             result.0,
-            serde_json::from_str::<Value>(EXPECTED_PLAN_SUPPORTED).unwrap()
+            serde_json::from_str::<Value>(
+                // Note: This output can be obtained directly from postgres
+                r#"
+                    [
+                      {
+                        "Plan": {
+                          "Node Type": "Result",
+                          "Parallel Aware": false,
+                          "Async Capable": false,
+                          "One-Time Filter": "($0 = 'constvalue'::text)",
+                          "Plans": [
+                            {
+                              "Node Type": "Result",
+                              "Parent Relationship": "InitPlan",
+                              "Subplan Name": "InitPlan 1 (returns $0)",
+                              "Parallel Aware": false,
+                              "Async Capable": false
+                            },
+                            {
+                              "Node Type": "Seq Scan",
+                              "Parent Relationship": "Outer",
+                              "Parallel Aware": false,
+                              "Async Capable": false,
+                              "Relation Name": "gfs_test_table",
+                              "Alias": "gfs_test_table"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                "#
+            )
+            .unwrap()
         );
     }
 }
