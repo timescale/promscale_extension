@@ -1055,9 +1055,9 @@ dependencies = [
 
 [[package]]
 name = "pgx"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff7dda0222eb98f296cb099f4ada670356f1e106cc0547df24c32a6e74e35dff"
+checksum = "05afda51b125b4d6cd101c50f51cd09dbf968ad3a6d14d3533e53e474af7c058"
 dependencies = [
  "atomic-traits",
  "bitflags",
@@ -1083,9 +1083,9 @@ dependencies = [
 
 [[package]]
 name = "pgx-macros"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2903efe41e40c7b6aed4fae7a5bfc766a2239abdb61c36764514409e8afd2ec"
+checksum = "e5e052bcc9c551130b30806321cbc97958ee04189de24602dce0b53a92a1dc85"
 dependencies = [
  "pgx-utils",
  "proc-macro-crate",
@@ -1097,9 +1097,9 @@ dependencies = [
 
 [[package]]
 name = "pgx-pg-sys"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d98b9a9987180d7fabb622dd06688764f4b685f624ffdfdf0bbb125a84e44e0"
+checksum = "afae320962dbef5ccd08906823b61d0c2f062b878e95843977b4f79fda0f2d17"
 dependencies = [
  "bindgen",
  "build-deps",
@@ -1117,9 +1117,9 @@ dependencies = [
 
 [[package]]
 name = "pgx-tests"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef6bea5155c6256678b963034de61f4e4a1ae236ae67fc1924028caaf94586f1"
+checksum = "2613daf5279634fbdbaac5e13845d31c65a8ba04a4c107303011da8a79d53ad3"
 dependencies = [
  "colored",
  "lazy_static",
@@ -1137,9 +1137,9 @@ dependencies = [
 
 [[package]]
 name = "pgx-utils"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84a0782fb45ad451a22f7b4b7f4eeb37dab6008fa8723a2b248581460287a9e4"
+checksum = "98ed72f6ecc3ec6a8981c2c30ad4aa8a074cde3eaa2c13f9ed84c7462995f7a2"
 dependencies = [
  "clap",
  "color-eyre",
@@ -1276,14 +1276,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "promscale_rs"
-version = "0.3.0"
+name = "promscale"
+version = "0.3.1"
 dependencies = [
  "bincode",
  "pgx",
  "pgx-macros",
  "pgx-tests",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -1615,9 +1616,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.69"
+version = "1.0.70"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e466864e431129c7e0d3476b92f20458e5879919a0596c6472738d9fa2d342f8"
+checksum = "e277c495ac6cd1a01a58d0a0c574568b4d1ddf14f59965c6a58b8d96400b54f3"
 dependencies = [
  "itoa",
  "ryu",

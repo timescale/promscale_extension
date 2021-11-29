@@ -1,4 +1,7 @@
-use std::ptr::NonNull;
+use std::{
+    ops::{Deref, DerefMut},
+    ptr::NonNull,
+};
 
 use pgx::*;
 
@@ -10,59 +13,58 @@ pub unsafe fn in_memory_context<T, F: FnOnce() -> T>(mctx: pg_sys::MemoryContext
     t
 }
 
-pub struct Internal<T>(pub NonNull<T>);
+pub use pgx::Internal;
 
-impl<T> FromDatum for Internal<T> {
-    #[inline]
-    unsafe fn from_datum(
-        datum: pg_sys::Datum,
-        is_null: bool,
-        _: pg_sys::Oid,
-    ) -> Option<Internal<T>> {
-        if is_null {
-            return None;
-        }
+pub unsafe trait InternalAsValue {
+    unsafe fn to_inner<T>(self) -> Option<Inner<T>>;
+}
 
-        let ptr = datum as *mut T;
-        // FIXME it looks like timescale occasionally passes a 0 ptr as non-null
-        //       we special case 0-sized types to ensure that we still function
-        //       in that case
-        if std::mem::size_of::<T>() == 0 && ptr.is_null() {
-            return Some(Internal(NonNull::dangling()));
-        }
-        let nn = NonNull::new(ptr).unwrap_or_else(|| {
-            panic!("Internal-type Datum flagged not null but its datum is zero")
-        });
-        Some(Internal(nn))
+unsafe impl InternalAsValue for Internal {
+    unsafe fn to_inner<T>(self) -> Option<Inner<T>> {
+        self.unwrap().map(|p| Inner(NonNull::new(p as _).unwrap()))
     }
 }
 
-impl<T> IntoDatum for Internal<T> {
-    fn into_datum(self) -> Option<pg_sys::Datum> {
-        Some(self.0.as_ptr() as pg_sys::Datum)
-    }
-
-    fn type_oid() -> pg_sys::Oid {
-        pg_sys::INTERNALOID
-    }
+pub unsafe trait ToInternal {
+    fn internal(self) -> Internal;
 }
 
-impl<T> From<T> for Internal<T> {
-    fn from(t: T) -> Self {
-        let ptr = pgx::Internal::new(t).unwrap().unwrap();
-        Internal::<T>(NonNull::new(ptr as _).unwrap())
-    }
-}
+pub struct Inner<T>(pub NonNull<T>);
 
-impl<T> std::ops::Deref for Internal<T> {
+impl<T> Deref for Inner<T> {
     type Target = T;
+
     fn deref(&self) -> &Self::Target {
         unsafe { self.0.as_ref() }
     }
 }
 
-impl<T> std::ops::DerefMut for Internal<T> {
+impl<T> DerefMut for Inner<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { self.0.as_mut() }
+    }
+}
+
+unsafe impl<T> ToInternal for Option<Inner<T>> {
+    fn internal(self) -> Internal {
+        self.map(|p| p.0.as_ptr() as pg_sys::Datum).into()
+    }
+}
+
+unsafe impl<T> ToInternal for Inner<T> {
+    fn internal(self) -> Internal {
+        Some(self.0.as_ptr() as pg_sys::Datum).into()
+    }
+}
+
+impl<T> From<T> for Inner<T> {
+    fn from(t: T) -> Self {
+        unsafe { Internal::new(t).to_inner().unwrap() }
+    }
+}
+
+unsafe impl<T> ToInternal for *mut T {
+    fn internal(self) -> Internal {
+        Internal::from(Some(self as pg_sys::Datum))
     }
 }
