@@ -2,15 +2,22 @@ use std::collections::VecDeque;
 
 use pgx::*;
 
-use pgx::{error, pg_sys::TimestampTz};
+use pgx::error;
+
+use aggregate_utils::in_aggregate_context;
+use serde::{Deserialize, Serialize};
+
+use crate::palloc::{Inner, InternalAsValue, ToInternal};
+use crate::raw::{bytea, TimestampTz};
 
 mod aggregate_utils;
 mod palloc;
+mod prom_agg;
+mod raw;
+mod support;
 mod type_builder;
 
-use aggregate_utils::in_aggregate_context;
-
-use palloc::Internal;
+pg_module_magic!();
 
 type Milliseconds = i64;
 type Microseconds = i64;
@@ -19,54 +26,10 @@ const USECS_PER_MS: i64 = 1_000;
 
 const STALE_NAN: u64 = 0x7ff0000000000002;
 
-// prom divides time into sliding windows of fixed size, e.g.
-// |  5 seconds  |  5 seconds  |  5 seconds  |  5 seconds  |  5 seconds  |
-// we take the first and last values in that bucket and uses `last-first` as the
-// value for that bucket.
-//  | a b c d e | f g h i | j   k |   m    |
-//  |   e - a   |  i - f  | k - j | <null> |
-#[allow(clippy::too_many_arguments)]
-#[pg_extern(immutable, parallel_safe)]
-pub fn prom_delta_transition(
-    state: Option<Internal<GapfillDeltaTransition>>,
-    lowest_time: TimestampTz,
-    greatest_time: TimestampTz,
-    step_size: Milliseconds, // `prev_now - step` is where the next window starts
-    range: Milliseconds,     // the size of a window to delta over
-    time: TimestampTz,
-    val: f64,
-    fc: pg_sys::FunctionCallInfo,
-) -> Option<Internal<GapfillDeltaTransition>> {
-    unsafe {
-        in_aggregate_context(fc, || {
-            if time < lowest_time || time > greatest_time {
-                error!("input time less than lowest time")
-            }
-
-            let mut state = state.unwrap_or_else(|| {
-                let state: Internal<_> = GapfillDeltaTransition::new(
-                    lowest_time,
-                    greatest_time,
-                    range,
-                    step_size,
-                    false,
-                    false,
-                )
-                .into();
-                state
-            });
-
-            state.add_data_point(time, val);
-
-            Some(state)
-        })
-    }
-}
-
 #[allow(clippy::too_many_arguments)]
 #[pg_extern(immutable, parallel_safe)]
 pub fn prom_rate_transition(
-    state: Option<Internal<GapfillDeltaTransition>>,
+    state: Internal,
     lowest_time: TimestampTz,
     greatest_time: TimestampTz,
     step_size: Milliseconds,
@@ -74,7 +37,30 @@ pub fn prom_rate_transition(
     time: TimestampTz,
     val: f64,
     fc: pg_sys::FunctionCallInfo,
-) -> Option<Internal<GapfillDeltaTransition>> {
+) -> Internal {
+    prom_rate_transition_inner(
+        unsafe { state.to_inner() },
+        lowest_time.into(),
+        greatest_time.into(),
+        step_size,
+        range,
+        time.into(),
+        val,
+        fc,
+    )
+    .internal()
+}
+
+pub fn prom_rate_transition_inner(
+    state: Option<Inner<GapfillDeltaTransition>>,
+    lowest_time: pg_sys::TimestampTz,
+    greatest_time: pg_sys::TimestampTz,
+    step_size: Milliseconds,
+    range: Milliseconds, // the size of a window to calculate over
+    time: pg_sys::TimestampTz,
+    val: f64,
+    fc: pg_sys::FunctionCallInfo,
+) -> Option<Inner<GapfillDeltaTransition>> {
     unsafe {
         in_aggregate_context(fc, || {
             if time < lowest_time || time > greatest_time {
@@ -82,7 +68,7 @@ pub fn prom_rate_transition(
             }
 
             let mut state = state.unwrap_or_else(|| {
-                let state: Internal<_> = GapfillDeltaTransition::new(
+                let state: Inner<_> = GapfillDeltaTransition::new(
                     lowest_time,
                     greatest_time,
                     range,
@@ -104,7 +90,7 @@ pub fn prom_rate_transition(
 #[allow(clippy::too_many_arguments)]
 #[pg_extern(immutable, parallel_safe)]
 pub fn prom_increase_transition(
-    state: Option<Internal<GapfillDeltaTransition>>,
+    state: Internal,
     lowest_time: TimestampTz,
     greatest_time: TimestampTz,
     step_size: Milliseconds, // `prev_now - step` is where the next window starts
@@ -112,7 +98,29 @@ pub fn prom_increase_transition(
     time: TimestampTz,
     val: f64,
     fc: pg_sys::FunctionCallInfo,
-) -> Option<Internal<GapfillDeltaTransition>> {
+) -> Internal {
+    prom_increase_transition_inner(
+        unsafe { state.to_inner() },
+        lowest_time.into(),
+        greatest_time.into(),
+        step_size,
+        range,
+        time.into(),
+        val,
+        fc,
+    )
+    .internal()
+}
+pub fn prom_increase_transition_inner(
+    state: Option<Inner<GapfillDeltaTransition>>,
+    lowest_time: pg_sys::TimestampTz,
+    greatest_time: pg_sys::TimestampTz,
+    step_size: Milliseconds, // `prev_now - step` is where the next window starts
+    range: Milliseconds,     // the size of a window to delta over
+    time: pg_sys::TimestampTz,
+    val: f64,
+    fc: pg_sys::FunctionCallInfo,
+) -> Option<Inner<GapfillDeltaTransition>> {
     unsafe {
         in_aggregate_context(fc, || {
             if time < lowest_time || time > greatest_time {
@@ -120,7 +128,7 @@ pub fn prom_increase_transition(
             }
 
             let mut state = state.unwrap_or_else(|| {
-                let state: Internal<_> = GapfillDeltaTransition::new(
+                let state: Inner<_> = GapfillDeltaTransition::new(
                     lowest_time,
                     greatest_time,
                     range,
@@ -139,31 +147,24 @@ pub fn prom_increase_transition(
     }
 }
 
-#[pg_extern()]
-pub fn prom_delta_final(
-    state: Option<Internal<GapfillDeltaTransition>>,
-) -> Option<Vec<Option<f64>>> {
-    state.map(|mut s| s.to_vec())
-}
-
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, PostgresType, Debug)]
 pub struct GapfillDeltaTransition {
-    window: VecDeque<(TimestampTz, f64)>,
+    window: VecDeque<(pg_sys::TimestampTz, f64)>,
     // a Datum for each index in the array, 0 by convention if the value is NULL
     deltas: Vec<Option<f64>>,
-    current_window_max: TimestampTz,
-    current_window_min: TimestampTz,
+    current_window_max: pg_sys::TimestampTz,
+    current_window_min: pg_sys::TimestampTz,
     step_size: Microseconds,
     range: Microseconds,
-    greatest_time: TimestampTz,
+    greatest_time: pg_sys::TimestampTz,
     is_counter: bool,
     is_rate: bool,
 }
 
 impl GapfillDeltaTransition {
     pub fn new(
-        lowest_time: TimestampTz,
-        greatest_time: TimestampTz,
+        lowest_time: pg_sys::TimestampTz,
+        greatest_time: pg_sys::TimestampTz,
         range: Milliseconds,
         step_size: Milliseconds,
         is_counter: bool,
@@ -186,7 +187,7 @@ impl GapfillDeltaTransition {
         }
     }
 
-    fn add_data_point(&mut self, time: TimestampTz, val: f64) {
+    fn add_data_point(&mut self, time: pg_sys::TimestampTz, val: f64) {
         // skip stale NaNs
         if val.to_bits() == STALE_NAN {
             return;
@@ -204,7 +205,7 @@ impl GapfillDeltaTransition {
         }
     }
 
-    fn in_current_window(&self, time: TimestampTz) -> bool {
+    fn in_current_window(&self, time: pg_sys::TimestampTz) -> bool {
         time <= self.current_window_max
     }
 
@@ -317,40 +318,41 @@ impl GapfillDeltaTransition {
 // Note that for performance, this aggregate is parallel-izable, combinable, and does not expect ordered inputs.
 #[pg_extern(immutable, parallel_safe)]
 pub fn vector_selector_transition(
+    state: Internal,
+    start_time: TimestampTz,
+    end_time: TimestampTz,
+    bucket_width: Milliseconds,
+    lookback: Milliseconds,
+    time: TimestampTz,
+    value: f64,
     fcinfo: pg_sys::FunctionCallInfo,
-) -> Option<Internal<VectorSelector>> {
-    let fcinfo = unsafe { fcinfo.as_mut() }.unwrap();
-    let nargs = fcinfo.nargs;
-    let len = std::mem::size_of::<pg_sys::NullableDatum>() * nargs as usize;
-    let args = unsafe { fcinfo.args.as_slice(len) };
-
-    let state = unsafe { Internal::from_datum(args[0].value, args[0].isnull, pg_sys::INTERNALOID) };
-    let start_time =
-        unsafe { TimestampTz::from_datum(args[1].value, args[1].isnull, pg_sys::TIMESTAMPTZOID) }
-            .unwrap_or_else(|| error!("start_time is null"));
-    let end_time =
-        unsafe { TimestampTz::from_datum(args[2].value, args[2].isnull, pg_sys::TIMESTAMPTZOID) }
-            .unwrap_or_else(|| error!("end_time is null"));
-
-    let bucket_width =
-        unsafe { Milliseconds::from_datum(args[3].value, args[3].isnull, pg_sys::INT8OID) }
-            .unwrap_or_else(|| error!("bucket_width is null"));
-
-    let lookback =
-        unsafe { Milliseconds::from_datum(args[4].value, args[4].isnull, pg_sys::INT8OID) }
-            .unwrap_or_else(|| error!("lookback is null"));
-
-    let time =
-        unsafe { TimestampTz::from_datum(args[5].value, args[5].isnull, pg_sys::TIMESTAMPTZOID) }
-            .unwrap_or_else(|| error!("time is null"));
-
-    let value = unsafe { f64::from_datum(args[6].value, args[6].isnull, pg_sys::FLOAT8OID) }
-        .unwrap_or_else(|| error!("value is null"));
-
+) -> Internal {
+    vector_selector_transition_inner(
+        unsafe { state.to_inner() },
+        start_time.into(),
+        end_time.into(),
+        bucket_width,
+        lookback,
+        time.into(),
+        value,
+        fcinfo,
+    )
+    .internal()
+}
+pub fn vector_selector_transition_inner(
+    state: Option<Inner<VectorSelector>>,
+    start_time: pg_sys::TimestampTz,
+    end_time: pg_sys::TimestampTz,
+    bucket_width: Milliseconds,
+    lookback: Milliseconds,
+    time: pg_sys::TimestampTz,
+    value: f64,
+    fcinfo: pg_sys::FunctionCallInfo,
+) -> Option<Inner<VectorSelector>> {
     unsafe {
         in_aggregate_context(fcinfo, || {
             let mut state = state.unwrap_or_else(|| {
-                let state: Internal<_> =
+                let state: Inner<VectorSelector> =
                     VectorSelector::new(start_time, end_time, bucket_width, lookback).into();
                 state
             });
@@ -363,32 +365,43 @@ pub fn vector_selector_transition(
 }
 
 #[pg_extern(immutable, parallel_safe)]
-pub fn vector_selector_final(state: Option<Internal<VectorSelector>>) -> Option<Vec<Option<f64>>> {
-    state.map(|s| s.to_pg_array())
+pub fn vector_selector_final(state: Internal /* Option<Inner<VectorSelector>> */) -> Internal /* Option<Vec<Option<f64>>> */
+{
+    let state: Option<Inner<VectorSelector>> = unsafe { state.to_inner() };
+    let res = state.map(|s| s.to_pg_array());
+    Inner::from(res).internal()
 }
 
-#[allow(non_camel_case_types)]
-pub type bytea = pg_sys::Datum;
-
 #[pg_extern(immutable, parallel_safe)]
-pub fn vector_selector_serialize(state: Internal<VectorSelector>) -> bytea {
+pub fn vector_selector_serialize(state: Internal) -> bytea {
+    let state: &mut VectorSelector = unsafe { state.get_mut().unwrap() };
     crate::do_serialize!(state)
 }
 
 #[pg_extern(immutable, parallel_safe)]
-pub fn vector_selector_deserialize(
-    bytes: bytea,
-    _internal: Option<Internal<()>>,
-) -> Internal<VectorSelector> {
-    crate::do_deserialize!(bytes, VectorSelector)
+pub fn vector_selector_deserialize(bytes: bytea, _internal: Internal) -> Internal {
+    let v: VectorSelector = crate::do_deserialize!(bytes, VectorSelector);
+    Inner::from(v).internal()
 }
 
 #[pg_extern(immutable, parallel_safe)]
 pub fn vector_selector_combine(
-    state1: Option<Internal<VectorSelector>>,
-    state2: Option<Internal<VectorSelector>>,
+    state1: Internal,
+    state2: Internal,
     fcinfo: pg_sys::FunctionCallInfo,
-) -> Option<Internal<VectorSelector>> {
+) -> Internal {
+    vector_selector_combine_inner(
+        unsafe { state1.to_inner() },
+        unsafe { state2.to_inner() },
+        fcinfo,
+    )
+    .internal()
+}
+pub fn vector_selector_combine_inner(
+    state1: Option<Inner<VectorSelector>>,
+    state2: Option<Inner<VectorSelector>>,
+    fcinfo: pg_sys::FunctionCallInfo,
+) -> Option<Inner<VectorSelector>> {
     unsafe {
         in_aggregate_context(fcinfo, || {
             match (state1, state2) {
@@ -417,20 +430,20 @@ pub fn vector_selector_combine(
 //bucket (inclusive). The minimum value is defined by the maximum value of
 //the previous bucket (exclusive).
 //the value stored inside the bucket is the last sample in the bucket (sample with highest timestamp)
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VectorSelector {
-    first_bucket_max_time: TimestampTz,
-    last_bucket_max_time: TimestampTz,
-    end_time: TimestampTz, //only used for error checking
+    first_bucket_max_time: pg_sys::TimestampTz,
+    last_bucket_max_time: pg_sys::TimestampTz,
+    end_time: pg_sys::TimestampTz, //only used for error checking
     bucket_width: Milliseconds,
     lookback: Milliseconds,
-    elements: Vec<Option<(TimestampTz, f64)>>,
+    elements: Vec<Option<(pg_sys::TimestampTz, f64)>>,
 }
 
 impl VectorSelector {
     pub fn new(
-        start_time: TimestampTz,
-        end_time: TimestampTz,
+        start_time: pg_sys::TimestampTz,
+        end_time: pg_sys::TimestampTz,
         bucket_width: Milliseconds,
         lookback: Milliseconds,
     ) -> Self {
@@ -449,7 +462,7 @@ impl VectorSelector {
         }
     }
 
-    fn combine(&mut self, other: &Internal<VectorSelector>) {
+    fn combine(&mut self, other: &Inner<VectorSelector>) {
         if self.first_bucket_max_time != other.first_bucket_max_time
             || self.last_bucket_max_time != other.last_bucket_max_time
             || self.end_time != other.end_time
@@ -467,8 +480,8 @@ impl VectorSelector {
                 (Some(_), None) => (),
                 (None, Some(other)) => *s = Some(*other),
                 (Some(mine), Some(other)) => {
-                    let (my_t, _): (TimestampTz, f64) = mine;
-                    let (other_t, _): (TimestampTz, f64) = *other;
+                    let (my_t, _): (pg_sys::TimestampTz, f64) = mine;
+                    let (other_t, _): (pg_sys::TimestampTz, f64) = *other;
                     if other_t > my_t {
                         *s = Some(*other)
                     }
@@ -477,7 +490,7 @@ impl VectorSelector {
         }
     }
 
-    fn insert(&mut self, time: TimestampTz, val: f64) {
+    fn insert(&mut self, time: pg_sys::TimestampTz, val: f64) {
         if time > self.end_time {
             error!("input time greater than expected")
         }
@@ -499,7 +512,7 @@ impl VectorSelector {
         }
     }
 
-    fn get_bucket(&self, time: TimestampTz) -> usize {
+    fn get_bucket(&self, time: pg_sys::TimestampTz) -> usize {
         if time < self.first_bucket_max_time - (self.lookback * USECS_PER_MS) {
             error!("input time less than expected")
         }
@@ -538,7 +551,7 @@ impl VectorSelector {
                 /* if current bucket is empty, last value may still apply */
                 None => {
                     if let Some(tuple) = last {
-                        let (t, v): (TimestampTz, f64) = tuple;
+                        let (t, v): (pg_sys::TimestampTz, f64) = tuple;
                         if t >= ts - (self.lookback * USECS_PER_MS) && v.to_bits() != STALE_NAN {
                             pushed = true;
                             vals.push(Some(v));
@@ -546,7 +559,7 @@ impl VectorSelector {
                     }
                 }
                 Some(tuple) => {
-                    let (t, v2): &(TimestampTz, f64) = tuple;
+                    let (t, v2): &(pg_sys::TimestampTz, f64) = tuple;
                     //if buckets > lookback, timestamp in bucket may still be out of lookback
                     if *t >= ts - (self.lookback * USECS_PER_MS) && v2.to_bits() != STALE_NAN {
                         pushed = true;
@@ -570,24 +583,37 @@ impl VectorSelector {
     }
 }
 
-extension_sql!(
-    r#"
-CREATE AGGREGATE vector_selector(
-    start_time timestamptz,
-    end_time timestamptz,
-    bucket_width bigint,
-    lookback bigint,
-    sample_time timestamptz,
-    sample_value DOUBLE PRECISION)
-(
-    sfunc = vector_selector_transition,
-    stype = internal,
-    finalfunc = vector_selector_final,
-    combinefunc = vector_selector_combine,
-    serialfunc = vector_selector_serialize,
-    deserialfunc = vector_selector_deserialize,
-    parallel = safe
-);
-"#,
-    name = "create_aggregate_vector_selector"
-);
+// extension_sql!(
+//     r#"
+// CREATE AGGREGATE vector_selector(
+//     start_time timestamptz,
+//     end_time timestamptz,
+//     bucket_width bigint,
+//     lookback bigint,
+//     sample_time timestamptz,
+//     sample_value DOUBLE PRECISION)
+// (
+//     sfunc = vector_selector_transition,
+//     stype = internal,
+//     finalfunc = vector_selector_final,
+//     combinefunc = vector_selector_combine,
+//     serialfunc = vector_selector_serialize,
+//     deserialfunc = vector_selector_deserialize,
+//     parallel = safe
+// );
+// "#,
+//     name = "create_aggregate_vector_selector"
+// );
+
+#[cfg(test)]
+#[pg_schema]
+pub mod pg_test {
+    pub fn setup(_options: Vec<&str>) {
+        // perform one-off initialization when the pg_test framework starts
+    }
+
+    pub fn postgresql_conf_options() -> Vec<&'static str> {
+        // return any postgresql.conf settings that are required for your tests
+        vec![]
+    }
+}

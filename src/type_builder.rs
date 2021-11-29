@@ -49,7 +49,7 @@ macro_rules! do_serialize {
                 let len = writer.position().try_into().expect("serialized size too large");
                 ::pgx::set_varsize(writer.get_mut().as_mut_ptr() as *mut _, len);
             }
-            writer.into_inner().as_mut_ptr() as pg_sys::Datum
+            bytea::from(writer.into_inner().as_mut_ptr() as pg_sys::Datum)
         }
     };
 }
@@ -59,7 +59,9 @@ macro_rules! do_deserialize {
         use $crate::type_builder::SerializationType;
 
         let state: $t = unsafe {
-            let detoasted = pg_sys::pg_detoast_datum_packed($bytes as *mut _);
+            let input: bytea = $bytes;
+            let input: pgx::pg_sys::Datum = input.into();
+            let detoasted = pg_sys::pg_detoast_datum_packed(input as *mut _);
             let len = pgx::varsize_any_exhdr(detoasted);
             let data = pgx::vardata_any(detoasted);
             let bytes = std::slice::from_raw_parts(data as *mut u8, len);
