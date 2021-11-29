@@ -25,6 +25,7 @@ const STALE_NAN: u64 = 0x7ff0000000000002;
 // value for that bucket.
 //  | a b c d e | f g h i | j   k |   m    |
 //  |   e - a   |  i - f  | k - j | <null> |
+#[allow(clippy::too_many_arguments)]
 #[pg_extern(immutable, parallel_safe)]
 pub fn prom_delta_transition(
     state: Option<Internal<GapfillDeltaTransition>>,
@@ -62,6 +63,7 @@ pub fn prom_delta_transition(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 #[pg_extern(immutable, parallel_safe)]
 pub fn prom_rate_transition(
     state: Option<Internal<GapfillDeltaTransition>>,
@@ -99,6 +101,7 @@ pub fn prom_rate_transition(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 #[pg_extern(immutable, parallel_safe)]
 pub fn prom_increase_transition(
     state: Option<Internal<GapfillDeltaTransition>>,
@@ -287,10 +290,10 @@ impl GapfillDeltaTransition {
             extrapolate_to_interval += avg_duration_between_samples / 2.0
         }
 
-        result_val = result_val * (extrapolate_to_interval / sampled_interval);
+        result_val *= extrapolate_to_interval / sampled_interval;
 
         if self.is_rate {
-            result_val = result_val / (self.range / USECS_PER_SEC) as f64
+            result_val /= (self.range / USECS_PER_SEC) as f64
         }
 
         self.deltas.push(Some(result_val));
@@ -300,7 +303,7 @@ impl GapfillDeltaTransition {
         while self.current_window_max <= self.greatest_time {
             self.flush_current_window();
         }
-        return self.deltas.clone();
+        self.deltas.clone()
     }
 }
 
@@ -438,10 +441,10 @@ impl VectorSelector {
 
         VectorSelector {
             first_bucket_max_time: start_time,
-            last_bucket_max_time: last_bucket_max_time,
-            end_time: end_time,
-            bucket_width: bucket_width,
-            lookback: lookback,
+            last_bucket_max_time,
+            end_time,
+            bucket_width,
+            lookback,
             elements: vec![None; num_buckets as usize],
         }
     }
@@ -533,16 +536,15 @@ impl VectorSelector {
             let mut pushed = false;
             match content {
                 /* if current bucket is empty, last value may still apply */
-                None => match last {
-                    Some(tuple) => {
+                None => {
+                    if let Some(tuple) = last {
                         let (t, v): (TimestampTz, f64) = tuple;
                         if t >= ts - (self.lookback * USECS_PER_MS) && v.to_bits() != STALE_NAN {
                             pushed = true;
                             vals.push(Some(v));
                         }
                     }
-                    None => (),
-                },
+                }
                 Some(tuple) => {
                     let (t, v2): &(TimestampTz, f64) = tuple;
                     //if buckets > lookback, timestamp in bucket may still be out of lookback
@@ -557,7 +559,7 @@ impl VectorSelector {
                 //push a null
                 vals.push(None);
             }
-            ts = ts + (self.bucket_width * USECS_PER_MS)
+            ts += self.bucket_width * USECS_PER_MS
         }
 
         vals
