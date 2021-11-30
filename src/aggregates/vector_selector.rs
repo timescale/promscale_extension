@@ -312,6 +312,7 @@ impl VectorSelector {
 #[pg_schema]
 mod tests {
     use pgx::*;
+    use serde_json::Value;
 
     fn setup() {
         Spi::run(
@@ -334,7 +335,7 @@ mod tests {
     }
 
     #[pg_test]
-    fn test_vector_selector() {
+    fn test_vector_selector_bucket_and_lookback_size_exact_match_beginning_end() {
         setup();
         let result = Spi::get_one::<Vec<Option<f64>>>(
             r#"
@@ -354,7 +355,7 @@ mod tests {
     }
 
     #[pg_test]
-    fn test_vector_selector_three() {
+    fn test_vector_selector_start_end_not_aligned_with_table_data() {
         setup();
         let result = Spi::get_one::<Vec<Option<f64>>>(
             r#"
@@ -374,7 +375,7 @@ mod tests {
     }
 
     #[pg_test]
-    fn test_vector_selector_two() {
+    fn test_vector_selector_smaller_bucket_and_lookback_size() {
         setup();
         let result = Spi::get_one::<Vec<Option<f64>>>(
             r#"
@@ -390,6 +391,94 @@ mod tests {
             ;"#,
         )
         .expect("SQL query failed");
+        assert_eq!(
+            result,
+            vec![
+                Some(0_f64),
+                Some(20_f64),
+                Some(40_f64),
+                Some(60_f64),
+                Some(80_f64),
+                Some(100_f64)
+            ]
+        );
+    }
+
+    #[pg_test]
+    fn test_vector_selector_parallel_execution_smaller_bucket_lookback() {
+        setup();
+
+        // Force parallel execution
+        Spi::run(
+            r#"
+            SET max_parallel_workers = 6;
+            SET max_parallel_workers_per_gather = 6;
+            SET parallel_leader_participation = off;
+            SET parallel_tuple_cost = 0;
+            SET parallel_setup_cost = 0;
+            SET min_parallel_table_scan_size = 0;
+            "#,
+        );
+
+        let query = r#"
+            SELECT
+                vector_selector(
+                  '2000-01-02T15:00:00+00:00'::TIMESTAMPTZ
+                , '2000-01-02T15:50:00+00:00'::TIMESTAMPTZ
+                , 10 * 60 * 1000
+                , 10 * 60 * 1000
+                , t
+                , v order by t)
+            FROM gfv_test_table
+            ;"#;
+
+        let parallel_plan =
+            Spi::get_one::<Json>(format!("EXPLAIN (COSTS OFF, FORMAT JSON) {}", query).as_str())
+                .expect("SQL query failed");
+
+        // Assert that we're running in parallel mode.
+        // Note: this query plan is specific to PG14.
+        assert_eq!(
+            parallel_plan.0,
+            serde_json::from_str::<Value>(
+                r#"
+                [
+                  {
+                    "Plan": {
+                      "Node Type": "Aggregate",
+                      "Strategy": "Plain",
+                      "Partial Mode": "Simple",
+                      "Parallel Aware": false,
+                      "Async Capable": false,
+                      "Plans": [
+                        {
+                          "Node Type": "Gather",
+                          "Parent Relationship": "Outer",
+                          "Parallel Aware": false,
+                          "Async Capable": false,
+                          "Workers Planned": 3,
+                          "Single Copy": false,
+                          "Plans": [
+                            {
+                              "Node Type": "Seq Scan",
+                              "Parent Relationship": "Outer",
+                              "Parallel Aware": true,
+                              "Async Capable": false,
+                              "Relation Name": "gfv_test_table",
+                              "Alias": "gfv_test_table"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                ]
+                "#
+            )
+            .unwrap()
+        );
+
+        let result = Spi::get_one::<Vec<Option<f64>>>(query).expect("SQL query failed");
         assert_eq!(
             result,
             vec![
