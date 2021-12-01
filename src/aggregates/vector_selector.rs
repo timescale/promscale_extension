@@ -74,13 +74,18 @@ pub fn vector_selector_final(
     state.map(|s| s.to_pg_array())
 }
 
-#[pg_extern(immutable, parallel_safe)]
+#[pg_extern(immutable, parallel_safe, strict)]
 pub fn vector_selector_serialize(state: Internal) -> bytea {
-    let state: &mut VectorSelector = unsafe { state.get_mut().unwrap() };
+    let state: &mut VectorSelector = unsafe {
+        // This is safe as long as this function is defined as `strict`, in
+        // which case PG knows that NULL -> NULL and so it will not call this
+        // function with NULL values
+        state.get_mut().unwrap()
+    };
     crate::do_serialize!(state)
 }
 
-#[pg_extern(immutable, parallel_safe)]
+#[pg_extern(immutable, parallel_safe, strict)]
 pub fn vector_selector_deserialize(bytes: bytea, _internal: Internal) -> Internal {
     let v: VectorSelector = crate::do_deserialize!(bytes, VectorSelector);
     Inner::from(v).internal()
@@ -405,6 +410,41 @@ mod tests {
     }
 
     #[pg_test]
+    fn test_vector_selector_smaller_bucket_and_lookback_size_randomized_input() {
+        setup();
+        Spi::run(
+            r#"
+            CREATE TABLE gfv_rand_test_table AS SELECT * FROM gfv_test_table ORDER BY RANDOM();
+            "#,
+        );
+        let result = Spi::get_one::<Vec<Option<f64>>>(
+            r#"
+            SELECT
+                vector_selector(
+                  '2000-01-02T15:00:00+00:00'::TIMESTAMPTZ
+                , '2000-01-02T15:50:00+00:00'::TIMESTAMPTZ
+                , 10 * 60 * 1000
+                , 10 * 60 * 1000
+                , t
+                , v)
+            FROM gfv_rand_test_table
+            ;"#,
+        )
+        .expect("SQL query failed");
+        assert_eq!(
+            result,
+            vec![
+                Some(0_f64),
+                Some(20_f64),
+                Some(40_f64),
+                Some(60_f64),
+                Some(80_f64),
+                Some(100_f64)
+            ]
+        );
+    }
+
+    #[pg_test]
     fn test_vector_selector_parallel_execution_smaller_bucket_lookback() {
         setup();
 
@@ -428,7 +468,7 @@ mod tests {
                 , 10 * 60 * 1000
                 , 10 * 60 * 1000
                 , t
-                , v order by t)
+                , v)
             FROM gfv_test_table
             ;"#;
 
@@ -442,37 +482,47 @@ mod tests {
             parallel_plan.0,
             serde_json::from_str::<Value>(
                 r#"
-                [
-                  {
-                    "Plan": {
-                      "Node Type": "Aggregate",
-                      "Strategy": "Plain",
-                      "Partial Mode": "Simple",
-                      "Parallel Aware": false,
-                      "Async Capable": false,
-                      "Plans": [
-                        {
-                          "Node Type": "Gather",
-                          "Parent Relationship": "Outer",
-                          "Parallel Aware": false,
-                          "Async Capable": false,
-                          "Workers Planned": 3,
-                          "Single Copy": false,
-                          "Plans": [
-                            {
-                              "Node Type": "Seq Scan",
-                              "Parent Relationship": "Outer",
-                              "Parallel Aware": true,
-                              "Async Capable": false,
-                              "Relation Name": "gfv_test_table",
-                              "Alias": "gfv_test_table"
-                            }
-                          ]
-                        }
-                      ]
-                    }
-                  }
-                ]
+                 [
+                   {
+                     "Plan": {
+                       "Node Type": "Aggregate",
+                       "Strategy": "Plain",
+                       "Partial Mode": "Finalize",
+                       "Parallel Aware": false,
+                       "Async Capable": false,
+                       "Plans": [
+                         {
+                           "Node Type": "Gather",
+                           "Parent Relationship": "Outer",
+                           "Parallel Aware": false,
+                           "Async Capable": false,
+                           "Workers Planned": 3,
+                           "Single Copy": false,
+                           "Plans": [
+                             {
+                               "Node Type": "Aggregate",
+                               "Strategy": "Plain",
+                               "Partial Mode": "Partial",
+                               "Parent Relationship": "Outer",
+                               "Parallel Aware": false,
+                               "Async Capable": false,
+                               "Plans": [
+                                 {
+                                   "Node Type": "Seq Scan",
+                                   "Parent Relationship": "Outer",
+                                   "Parallel Aware": true,
+                                   "Async Capable": false,
+                                   "Relation Name": "gfv_test_table",
+                                   "Alias": "gfv_test_table"
+                                 }
+                               ]
+                             }
+                           ]
+                         }
+                       ]
+                     }
+                   }
+                 ]
                 "#
             )
             .unwrap()
