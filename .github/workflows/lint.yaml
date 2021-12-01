@@ -1,14 +1,6 @@
 name: lint
 on:
   pull_request:
-  push:
-    branches:
-    - master
-    - develop
-  schedule:
-    # we build at 8am UTC, 3am Eastern, midnight Pacific
-    - cron:  '0 8 * * 1-5'
-  workflow_dispatch:
 
 jobs:
   fmt:
