@@ -136,30 +136,30 @@ impl GapfillDeltaTransition {
         let mut extrapolate_to_interval = sampled_interval;
 
         if duration_to_start < extrapolation_threshold {
-            extrapolate_to_interval += duration_to_start
+            extrapolate_to_interval += duration_to_start;
         } else {
-            extrapolate_to_interval += avg_duration_between_samples / 2.0
+            extrapolate_to_interval += avg_duration_between_samples / 2.0;
         }
 
         if duration_to_end < extrapolation_threshold {
-            extrapolate_to_interval += duration_to_end
+            extrapolate_to_interval += duration_to_end;
         } else {
-            extrapolate_to_interval += avg_duration_between_samples / 2.0
+            extrapolate_to_interval += avg_duration_between_samples / 2.0;
         }
 
-        result_val = result_val * (extrapolate_to_interval / sampled_interval);
+        result_val *= extrapolate_to_interval / sampled_interval;
 
         if self.is_rate {
-            result_val = result_val / (self.range / USECS_PER_SEC) as f64
+            result_val /= (self.range / USECS_PER_SEC) as f64;
         }
 
         self.deltas.push(Some(result_val));
     }
 
-    pub fn to_vec(&mut self) -> Vec<Option<f64>> {
+    pub fn as_vec(&mut self) -> Vec<Option<f64>> {
         while self.current_window_max <= self.greatest_time {
             self.flush_current_window();
         }
-        return self.deltas.clone();
+        self.deltas.clone()
     }
 }

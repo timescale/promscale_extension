@@ -13,7 +13,7 @@ use crate::raw::TimestampTz;
 // value for that bucket.
 //  | a b c d e | f g h i | j   k |   m    |
 //  |   e - a   |  i - f  | k - j | <null> |
-#[allow(clippy:too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 #[pg_extern(immutable, parallel_safe)]
 pub fn prom_delta_transition(
     state: Internal,
@@ -37,7 +37,9 @@ pub fn prom_delta_transition(
     )
     .internal()
 }
-pub fn prom_delta_transition_inner(
+
+#[allow(clippy::too_many_arguments)]
+fn prom_delta_transition_inner(
     state: Option<Inner<GapfillDeltaTransition>>,
     lowest_time: pg_sys::TimestampTz,
     greatest_time: pg_sys::TimestampTz,

@@ -7,7 +7,7 @@ use crate::aggregates::{GapfillDeltaTransition, Milliseconds};
 use crate::palloc::{Inner, InternalAsValue, ToInternal};
 use crate::raw::TimestampTz;
 
-#[allow(clippy:too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 #[pg_extern(immutable, parallel_safe)]
 pub fn prom_increase_transition(
     state: Internal,
@@ -31,7 +31,9 @@ pub fn prom_increase_transition(
     )
     .internal()
 }
-pub fn prom_increase_transition_inner(
+
+#[allow(clippy::too_many_arguments)]
+fn prom_increase_transition_inner(
     state: Option<Inner<GapfillDeltaTransition>>,
     lowest_time: pg_sys::TimestampTz,
     greatest_time: pg_sys::TimestampTz,
@@ -110,7 +112,8 @@ mod tests {
                 ('2000-01-02T15:40:00+00:00',80),
                 ('2000-01-02T15:45:00+00:00',90),
                 ('2000-01-02T15:50:00+00:00',100);
-        "#);
+        "#,
+        );
 
         let result = Spi::get_one::<Vec<f64>>(
             "SELECT prom_increase('2000-01-02T15:00:00+00:00'::TIMESTAMPTZ, '2000-01-02T15:50:00+00:00'::TIMESTAMPTZ, 50 * 60 * 1000, 50 * 60 * 1000, t, v order by t) FROM gfi_test_table"
@@ -135,7 +138,8 @@ mod tests {
                 ('2000-01-02T15:40:00+00:00',20),
                 ('2000-01-02T15:45:00+00:00',30),
                 ('2000-01-02T15:50:00+00:00',40);
-        "#);
+        "#,
+        );
 
         let result = Spi::get_one::<Vec<f64>>(
             "SELECT prom_increase('2000-01-02T15:00:00+00:00'::TIMESTAMPTZ, '2000-01-02T15:50:00+00:00'::TIMESTAMPTZ, 50 * 60 * 1000, 50 * 60 * 1000, t, v order by t) FROM gfi_test_table;"
@@ -156,7 +160,8 @@ mod tests {
                 ('2000-01-02T15:20:00+00:00',2),
                 ('2000-01-02T15:25:00+00:00',3),
                 ('2000-01-02T15:30:00+00:00',4);
-        "#);
+        "#,
+        );
         let result =
             Spi::get_one::<Vec<f64>>(
             "SELECT prom_increase('2000-01-02T15:00:00+00:00'::TIMESTAMPTZ, '2000-01-02T15:30:00+00:00'::TIMESTAMPTZ, 30 * 60 * 1000, 30 * 60 * 1000, t, v order by t) FROM gfi_test_table;"

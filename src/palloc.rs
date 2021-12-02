@@ -15,6 +15,7 @@ pub unsafe fn in_memory_context<T, F: FnOnce() -> T>(mctx: pg_sys::MemoryContext
 
 pub use pgx::Internal;
 
+#[allow(clippy::missing_safety_doc)]
 pub unsafe trait InternalAsValue {
     unsafe fn to_inner<T>(self) -> Option<Inner<T>>;
 }
@@ -25,6 +26,7 @@ unsafe impl InternalAsValue for Internal {
     }
 }
 
+#[allow(clippy::missing_safety_doc)]
 pub unsafe trait ToInternal {
     fn internal(self) -> Internal;
 }

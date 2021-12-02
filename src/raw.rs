@@ -3,7 +3,8 @@
 use pgx::*;
 
 // TODO: Is this the right approach to declaring `bytea` and `TimestampTz`?
-extension_sql!("",
+extension_sql!(
+    "",
     name = "pseudo_create_types",
     creates = [Type(bytea), Type(TimestampTz),],
     bootstrap,
@@ -47,6 +48,7 @@ macro_rules! raw_type {
             }
         }
 
+        #[allow(clippy::from_over_into)]
         impl Into<pg_sys::Datum> for $name {
             fn into(self) -> pg_sys::Datum {
                 self.0
@@ -71,6 +73,7 @@ raw_type!(
     pg_sys::TIMESTAMPTZARRAYOID
 );
 
+#[allow(clippy::from_over_into)]
 impl Into<pg_sys::TimestampTz> for TimestampTz {
     fn into(self) -> pg_sys::TimestampTz {
         self.0 as _
