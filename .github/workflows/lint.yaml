@@ -1,0 +1,53 @@
+name: lint
+on:
+  pull_request:
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install latest nightly
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
+            components: rustfmt, clippy
+
+      - name: Run cargo fmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install latest nightly
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
+            components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v1
+
+      - name: Install cargo-pgx
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cargo-pgx
+
+      - name: Initialize pgx
+        uses: actions-rs/cargo@v1
+        with:
+          command: pgx
+          args: init --pg14 download
+      
+      - name: Run cargo clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --features pg14 -- -D warnings
+
