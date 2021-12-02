@@ -28,5 +28,5 @@ pub fn prom_delta_final(state: Internal) -> Option<Vec<Option<f64>>> {
 pub fn prom_delta_final_inner(
     state: Option<Inner<GapfillDeltaTransition>>,
 ) -> Option<Vec<Option<f64>>> {
-    state.map(|mut s| s.to_vec())
+    state.map(|mut s| s.as_vec())
 }

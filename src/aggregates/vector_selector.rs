@@ -17,7 +17,7 @@ use crate::raw::{bytea, TimestampTz};
 // thus, the vector selector returns a regular series of values corresponding to all the points in the
 // ts series above.
 // Note that for performance, this aggregate is parallel-izable, combinable, and does not expect ordered inputs.
-#[allow(clippy:too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 #[pg_extern(immutable, parallel_safe)]
 pub fn vector_selector_transition(
     state: Internal,
@@ -41,7 +41,9 @@ pub fn vector_selector_transition(
     )
     .internal()
 }
-pub fn vector_selector_transition_inner(
+
+#[allow(clippy::too_many_arguments)]
+fn vector_selector_transition_inner(
     state: Option<Inner<VectorSelector>>,
     start_time: pg_sys::TimestampTz,
     end_time: pg_sys::TimestampTz,
@@ -104,7 +106,8 @@ pub fn vector_selector_combine(
     )
     .internal()
 }
-pub fn vector_selector_combine_inner(
+
+fn vector_selector_combine_inner(
     state1: Option<Inner<VectorSelector>>,
     state2: Option<Inner<VectorSelector>>,
     fcinfo: pg_sys::FunctionCallInfo,
@@ -183,10 +186,10 @@ impl VectorSelector {
 
         VectorSelector {
             first_bucket_max_time: start_time,
-            last_bucket_max_time: last_bucket_max_time,
-            end_time: end_time,
-            bucket_width: bucket_width,
-            lookback: lookback,
+            last_bucket_max_time,
+            end_time,
+            bucket_width,
+            lookback,
             elements: vec![None; num_buckets as usize],
         }
     }
@@ -278,16 +281,15 @@ impl VectorSelector {
             let mut pushed = false;
             match content {
                 /* if current bucket is empty, last value may still apply */
-                None => match last {
-                    Some(tuple) => {
+                None => {
+                    if let Some(tuple) = last {
                         let (t, v): (pg_sys::TimestampTz, f64) = tuple;
                         if t >= ts - (self.lookback * USECS_PER_MS) && v.to_bits() != STALE_NAN {
                             pushed = true;
                             vals.push(Some(v));
                         }
                     }
-                    None => (),
-                },
+                }
                 Some(tuple) => {
                     let (t, v2): &(pg_sys::TimestampTz, f64) = tuple;
                     //if buckets > lookback, timestamp in bucket may still be out of lookback
@@ -302,7 +304,7 @@ impl VectorSelector {
                 //push a null
                 vals.push(None);
             }
-            ts = ts + (self.bucket_width * USECS_PER_MS)
+            ts += self.bucket_width * USECS_PER_MS
         }
 
         vals
