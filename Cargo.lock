@@ -697,9 +697,9 @@ checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 
 [[package]]
 name = "heapless"
-version = "0.7.7"
+version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe65ef062f1af5b1b189842b0bc45bd671c38e1d22c6aa22e6ada03d01026d53"
+checksum = "9c1ad878e07405df82b695089e63d278244344f80e764074d0bdfe99b89460f3"
 dependencies = [
  "atomic-polyfill",
  "hash32",
@@ -800,9 +800,9 @@ checksum = "fbe5e23404da5b4f555ef85ebed98fb4083e55a00c317800bc2a50ede9f3d219"
 
 [[package]]
 name = "libloading"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0cf036d15402bea3c5d4de17b3fce76b3e4a56ebc1f577be0e7a72f7c607cf0"
+checksum = "afe203d669ec979b7128619bae5a63b7b42e9203c1b29146079ee05e2f604b52"
 dependencies = [
  "cfg-if",
  "winapi 0.3.9",
@@ -1055,9 +1055,9 @@ dependencies = [
 
 [[package]]
 name = "pgx"
-version = "0.2.1"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05afda51b125b4d6cd101c50f51cd09dbf968ad3a6d14d3533e53e474af7c058"
+checksum = "44e02f6ea2a8e1ead4e938254069209ef994c989a8efbf916c6d1f036b8dbf16"
 dependencies = [
  "atomic-traits",
  "bitflags",
@@ -1083,9 +1083,9 @@ dependencies = [
 
 [[package]]
 name = "pgx-macros"
-version = "0.2.1"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5e052bcc9c551130b30806321cbc97958ee04189de24602dce0b53a92a1dc85"
+checksum = "b429163996e39f6cda15d18973e71630a41a495cd223c213a2988ebece828c95"
 dependencies = [
  "pgx-utils",
  "proc-macro-crate",
@@ -1097,9 +1097,9 @@ dependencies = [
 
 [[package]]
 name = "pgx-pg-sys"
-version = "0.2.1"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "afae320962dbef5ccd08906823b61d0c2f062b878e95843977b4f79fda0f2d17"
+checksum = "1f143b39d6ccb8ab1aa6e4242158fbc969b3db610b0deb50e6766d1a463a926c"
 dependencies = [
  "bindgen",
  "build-deps",
@@ -1117,9 +1117,9 @@ dependencies = [
 
 [[package]]
 name = "pgx-tests"
-version = "0.2.1"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2613daf5279634fbdbaac5e13845d31c65a8ba04a4c107303011da8a79d53ad3"
+checksum = "ab2f279b0af3bf93ab08732f670b8f75c77374b843ca4f282d6317830294792c"
 dependencies = [
  "colored",
  "lazy_static",
@@ -1137,9 +1137,9 @@ dependencies = [
 
 [[package]]
 name = "pgx-utils"
-version = "0.2.1"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98ed72f6ecc3ec6a8981c2c30ad4aa8a074cde3eaa2c13f9ed84c7462995f7a2"
+checksum = "ed809e82dfdb3a7384382c6fcbd8474cbf8c79678e2d8eb3688a61911a3774ea"
 dependencies = [
  "clap",
  "color-eyre",
@@ -1616,9 +1616,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.70"
+version = "1.0.72"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e277c495ac6cd1a01a58d0a0c574568b4d1ddf14f59965c6a58b8d96400b54f3"
+checksum = "d0ffa0837f2dfa6fb90868c2b5468cad482e175f7dad97e7421951e663f2b527"
 dependencies = [
  "itoa",
  "ryu",
@@ -1802,9 +1802,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99beeb0daeac2bd1e86ac2c21caddecb244b39a093594da1a661ec2060c7aedd"
+checksum = "41effe7cfa8af36f439fac33861b66b049edc6f9a32331e2312660529c1c24ad"
 dependencies = [
  "itoa",
  "libc",
