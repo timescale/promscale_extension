@@ -1,7 +1,18 @@
 use crate::aggregates::{Microseconds, Milliseconds, STALE_NAN, USECS_PER_MS, USECS_PER_SEC};
+use crate::palloc::{Inner, InternalAsValue};
 use pgx::*;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
+
+#[pg_extern(immutable, parallel_safe)]
+pub fn prom_extrapolate_final(state: Internal) -> Option<Vec<Option<f64>>> {
+    prom_extrapolate_final_inner(unsafe { state.to_inner() })
+}
+pub fn prom_extrapolate_final_inner(
+    state: Option<Inner<GapfillDeltaTransition>>,
+) -> Option<Vec<Option<f64>>> {
+    state.map(|mut s| s.as_vec())
+}
 
 #[derive(Serialize, Deserialize, PostgresType, Debug)]
 pub struct GapfillDeltaTransition {

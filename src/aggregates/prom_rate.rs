@@ -15,8 +15,8 @@ pub fn prom_rate_transition(
     greatest_time: TimestampTz,
     step_size: Milliseconds,
     range: Milliseconds, // the size of a window to calculate over
-    time: TimestampTz,
-    val: f64,
+    sample_time: TimestampTz,
+    sample_value: f64,
     fc: pg_sys::FunctionCallInfo,
 ) -> Internal {
     prom_rate_transition_inner(
@@ -25,8 +25,8 @@ pub fn prom_rate_transition(
         greatest_time.into(),
         step_size,
         range,
-        time.into(),
-        val,
+        sample_time.into(),
+        sample_value,
         fc,
     )
     .internal()
@@ -39,16 +39,16 @@ fn prom_rate_transition_inner(
     greatest_time: pg_sys::TimestampTz,
     step_size: Milliseconds,
     range: Milliseconds, // the size of a window to calculate over
-    time: pg_sys::TimestampTz,
-    val: f64,
+    sample_time: pg_sys::TimestampTz,
+    sample_value: f64,
     fc: pg_sys::FunctionCallInfo,
 ) -> Option<Inner<GapfillDeltaTransition>> {
     unsafe {
         in_aggregate_context(fc, || {
-            if time < lowest_time || time > greatest_time {
+            if sample_time < lowest_time || sample_time > greatest_time {
                 error!(format!(
                     "input time {} not in bounds [{}, {}]",
-                    time, lowest_time, greatest_time
+                    sample_time, lowest_time, greatest_time
                 ))
             }
 
@@ -65,7 +65,7 @@ fn prom_rate_transition_inner(
                 state
             });
 
-            state.add_data_point(time, val);
+            state.add_data_point(sample_time, sample_value);
 
             Some(state)
         })
@@ -79,17 +79,18 @@ extension_sql!(
 CREATE AGGREGATE @extschema@.prom_rate(
     lowest_time TIMESTAMPTZ,
     greatest_time TIMESTAMPTZ,
-    step BIGINT,
+    step_size BIGINT,
     range BIGINT,
     sample_time TIMESTAMPTZ,
     sample_value DOUBLE PRECISION)
 (
     sfunc=@extschema@.prom_rate_transition,
     stype=internal,
-    finalfunc=@extschema@.prom_delta_final
+    finalfunc=@extschema@.prom_extrapolate_final
 );
 "#,
-    name = "create_prom_rate_aggregate"
+    name = "create_prom_rate_aggregate",
+    requires = [prom_rate_transition, prom_extrapolate_final]
 );
 
 #[cfg(any(test, feature = "pg_test"))]

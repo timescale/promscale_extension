@@ -7,7 +7,6 @@ extension_sql!(
     "",
     name = "pseudo_create_types",
     creates = [Type(bytea), Type(TimestampTz),],
-    bootstrap,
 );
 
 macro_rules! raw_type {

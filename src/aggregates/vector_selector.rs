@@ -153,7 +153,14 @@ CREATE AGGREGATE @extschema@.vector_selector(
     parallel = safe
 );
 "#,
-    name = "create_vector_selector_aggregate"
+    name = "create_vector_selector_aggregate",
+    requires = [
+        vector_selector_transition,
+        vector_selector_final,
+        vector_selector_combine,
+        vector_selector_serialize,
+        vector_selector_deserialize
+    ]
 );
 
 // The internal state consists of a vector non-overlapping sample buckets. Each bucket
