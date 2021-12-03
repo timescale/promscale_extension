@@ -26,7 +26,6 @@ use std::ptr;
 ///
 /// [support function]: https://www.postgresql.org/docs/current/xfunc-optimization.html
 #[pg_extern(immutable, strict)]
-#[search_path(@extschema@)]
 pub unsafe fn rewrite_fn_call_to_subquery(input: Internal) -> Internal {
     let input: *mut pg_sys::Node = input.unwrap().unwrap() as _;
     if !pgx::is_a(input, pg_sys::NodeTag_T_SupportRequestSimplify) {
@@ -91,6 +90,20 @@ extension_sql!(
     name = "grant_execute_rewrite_fn_call_to_subquery_prom_reader",
     requires = [rewrite_fn_call_to_subquery, "promscale_setup"]
 );
+
+/// Backwards compatibility
+#[no_mangle]
+pub extern "C" fn pg_finfo_make_call_subquery_support() -> &'static pg_sys::Pg_finfo_record {
+    const V1_API: pg_sys::Pg_finfo_record = pg_sys::Pg_finfo_record { api_version: 1 };
+    &V1_API
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn make_call_subquery_support(
+    fcinfo: pg_sys::FunctionCallInfo,
+) -> pg_sys::Datum {
+    rewrite_fn_call_to_subquery_wrapper(fcinfo)
+}
 
 pub unsafe fn arg_can_be_put_into_subquery(arg: *mut pg_sys::Node) -> bool {
     if pgx::is_a(arg, pg_sys::NodeTag_T_Const) {

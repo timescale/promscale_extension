@@ -14,6 +14,18 @@ pub fn prom_extrapolate_final_inner(
     state.map(|mut s| s.as_vec())
 }
 
+/// Backwards compatibility
+#[no_mangle]
+pub extern "C" fn pg_finfo_gapfill_delta_final() -> &'static pg_sys::Pg_finfo_record {
+    const V1_API: pg_sys::Pg_finfo_record = pg_sys::Pg_finfo_record { api_version: 1 };
+    &V1_API
+}
+
+#[no_mangle]
+unsafe extern "C" fn gapfill_delta_final(fcinfo: pg_sys::FunctionCallInfo) -> pg_sys::Datum {
+    prom_extrapolate_final_wrapper(fcinfo)
+}
+
 #[derive(Serialize, Deserialize, PostgresType, Debug)]
 pub struct GapfillDeltaTransition {
     window: VecDeque<(pg_sys::TimestampTz, f64)>,

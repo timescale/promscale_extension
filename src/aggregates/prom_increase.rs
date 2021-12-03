@@ -69,6 +69,20 @@ fn prom_increase_transition_inner(
     }
 }
 
+/// Backwards compatibility
+#[no_mangle]
+pub extern "C" fn pg_finfo_gapfill_increase_transition() -> &'static pg_sys::Pg_finfo_record {
+    const V1_API: pg_sys::Pg_finfo_record = pg_sys::Pg_finfo_record { api_version: 1 };
+    &V1_API
+}
+
+#[no_mangle]
+unsafe extern "C" fn gapfill_increase_transition(
+    fcinfo: pg_sys::FunctionCallInfo,
+) -> pg_sys::Datum {
+    prom_increase_transition_wrapper(fcinfo)
+}
+
 // implementation of prometheus increase function
 // for proper behavior the input must be ORDER BY sample_time
 extension_sql!(
