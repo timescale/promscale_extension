@@ -4,6 +4,7 @@ mod aggregate_utils;
 mod aggregates;
 mod palloc;
 mod raw;
+mod schema;
 mod support;
 mod type_builder;
 

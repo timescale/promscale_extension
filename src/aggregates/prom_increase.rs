@@ -13,10 +13,10 @@ pub fn prom_increase_transition(
     state: Internal,
     lowest_time: TimestampTz,
     greatest_time: TimestampTz,
-    step_size: Milliseconds, // `prev_now - step` is where the next window starts
+    step_size: Milliseconds, // `prev_now - step_size` is where the next window starts
     range: Milliseconds,     // the size of a window to delta over
-    time: TimestampTz,
-    val: f64,
+    sample_time: TimestampTz,
+    sample_value: f64,
     fc: pg_sys::FunctionCallInfo,
 ) -> Internal {
     prom_increase_transition_inner(
@@ -25,8 +25,8 @@ pub fn prom_increase_transition(
         greatest_time.into(),
         step_size,
         range,
-        time.into(),
-        val,
+        sample_time.into(),
+        sample_value,
         fc,
     )
     .internal()
@@ -39,13 +39,13 @@ fn prom_increase_transition_inner(
     greatest_time: pg_sys::TimestampTz,
     step_size: Milliseconds, // `prev_now - step` is where the next window starts
     range: Milliseconds,     // the size of a window to delta over
-    time: pg_sys::TimestampTz,
-    val: f64,
+    sample_time: pg_sys::TimestampTz,
+    sample_value: f64,
     fc: pg_sys::FunctionCallInfo,
 ) -> Option<Inner<GapfillDeltaTransition>> {
     unsafe {
         in_aggregate_context(fc, || {
-            if time < lowest_time || time > greatest_time {
+            if sample_time < lowest_time || sample_time > greatest_time {
                 error!("input time less than lowest time")
             }
 
@@ -62,7 +62,7 @@ fn prom_increase_transition_inner(
                 state
             });
 
-            state.add_data_point(time, val);
+            state.add_data_point(sample_time, sample_value);
 
             Some(state)
         })
@@ -76,17 +76,18 @@ extension_sql!(
 CREATE AGGREGATE @extschema@.prom_increase(
     lowest_time TIMESTAMPTZ,
     greatest_time TIMESTAMPTZ,
-    step BIGINT,
+    step_size BIGINT,
     range BIGINT,
     sample_time TIMESTAMPTZ,
     sample_value DOUBLE PRECISION)
 (
     sfunc=@extschema@.prom_increase_transition,
     stype=internal,
-    finalfunc=@extschema@.prom_delta_final
+    finalfunc=@extschema@.prom_extrapolate_final
 );
 "#,
-    name = "create_prom_increase_aggregate"
+    name = "create_prom_increase_aggregate",
+    requires = [prom_increase_transition, prom_extrapolate_final]
 );
 
 #[cfg(any(test, feature = "pg_test"))]

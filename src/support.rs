@@ -27,7 +27,7 @@ use std::ptr;
 /// [support function]: https://www.postgresql.org/docs/current/xfunc-optimization.html
 #[pg_extern(immutable, strict)]
 #[search_path(@extschema@)]
-pub unsafe fn make_call_subquery_support(input: Internal) -> Internal {
+pub unsafe fn rewrite_fn_call_to_subquery(input: Internal) -> Internal {
     let input: *mut pg_sys::Node = input.unwrap().unwrap() as _;
     if !pgx::is_a(input, pg_sys::NodeTag_T_SupportRequestSimplify) {
         return ptr::null_mut::<pg_sys::Node>().internal();
@@ -85,6 +85,12 @@ pub unsafe fn make_call_subquery_support(input: Internal) -> Internal {
 
     (sublink.into_pg() as *mut pg_sys::Node).internal()
 }
+
+extension_sql!(
+    "GRANT EXECUTE ON FUNCTION @extschema@.rewrite_fn_call_to_subquery(internal) TO prom_reader;",
+    name = "grant_execute_rewrite_fn_call_to_subquery_prom_reader",
+    requires = [rewrite_fn_call_to_subquery, "promscale_setup"]
+);
 
 pub unsafe fn arg_can_be_put_into_subquery(arg: *mut pg_sys::Node) -> bool {
     if pgx::is_a(arg, pg_sys::NodeTag_T_Const) {
@@ -179,7 +185,7 @@ mod tests {
                     SELECT key || value
                 $func$
                 LANGUAGE SQL STABLE PARALLEL SAFE
-                SUPPORT make_call_subquery_support;
+                SUPPORT rewrite_fn_call_to_subquery;
             "#,
         );
         let result = Spi::get_one::<Json>(
