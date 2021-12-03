@@ -75,6 +75,29 @@ fn prom_delta_transition_inner(
     }
 }
 
+/// Backwards compatibility
+#[no_mangle]
+pub extern "C" fn pg_finfo_gapfill_delta_transition() -> &'static pg_sys::Pg_finfo_record {
+    const V1_API: pg_sys::Pg_finfo_record = pg_sys::Pg_finfo_record { api_version: 1 };
+    &V1_API
+}
+
+#[no_mangle]
+unsafe extern "C" fn gapfill_delta_transition(fcinfo: pg_sys::FunctionCallInfo) -> pg_sys::Datum {
+    prom_delta_transition_wrapper(fcinfo)
+}
+
+#[no_mangle]
+pub extern "C" fn pg_finfo_prom_delta_final_wrapper() -> &'static pg_sys::Pg_finfo_record {
+    const V1_API: pg_sys::Pg_finfo_record = pg_sys::Pg_finfo_record { api_version: 1 };
+    &V1_API
+}
+
+#[no_mangle]
+unsafe extern "C" fn prom_delta_final_wrapper(fcinfo: pg_sys::FunctionCallInfo) -> pg_sys::Datum {
+    super::gapfill_delta::prom_extrapolate_final_wrapper(fcinfo)
+}
+
 // implementation of prometheus delta function
 // for proper behavior the input must be ORDER BY sample_time
 extension_sql!(
