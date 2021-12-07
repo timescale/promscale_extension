@@ -1,6 +1,5 @@
 CALL SCHEMA_CATALOG.execute_everywhere('create_schemas', $ee$ DO $$ BEGIN
-
-    CREATE SCHEMA IF NOT EXISTS SCHEMA_CATALOG; -- catalog tables + internal functions
+    CREATE SCHEMA IF NOT EXISTS SCHEMA_CATALOG; -- this will be limited to metric and probably renamed in future
     GRANT USAGE ON SCHEMA SCHEMA_CATALOG TO prom_reader;
 
     CREATE SCHEMA IF NOT EXISTS SCHEMA_PROM; -- public functions
@@ -36,6 +35,9 @@ CALL SCHEMA_CATALOG.execute_everywhere('create_schemas', $ee$ DO $$ BEGIN
 
     CREATE SCHEMA IF NOT EXISTS SCHEMA_TRACING_PUBLIC;
     GRANT USAGE ON SCHEMA SCHEMA_TRACING_PUBLIC TO prom_reader;
+
+    CREATE SCHEMA IF NOT EXISTS SCHEMA_PS_CATALOG;
+    GRANT USAGE ON SCHEMA SCHEMA_PS_CATALOG TO prom_reader;
 END $$ $ee$);
 
 -- the promscale extension contains optimized version of some
