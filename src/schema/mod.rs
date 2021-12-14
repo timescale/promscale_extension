@@ -2,6 +2,5 @@
 //! directly related to any functionality which this extension itself provides.
 
 mod estimates;
-mod searchpath;
 mod setup;
 mod support;

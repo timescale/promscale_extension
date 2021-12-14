@@ -3,4 +3,5 @@ comment = 'Promscale support functions'
 default_version = '0.3.1'
 module_pathname = '$libdir/promscale'
 relocatable = false
+schema = _prom_ext
 superuser = true
