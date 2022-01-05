@@ -7,18 +7,41 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        docker:
-        - docker-image-ts2-14
-        - docker-image-ts2-13
-        - docker-image-ts2-12
-        - docker-image-ts1
+        tsdb: [2.5.0]
+        pg: [pg12, pg13, pg14]
+        include:
+          - tsdb: 1.7.5
+            pg: pg12
     steps:
       - uses: actions/checkout@v2
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v3
+        with:
+          images: |
+            timescaledev/promscale-extension
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=ref,event=pr
+          flavor: |
+            latest=false
+            suffix=-${{ matrix.tsdb }}-${{ matrix.pg }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
 
-      - name: build docker image
-        run: make ${{ matrix.docker }}
-        env:
-          DOCKER_BUILDKIT: 1
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            TIMESCALEDB_VERSION=${{ matrix.tsdb }}
+            PG_VERSION_TAG=${{ matrix.pg }}
