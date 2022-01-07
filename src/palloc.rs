@@ -5,14 +5,6 @@ use std::{
 
 use pgx::*;
 
-pub unsafe fn in_memory_context<T, F: FnOnce() -> T>(mctx: pg_sys::MemoryContext, f: F) -> T {
-    let prev_ctx = pg_sys::CurrentMemoryContext;
-    pg_sys::CurrentMemoryContext = mctx;
-    let t = f();
-    pg_sys::CurrentMemoryContext = prev_ctx;
-    t
-}
-
 pub use pgx::Internal;
 
 #[allow(clippy::missing_safety_doc)]

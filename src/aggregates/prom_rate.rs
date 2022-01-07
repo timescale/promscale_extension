@@ -1,108 +1,53 @@
 use pgx::error;
-use pgx::Internal;
 use pgx::*;
 
-use crate::aggregate_utils::in_aggregate_context;
 use crate::aggregates::{GapfillDeltaTransition, Milliseconds};
-use crate::palloc::{Inner, InternalAsValue, ToInternal};
 
-#[allow(clippy::too_many_arguments)]
-#[pg_extern(immutable, parallel_safe)]
-pub fn prom_rate_transition(
-    state: Internal,
-    lowest_time: pg_sys::TimestampTz,
-    greatest_time: pg_sys::TimestampTz,
-    step_size: Milliseconds,
-    range: Milliseconds, // the size of a window to calculate over
-    sample_time: pg_sys::TimestampTz,
-    sample_value: f64,
-    fc: pg_sys::FunctionCallInfo,
-) -> Internal {
-    prom_rate_transition_inner(
-        unsafe { state.to_inner() },
-        lowest_time,
-        greatest_time,
-        step_size,
-        range,
-        sample_time,
-        sample_value,
-        fc,
-    )
-    .internal()
-}
+#[allow(non_camel_case_types)]
+pub struct prom_rate;
 
-#[allow(clippy::too_many_arguments)]
-fn prom_rate_transition_inner(
-    state: Option<Inner<GapfillDeltaTransition>>,
-    lowest_time: pg_sys::TimestampTz,
-    greatest_time: pg_sys::TimestampTz,
-    step_size: Milliseconds,
-    range: Milliseconds, // the size of a window to calculate over
-    sample_time: pg_sys::TimestampTz,
-    sample_value: f64,
-    fc: pg_sys::FunctionCallInfo,
-) -> Option<Inner<GapfillDeltaTransition>> {
-    unsafe {
-        in_aggregate_context(fc, || {
-            if sample_time < lowest_time || sample_time > greatest_time {
-                error!(format!(
-                    "input time {} not in bounds [{}, {}]",
-                    sample_time, lowest_time, greatest_time
-                ))
-            }
+#[pg_aggregate]
+impl Aggregate for prom_rate {
+    type State = Option<GapfillDeltaTransition>;
+    type Args = (
+        name!(lowest_time, pg_sys::TimestampTz),
+        name!(greatest_time, pg_sys::TimestampTz),
+        name!(step_size, Milliseconds),
+        name!(range, Milliseconds),
+        name!(sample_time, pg_sys::TimestampTz),
+        name!(sample_value, f64),
+    );
+    type Finalize = Option<Vec<Option<f64>>>;
 
-            let mut state = state.unwrap_or_else(|| {
-                let state: Inner<_> = GapfillDeltaTransition::new(
-                    lowest_time,
-                    greatest_time,
-                    range,
-                    step_size,
-                    true,
-                    true,
-                )
-                .into();
-                state
-            });
+    fn state(
+        state: Self::State,
+        (lowest_time, greatest_time, step_size, range, sample_time, sample_value): Self::Args,
+        _: pg_sys::FunctionCallInfo,
+    ) -> Self::State {
+        if sample_time < lowest_time || sample_time > greatest_time {
+            error!(format!(
+                "input time {} not in bounds [{}, {}]",
+                sample_time, lowest_time, greatest_time
+            ))
+        }
 
-            state.add_data_point(sample_time, sample_value);
+        let mut state = state.unwrap_or_else(|| {
+            GapfillDeltaTransition::new(lowest_time, greatest_time, range, step_size, true, true)
+        });
 
-            Some(state)
-        })
+        state.add_data_point(sample_time, sample_value);
+
+        Some(state)
+    }
+
+    fn finalize(
+        current: Self::State,
+        _: Self::OrderedSetArgs,
+        _: pg_sys::FunctionCallInfo,
+    ) -> Self::Finalize {
+        current.map(|mut s| s.as_vec())
     }
 }
-
-/// Backwards compatibility
-#[no_mangle]
-pub extern "C" fn pg_finfo_gapfill_rate_transition() -> &'static pg_sys::Pg_finfo_record {
-    const V1_API: pg_sys::Pg_finfo_record = pg_sys::Pg_finfo_record { api_version: 1 };
-    &V1_API
-}
-
-#[no_mangle]
-unsafe extern "C" fn gapfill_rate_transition(fcinfo: pg_sys::FunctionCallInfo) -> pg_sys::Datum {
-    prom_rate_transition_wrapper(fcinfo)
-}
-
-// implementation of prometheus rate function
-// for proper behavior the input must be ORDER BY sample_time
-extension_sql!(
-    r#"
-CREATE OR REPLACE AGGREGATE @extschema@.prom_rate(
-    lowest_time TIMESTAMPTZ,
-    greatest_time TIMESTAMPTZ,
-    step_size BIGINT,
-    range BIGINT,
-    sample_time TIMESTAMPTZ,
-    sample_value DOUBLE PRECISION)
-(
-    sfunc=@extschema@.prom_rate_transition,
-    stype=internal,
-    finalfunc=@extschema@.prom_extrapolate_final
-);
-"#,
-    name = "create_prom_rate_aggregate",
-    requires = [prom_rate_transition, prom_extrapolate_final]
-);
 
 #[cfg(any(test, feature = "pg_test"))]
 #[pg_schema]
