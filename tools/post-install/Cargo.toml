@@ -1,0 +1,8 @@
+[package]
+name = "post-install"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+xshell = "0.1.14"
+walkdir = "2"
