@@ -1,0 +1,7 @@
+.git/
+.cargo/
+.github/
+target/
+*.md
+LICENSE
+NOTICE
