@@ -5,3 +5,6 @@ module_pathname = '$libdir/promscale'
 relocatable = false
 schema = _prom_ext
 superuser = true
+# comma-separated list of previous versions this version can be upgraded from
+# directly. This is used to generate upgrade scripts.
+# upgradeable_from = '0.3.0'
