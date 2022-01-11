@@ -1,6 +1,12 @@
 name: docker
 on:
   pull_request:
+    paths-ignore:
+    - '.github/workflows/ci.yaml'
+    - '.github/workflows/lint.yaml'
+    - '.github/workflows/release.yaml'
+    - 'dist/*'
+    - 'tools/*'
 
 jobs:
   docker:
