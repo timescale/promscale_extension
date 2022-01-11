@@ -1,42 +1,94 @@
-.DEFAULT_GOAL := build
+.DEFAULT_GOAL := help
 
-PG_CONFIG?=pg_config
+ARCH ?= `uname -m`
+EXT_VERSION ?= `cargo pkgid | cut -d':' -f3`
+IMAGE_NAME ?= timescaledev/promscale-extension
+OS_NAME ?= debian
+OS_VERSION ?= 11
+RUST_VERSION ?= `rustc --version | cut -d' ' -f2`
+PG_CONFIG ?= pg_config
+PG_VERSION ?= `${PG_CONFIG} --version | awk -F'[ \. ]' '{print $$2}'`
+PG_VER ?= pg${PG_VERSION}
+# If set to a non-empty value, docker builds will be pushed to the registry
+PUSH ?=
 
-EXT_VERSION = $(shell cargo pkgid | cut -d'\#' -f2 | cut -d ':' -f2)
-PG_VERSION = $(shell ${PG_CONFIG} --version | awk -F'[ \.]' '{print $$2}')
+# Calculate the correct dockerfile to use when running the release target
+ifeq ($(OS_NAME),debian)
+	DOCKERFILE = deb.dockerfile
+	PKG_TYPE = deb
+endif
+ifeq ($(OS_NAME),ubuntu)
+	DOCKERFILE = deb.dockerfile
+	PKG_TYPE = deb
+endif
+ifeq ($(OS_NAME),centos)
+	DOCKERFILE = rpm.dockerfile
+	PKG_TYPE = rpm
+endif
+ifeq ($(OS_NAME),rhel)
+	DOCKERFILE = rpm.dockerfile
+	PKG_TYPE = rpm
+endif
+ifeq ($(OS_NAME),fedora)
+	DOCKERFILE = rpm.dockerfile
+	PKG_TYPE = rpm
+endif
+RELEASE_IMAGE_NAME = promscale-extension-pkg:$(EXT_VERSION)-$(OS_NAME)$(OS_VERSION)-$(PG_VER)
+RELEASE_FILE_NAME = promscale_extension-$(EXT_VERSION).$(PG_VER).$(OS_NAME)$(OS_VERSION).$(ARCH).$(PKG_TYPE)
+
+.PHONY: help
+help:
+	@echo "promscale_extension $(EXT_VERSION) (pg$(PG_VERSION))"
+	@perl -nle'print $& if m{^[a-zA-Z_-]+:.*?## .*$$}' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: build
-build:
+build: ## Build the extension
 	cargo build --release --features pg${PG_VERSION} $(EXTRA_RUST_ARGS)
 	cargo pgx schema -f pg${PG_VERSION} --release
 
 .PHONY: clean
-clean:
+clean: ## Clean up latest build
 	cargo clean
 
 .PHONY: package
-package:
+package: ## Generate extension artifacts for packaging
 	cargo pgx package --pg-config ${PG_CONFIG}
 
 .PHONY: install
-install:
+install: ## Install the extension in the Postgres found via pg_config
 	cargo pgx install --pg-config ${PG_CONFIG}
 
-PG_VER ?= pg12
-PUSH ?= FALSE
-DOCKER_IMAGE_NAME?=promscale-extension
-ORGANIZATION?=timescaledev
+
+.PHONY: release
+release: release-builder ## Produces release artifacts based on OS_NAME, OS_VERSION, and PG_VERSION
+	@container="$$(docker create $(RELEASE_IMAGE_NAME))"; \
+	docker cp "$${container}:/dist/$(RELEASE_FILE_NAME)" ./dist/; \
+	docker rm -f "$${container}"
+
+.PHONY: release-builder
+release-builder: dist/$(DOCKERFILE) ## Build image with the release artifact for OS_NAME, OS_VERSION, and PG_VERSION
+ifndef DOCKERFILE
+	$(error Unsupported OS_NAME '$(OS_NAME)'! Expected one of debian,ubuntu,centos,rhel,fedora)
+endif
+	docker buildx build --load \
+		--build-arg OS_NAME=$(OS_NAME) \
+		--build-arg OS_VERSION=$(OS_VERSION) \
+		--build-arg PG_VERSION=$(PG_VERSION) \
+		--build-arg RUST_VERSION=$(RUST_VERSION) \
+		--build-arg RELEASE_FILE_NAME=$(RELEASE_FILE_NAME) \
+		-t $(RELEASE_IMAGE_NAME) \
+		-f dist/$(DOCKERFILE) \
+		.
 
 .PHONY: docker-image-build-1 docker-image-build-2-12 docker-image-build-2-13 docker-image-build-2-14
 docker-image-build-1 docker-image-build-2-12 docker-image-build-2-13 docker-image-build-2-14: Dockerfile $(SQL_FILES) $(SRCS) Cargo.toml Cargo.lock $(RUST_SRCS)
-	docker build --build-arg TIMESCALEDB_VERSION=$(TIMESCALEDB_VER) --build-arg PG_VERSION_TAG=$(PG_VER) -t $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):$(EXT_VERSION)-$(TIMESCALEDB_VER)-$(PG_VER) .
-	docker tag $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):$(EXT_VERSION)-$(TIMESCALEDB_VER)-$(PG_VER) $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):${EXT_VERSION}-ts$(TIMESCALEDB_MAJOR)-$(PG_VER)
-	docker tag $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):$(EXT_VERSION)-$(TIMESCALEDB_VER)-$(PG_VER) $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):latest-ts$(TIMESCALEDB_MAJOR)-$(PG_VER)
-ifeq ($(PUSH), TRUE)
-	docker push $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):$(EXT_VERSION)-$(TIMESCALEDB_VER)-$(PG_VER)
-	docker push $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):${EXT_VERSION}-ts$(TIMESCALEDB_MAJOR)-$(PG_VER)
-	docker push $(ORGANIZATION)/$(DOCKER_IMAGE_NAME):latest-ts$(TIMESCALEDB_MAJOR)-$(PG_VER)
-endif
+	docker buildx build $(if $(PUSH),--push,--load) \
+		--build-arg TIMESCALEDB_VERSION=$(TIMESCALEDB_VER) \
+		--build-arg PG_VERSION_TAG=$(PG_VER) \
+		-t $(IMAGE_NAME):$(EXT_VERSION)-$(TIMESCALEDB_VER)-$(PG_VER) \
+		-t $(IMAGE_NAME):$(EXT_VERSION)-ts$(TIMESCALEDB_MAJOR)-$(PG_VER) \
+		-t $(IMAGE_NAME):latest-ts$(TIMESCALEDB_MAJOR)-$(PG_VER) \
+		.
 
 .PHONY: docker-image-ts1
 docker-image-ts1: PG_VER=pg12
@@ -63,4 +115,17 @@ docker-image-ts2-14: TIMESCALEDB_VER=2.5.0
 docker-image-ts2-14: docker-image-build-2-14
 
 .PHONY: docker-image
-docker-image: docker-image-ts2-14 docker-image-ts2-13 docker-image-ts2-12 docker-image-ts1
+docker-image: docker-image-ts2-14 docker-image-ts2-13 docker-image-ts2-12 docker-image-ts1 ## Build Timescale images with the extension
+
+.PHONY: setup-buildx
+setup-buildx: ## Setup a Buildx builder
+	@if ! docker buildx ls | grep buildx-builder >/dev/null; then \
+		docker buildx create \
+			--buildkitd-flags '--allow-insecure-entitlement security.insecure' \
+			--append \
+			--name buildx-builder \
+			--driver docker-container \
+			--use && \
+		docker buildx inspect --bootstrap --builder buildx-builder; \
+	fi
+
