@@ -1,2 +1,5 @@
-/target
 .idea/
+dist/*.rpm
+dist/*.deb
+dist/*.tar
+/target

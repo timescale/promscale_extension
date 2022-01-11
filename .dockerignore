@@ -1,7 +1,10 @@
 .git/
-.cargo/
 .github/
+dist/*.rpm
+dist/*.deb
+dist/*.tar
 target/
 *.md
+!CHANGELOG.md
 LICENSE
 NOTICE

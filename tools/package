@@ -1,0 +1,314 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/../" && pwd -P)"
+
+function usage() {
+    echo "usage: $(basename "$0") [OPTIONS]"
+    echo ""
+    echo "OPTIONS"
+    echo " --out-dir <path>               The directory in which to place the generated .rpm package. Defaults to the current directory"
+    echo " --package-name <string>        The name of package file that will be placed in the output directory. Optional"
+    echo " --pg-version <string>          The major version of the Postgres release being targeted, e.g. '14'. Optional when --pg-config is set."
+    echo " --pg-config <path>             The path to the pg_config binary. Is detected based on OS and --pg-version by default"
+    echo " --type <deb|rpm|tar>           The type of package to build. Defaults to the native format for the host, or tar if unknown"
+    echo " --version <string>             The version of the extension being released. If not provided, it is read from the crate metadata"
+    echo " --lint                         Run linter on the package file after generation, if one is defined (e.g. lintian)"
+    echo ""
+}
+
+arch="$(uname -m)"
+lint="false"
+out_dir="."
+# Supported on all our targeted operating systems, /etc/os-release provides distribution info
+# shellcheck disable=SC1091
+os_name="$(source /etc/os-release; echo "${ID}")"
+# On Ubuntu use the full version number, e.g. 21.04
+# On the other platforms we only care about the major version number
+os_version=
+if [ "${os_name}" = "ubuntu" ]; then
+    # shellcheck disable=SC1091
+    os_version="$(source /etc/os-release; echo "${VERSION_ID}")"
+else
+    # shellcheck disable=SC1091
+    os_version="$(source /etc/os-release; echo "${VERSION_ID}" | cut -d '.' -f1)"
+fi
+pg_config=
+pkg_name=
+pkg_type=
+export pg_version=
+export version=
+
+while [ $# -gt 0 ]; do
+    lhs="${1%=*}"
+    rhs="${1#*=}"
+    # Shift once for the flag name if true
+    shift_key="false"
+    # Shift once for the flag value if true
+    shift_value="false"
+    # Shift for the flag value if true, and shift_value=true
+    has_value="false"
+    if [ "$lhs" = "$1" ]; then
+        # No '=' to split on, so grab the next arg
+        shift
+        rhs="$1"
+        # We already shifted for the name, but not for the value
+        shift_value="true"
+    else
+        # We only need one shift for both key and value
+        shift_key="true"
+    fi
+    case $lhs in
+        -lint | --lint )
+            lint="true"
+            ;;
+        -out-dir | --out-dir )
+            out_dir="$rhs"
+            has_value="true"
+            ;;
+        -package-name | --package-name )
+            pkg_name="$rhs"
+            has_value="true"
+            ;;
+        -pg-version | --pg-version )
+            pg_version="$rhs"
+            has_value="true"
+            ;;
+        -pg-config | --pg-config )
+            pg_config="$rhs"
+            has_value="true"
+            if [ ! -f "${pg_config}" ]; then
+                echo "Invalid --pg-config: no such file"
+                exit 2
+            fi
+            ;;
+        -type | --type )
+            pkg_type="$rhs"
+            has_value="true"
+            ;;
+        -version | --version )
+            version="$rhs"
+            has_value="true"
+            ;;
+        -help | --help | -h)
+            usage
+            exit 2
+            ;;
+        *)
+            echo "unknown option: $1"
+            usage
+            exit 2
+            ;;
+    esac
+
+    if [ "$shift_key" = "true" ]; then
+        shift
+    fi
+    if [ "$has_value" = "true" ] && [ "$shift_value" = "true" ]; then
+        shift
+    fi
+done
+
+if ! command -v cargo; then
+    echo "Must have cargo installed! Check your PATH"
+    exit 2
+fi
+
+if ! command -v jq; then
+    echo "Must have jq installed! Check your PATH"
+    exit 2
+fi
+
+if ! command -v fpm; then
+    echo "Must have fpm installed! Check your PATH"
+    exit 2
+fi
+
+if [ -z "${version}" ]; then
+    if ! version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')"; then
+        echo "${version}"
+        echo "Failed to read extension version from Cargo metadata!"
+        exit 1
+    fi
+fi
+
+if [ -z "${pg_version}" ] && [ -z "${pg_config}" ]; then
+    echo "Must provide either --pg-version or --pg-config!"
+    exit 2
+fi
+
+mkdir -p "${out_dir}"
+if [ ! -d "${out_dir}" ]; then
+    echo "Invalid --out-dir '${out_dir}', directory doesn't exist!"
+    exit 2
+fi
+
+if [ -n "${pg_config}" ]; then
+    if config_version="$("${pg_config}" --version | cut -d' ' -f2 | cut -d '.' -f1)"; then
+        if [ -n "$pg_version" ]; then
+            if [ ! "$config_version" = "$pg_version" ]; then
+                echo "Mismatched --pg-config and --pg-version"
+                echo "  Expected version:   ${pg_version}"
+                echo "  Got from pg_config: ${config_version} "
+                exit 1
+            fi
+        else
+            pg_version="${config_version}"
+        fi
+    else
+        echo "$config_version"
+        echo "Unable to obtain version from pg_config!"
+        exit 1
+    fi
+fi
+
+# If no package format was set, select an appropriate one for the current OS
+if [ -z "$pkg_type" ]; then
+    case "$os_name" in
+        debian|ubuntu)
+            pkg_type="deb"
+            ;;
+        rhel|centos|fedora)
+            pkg_type="rpm"
+            ;;
+        *)
+            pkg_type="tar"
+            ;;
+    esac
+fi
+
+# Validate the selected package format
+case "$pkg_type" in
+    deb|rpm|tar) ;;
+    *)
+        echo "Invalid package type selected '${pkg_type}'. Must be one of deb|rpm|tar"
+        exit 2
+        ;;
+esac
+
+# Ensure a package filename is set
+if [ -z "${pkg_name}" ]; then
+    pkg_name="promscale_extension-${version}.pg${pg_version}.${os_name}${os_version}.${arch}.${pkg_type}"
+fi
+
+# Select the appropriate package name for the Postgres dependency
+pg_package=
+case "$os_name" in
+    debian|ubuntu)
+        pg_package="postgresql-${pg_version}"
+        ;;
+
+    rhel|centos|fedora)
+        pg_package="postgresql${pg_version}-server"
+        ;;
+
+    *)
+        pg_package="postgresql${pg_version}-server"
+        ;;
+esac
+
+pg_config_dir=
+if [ -n "${pg_config}" ]; then
+    pg_config_dir="$(dirname "${pg_config}" && pwd -P)"
+else
+    case "$os_name" in
+        debian|ubuntu)
+            pg_config_dir="/usr/lib/postgresql/${pg_version}/bin"
+            ;;
+        rhel|centos|fedora)
+            pg_config_dir="/usr/pgsql-${pg_version}/bin"
+            ;;
+        *)
+            echo "Unable to detect pg_config, please set --pg_config"
+            exit 1
+            ;;
+    esac
+fi
+
+
+echo "Building.."
+cd "${ROOT_DIR}"
+
+PATH="${pg_config_dir}:${PATH}" cargo pgx package
+
+echo "Post-processing build.."
+cargo run --manifest-path tools/post-install/Cargo.toml -- --dir "target/release/promscale-pg${pg_version}"
+
+echo "Stripping objects.."
+find "target/release/promscale-pg${pg_version}"/ -type f -name "*.so" -exec strip {} +
+
+echo "Packaging ${pkg_name}.."
+extra_fpm_args=()
+case "$pkg_type" in
+    deb)
+        # Create copyright file to pass lintian checks
+        copyright_dir="target/release/promscale-pg${pg_version}/usr/share/doc/promscale-extension-postgresql-${pg_version}"
+        mkdir -p "${copyright_dir}"
+        cp dist/debian/copyright "${copyright_dir}"/
+        # Debian packages are required to express dependency on ${shlibs:Depends}
+        # shellcheck disable=SC2016
+        extra_fpm_args+=('-d' 'libc6')
+        # Add changelog to deb packages
+        extra_fpm_args+=('--deb-upstream-changelog' 'CHANGELOG.md')
+        # fpm uses priority extra, but this is deprecated in debian in favor of optional
+        extra_fpm_args+=('--deb-priority' 'optional')
+        ;;
+
+    *)
+        ;;
+esac
+
+pkg_path="${out_dir}/${pkg_name}"
+fpm --log info -s dir -t "${pkg_type}" \
+    --architecture native \
+    --maintainer 'Timescale <hello@timescale.com>' \
+    --vendor 'Timescale' \
+    --license 'Timescale License' \
+    --description 'Supporting functions, operators, and types for Promscale' \
+    --url 'https://github.com/timescale/promscale_extension' \
+    --category database \
+    --depends "${pg_package}" \
+    --name "promscale_extension-postgresql-${pg_version}" \
+    --version "${version}" \
+    --iteration 1 \
+    -C "target/release/promscale-pg${pg_version}" \
+    -p "${pkg_path}" \
+    ${extra_fpm_args[@]+"${extra_fpm_args[@]}"}
+
+exit_status=$?
+if [ $exit_status -ne 0 ]; then
+    exit $exit_status
+fi
+
+if [ "$lint" = "true" ]; then
+    echo "Linting.."
+    case "$pkg_type" in
+        deb)
+            if ! command -v lintian; then
+                echo "WARN: --lint was set, but lintian was not found, skipping"
+                exit 0
+            fi
+            if ! lintian --fail-on warning --profile "${os_name}" --suppress-tags-from-file dist/debian/lintian-ignore "${pkg_path}"; then
+                echo "Package failed lint checks!"
+                exit 1
+            fi
+            ;;
+        rpm)
+            if ! command -v rpmlint; then
+                echo "WARN: --lint was set, but rpmlint was not found, skipping"
+                exit 0
+            fi
+            if ! rpmlint --strict "${pkg_path}"; then
+                echo "Package failed lint checks!"
+                exit 1
+            fi
+            ;;
+        *)
+            echo "WARN: --lint was set, but no linter available for ${pkg_type} packages, skipping"
+            ;;
+    esac
+fi
+
+echo "Packaging complete! You can find the generated package at ${pkg_path}"
