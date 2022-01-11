@@ -1,6 +1,13 @@
 name: lint
 on:
   pull_request:
+    paths-ignore:
+    - '.github/workflows/ci.yaml'
+    - '.github/workflows/docker.yaml'
+    - '.github/workflows/release.yaml'
+    - 'dist/*'
+    - 'tools/package'
+    - '*.md'
 
 jobs:
   fmt:
