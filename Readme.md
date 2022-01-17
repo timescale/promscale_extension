@@ -16,6 +16,46 @@ To compile the extension (see instructions below):
 
 ## Installation ##
 
+### Precompiled OS Packages ###
+
+You can install the promscale extension from extension version 0.3.0 with precompiled deb and rpm packages for Debian and RedHat-based distributions. The packages are available with the GitHub [release](https://github.com/timescale/promscale_extension/releases). The extension builds on Postgres' official packages for each distribution and is compatible with Postgres versions 12, 13, and 14.
+
+#### Debian Derivatives ####
+
+1. Install Postgres
+    ```
+    apt-get install -y wget gnupg2 lsb-release
+    echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
+    wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
+    apt-get update
+    apt-get install -y postgresql-14
+    ```
+
+2. Install the extension
+    ```
+    wget https://github.com/timescale/promscale_extension/releases/download/0.3.0/promscale_extension-0.3.0.pg14.x86_64.deb
+    dpkg -i promscale_extension-0.3.0.pg14.x86_64.deb
+    ```
+
+#### RedHat Derivatives ####
+
+Note: This example is for CentOS 7. Please refer to Postgres' [documentation](https://www.postgresql.org/download/linux/redhat/) if you're using a different version or distribution.
+
+1. Install Postgres
+    ```
+    yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+    yum install -y postgresql14-server
+    ```
+
+2. Install the extension
+    ```
+    yum install -y wget
+    wget https://github.com/timescale/promscale_extension/releases/download/0.3.0/promscale_extension-0.3.0.pg14.x86_64.rpm
+    yum localinstall -y promscale_extension-0.3.0.pg14.x86_64.rpm
+    ```
+
+### Compile From Source ###
+
 The extension is installed by default on the
 [`timescaledev/promscale-extension:latest-pg12`](https://hub.docker.com/r/timescaledev/promscale-extension) docker image.
 
