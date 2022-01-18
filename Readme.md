@@ -1,11 +1,11 @@
-# Promscale Extension #
+# Promscale Extension
 
 This [Postgres extension](https://www.postgresql.org/docs/12/extend-extensions.html)
 contains support functions to improve the performance of Promscale.
 While Promscale will run without it, adding this extension will
 cause it to perform better.
 
-## Requirements ##
+## Requirements
 
 To run the extension:
 - PostgreSQL version 12 or newer.
@@ -14,13 +14,17 @@ To compile the extension (see instructions below):
 - Rust compiler
 - PGX framework
 
-## Installation ##
+## Installation
 
-### Precompiled OS Packages ###
+### Precompiled OS Packages
 
-You can install the promscale extension from extension version 0.3.0 with precompiled deb and rpm packages for Debian and RedHat-based distributions. The packages are available with the GitHub [release](https://github.com/timescale/promscale_extension/releases). The extension builds on Postgres' official packages for each distribution and is compatible with Postgres versions 12, 13, and 14.
+You can install the promscale extension starting from the 0.3.0 release, using precompiled .deb and .rpm packages for Debian and RedHat-based distributions. 
 
-#### Debian Derivatives ####
+The packages can be found on the GitHub [release page](https://github.com/timescale/promscale_extension/releases). 
+
+The extension depends on Postgres' official packages for each distribution and is compatible with Postgres versions 12, 13, and 14.
+
+#### Debian Derivatives
 
 1. Install Postgres
     ```
@@ -37,13 +41,21 @@ You can install the promscale extension from extension version 0.3.0 with precom
     dpkg -i promscale_extension-0.3.0.pg14.x86_64.deb
     ```
 
-#### RedHat Derivatives ####
+#### RHEL/CentOS/Fedora
 
-Note: This example is for CentOS 7. Please refer to Postgres' [documentation](https://www.postgresql.org/download/linux/redhat/) if you're using a different version or distribution.
+NOTE: In the following instructions, `$PG_REPO` is used to indicate the yum repo for PostgreSQL. The repo is slightly
+different between RHEL/CentOS and Fedora, and contains the major version of the distro:
+
+* RHEL/CentOS: `PG_REPO=https://download.postgresql.org/pub/repos/yum/reporpms/EL-${OS_MAJOR_VERSION}-x86_64/pgdg-redhat-repo-latest.noarch.rpm`
+* Fedora: `PG_REPO=https://download.postgresql.org/pub/repos/yum/reporpms/F-${OS_MAJOR_VERSION}-x86_64/pgdg-redhat-repo-latest.noarch.rpm`
+
+So for example, if we are installing on CentOS 7, the value of `$PG_REPO` would be `https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm`.
+
+See the Postgres [documentation](https://www.postgresql.org/download/linux/redhat/) for more information.
 
 1. Install Postgres
     ```
-    yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+    yum install -y $PG_REPO
     yum install -y postgresql14-server
     ```
 
@@ -54,7 +66,7 @@ Note: This example is for CentOS 7. Please refer to Postgres' [documentation](ht
     yum localinstall -y promscale_extension-0.3.0.pg14.x86_64.rpm
     ```
 
-### Compile From Source ###
+### Compile From Source
 
 The extension is installed by default on the
 [`timescaledev/promscale-extension:latest-pg12`](https://hub.docker.com/r/timescaledev/promscale-extension) docker image.
@@ -129,6 +141,6 @@ For bare-metal installations, the full instructions for setting up PostgreSQL, T
 
 This extension will be created via `CREATE EXTENSION` automatically by the Promscale connector and should not be created manually.
 
-## Common Compilation Issues ##
+## Common Compilation Issues
 
 - `cargo: No such file or directory` means the [Rust compiler](https://www.rust-lang.org/tools/install) is not installed
