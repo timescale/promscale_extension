@@ -38,7 +38,7 @@ RUN \
 # Remove crt-static feature on musl target to allow building cdylibs
 ENV RUSTFLAGS="-C target-feature=-crt-static"
 RUN --mount=type=cache,uid=70,gid=70,target=/build/promscale/.cargo/registry \
-    cargo install cargo-pgx && \
+    cargo install cargo-pgx --git https://github.com/timescale/pgx --branch promscale-staging && \
     cargo pgx init --${PG_VERSION_TAG} $(which pg_config)
 
 # Build extension

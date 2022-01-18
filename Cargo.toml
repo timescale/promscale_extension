@@ -34,3 +34,8 @@ serde_json = { version = "1.0.70", optional = true }
 
 [dev-dependencies]
 pgx-tests = "0.2.5"
+
+[patch.crates-io]
+pgx = { git = "https://github.com/timescale/pgx", branch = "promscale-staging" }
+pgx-macros = { git = "https://github.com/timescale/pgx", branch = "promscale-staging" }
+pgx-tests = { git = "https://github.com/timescale/pgx", branch = "promscale-staging" }

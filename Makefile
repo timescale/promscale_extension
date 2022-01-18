@@ -16,11 +16,11 @@ clean:
 
 .PHONY: package
 package:
-	cargo pgx package --pg_config ${PG_CONFIG}
+	cargo pgx package --pg-config ${PG_CONFIG}
 
 .PHONY: install
 install:
-	cargo pgx install --pg_config ${PG_CONFIG}
+	cargo pgx install --pg-config ${PG_CONFIG}
 
 PG_VER ?= pg12
 PUSH ?= FALSE

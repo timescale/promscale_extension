@@ -37,7 +37,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: install
-          args: cargo-pgx
+          args: cargo-pgx --git https://github.com/timescale/pgx --branch promscale-staging
 
       - name: Initialize pgx
         uses: actions-rs/cargo@v1
