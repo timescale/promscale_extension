@@ -2,15 +2,18 @@
 
 This [Postgres extension](https://www.postgresql.org/docs/12/extend-extensions.html)
 contains support functions to improve the performance of Promscale.
+
 While Promscale will run without it, adding this extension will
 cause it to perform better.
 
 ## Requirements
 
 To run the extension:
+
 - PostgreSQL version 12 or newer.
 
 To compile the extension (see instructions below):
+
 - Rust compiler
 - PGX framework
 
@@ -22,7 +25,10 @@ You can install the promscale extension starting from the 0.3.0 release, using p
 
 The packages can be found on the GitHub [release page](https://github.com/timescale/promscale_extension/releases). 
 
-The extension depends on Postgres' official packages for each distribution and is compatible with Postgres versions 12, 13, and 14.
+While the extension declares a dependency on Postgres 12-14, it can be run on TimescaleDB 2.x as well, which fufills the requirement
+on Postgres indirectly. You can find the installation instructions for TimescaleDB [here](https://docs.timescale.com/install/latest/self-hosted/)
+
+If you are using TimescaleDB, the steps below which install Postgres can be skipped.
 
 #### Debian Derivatives
 
