@@ -3,3 +3,5 @@ dist/*.rpm
 dist/*.deb
 dist/*.tar
 /target
+.idea/
+migration.sql

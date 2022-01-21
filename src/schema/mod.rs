@@ -3,4 +3,5 @@
 
 mod estimates;
 mod setup;
+mod sql;
 mod support;

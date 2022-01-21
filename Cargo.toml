@@ -32,6 +32,9 @@ num_cpus = "1.13.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0.70", optional = true }
 
+[build-dependencies]
+askama = "0.11.0"
+
 [dev-dependencies]
 pgx-tests = "0.2.5"
 
