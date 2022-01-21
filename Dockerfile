@@ -54,10 +54,12 @@ RUN --mount=type=cache,uid=70,gid=70,target=/build/promscale/.cargo/registry \
 
 # Build extension
 COPY Cargo.* /build/promscale/
-COPY promscale.control Makefile /build/promscale/
+COPY promscale.control Makefile build.rs /build/promscale/
 COPY .cargo/ /build/promscale/.cargo/
 COPY src/ /build/promscale/src/
 COPY sql/*.sql /build/promscale/sql/
+COPY migration/ /build/promscale/migration
+COPY templates/ /build/promscale/templates/
 
 RUN --mount=type=cache,uid=70,gid=70,target=/build/promscale/.cargo/registry \
     make package
