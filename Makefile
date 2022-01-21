@@ -2,7 +2,7 @@
 
 PG_CONFIG?=pg_config
 
-EXT_VERSION = $(shell cat promscale.control | grep 'default' | sed "s/^.*'\(.*\)'$\/\1/g")
+EXT_VERSION = $(shell cargo pkgid | cut -d'\#' -f2 | cut -d ':' -f2)
 PG_VERSION = $(shell ${PG_CONFIG} --version | awk -F'[ \.]' '{print $$2}')
 
 .PHONY: build
