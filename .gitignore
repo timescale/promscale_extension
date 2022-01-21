@@ -1,7 +1,2 @@
-.deps
-src/*.o
-src/*.bc
-src/*.d
-promscale.so
 /target
 .idea/
