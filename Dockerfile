@@ -19,12 +19,12 @@ RUN \
         linux-headers \
         openssl-dev
 
-WORKDIR /build/promscale
+WORKDIR /home/promscale
 
-ENV HOME=/build/promscale \
-    PATH=/build/promscale/.cargo/bin:$PATH
+ENV HOME=/home/promscale \
+    PATH=/home/promscale/.cargo/bin:$PATH
 
-RUN chown postgres:postgres /build/promscale
+RUN chown postgres:postgres /home/promscale
 
 # We must use a non-root user due to `pgx init` requirements
 USER postgres
@@ -41,9 +41,15 @@ RUN --mount=type=cache,uid=70,gid=70,target=/build/promscale/.cargo/registry \
     cargo install cargo-pgx --git https://github.com/timescale/pgx --branch promscale-staging && \
     cargo pgx init --${PG_VERSION_TAG} $(which pg_config)
 
+USER root
+WORKDIR /build/promscale
+RUN chown postgres:postgres /build/promscale
+USER postgres
+
 # Build extension
 COPY Cargo.* /build/promscale/
 COPY promscale.control Makefile /build/promscale/
+COPY .cargo/ /build/promscale/.cargo/
 COPY src/ /build/promscale/src/
 COPY sql/*.sql /build/promscale/sql/
 
