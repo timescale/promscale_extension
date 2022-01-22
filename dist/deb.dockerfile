@@ -3,6 +3,7 @@
 ## Build base system
 ARG OS_NAME=debian
 ARG OS_VERSION=11
+ARG PG_VERSION
 FROM ${OS_NAME}:${OS_VERSION} as base
 
 SHELL ["/bin/bash", "-eu", "-o", "pipefail", "-c"]
@@ -95,7 +96,7 @@ EOF
 
 # Initialize PGX
 RUN <<EOF
-cargo install cargo-pgx
+cargo install cargo-pgx --git https://github.com/timescale/pgx --branch promscale-staging
 cargo pgx init --pg${PG_VERSION} /usr/lib/postgresql/${PG_VERSION}/bin/pg_config
 EOF
 
@@ -113,3 +114,32 @@ tools/package --lint --pg-version ${PG_VERSION} --out-dir /dist --package-name "
 rm -rf target/
 rm -rf .cargo/
 EOF
+
+FROM postgres:${PG_VERSION} AS tester
+ARG PG_VERSION
+ARG RELEASE_FILE_NAME
+
+SHELL ["/bin/bash", "-eE", "-o", "pipefail", "-c"]
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install TimescaleDB, as required by Promscale
+RUN <<EOF
+apt-get update -y && apt-get install -y curl
+
+export OS_CODENAME="$(source /etc/os-release; echo "${VERSION_CODENAME}")"
+echo "deb https://packagecloud.io/timescale/timescaledb/debian/ ${OS_CODENAME} main" > /etc/apt/sources.list.d/timescaledb.list
+
+curl --proto '=https' --tlsv1.2 -sSLf https://packagecloud.io/timescale/timescaledb/gpgkey | apt-key add -
+
+apt-get update -y && apt-get install -y "timescaledb-2-postgresql-${PG_VERSION}"
+
+echo '#/bin/bash' >> /docker-entrypoint-initdb.d/99-timescaledb-tune.sh
+echo 'set -e' >> /docker-entrypoint-initdb.d/99-timescaledb-tune.sh
+echo 'timescaledb-tune -quiet -yes' >> /docker-entrypoint-initdb.d/99-timescaledb-tune.sh
+EOF
+
+# Install the Promscale extension
+COPY --from=packager /dist/${RELEASE_FILE_NAME} /var/lib/postgresql/
+
+RUN dpkg -i "/var/lib/postgresql/${RELEASE_FILE_NAME}"

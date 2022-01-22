@@ -51,6 +51,7 @@ if command -v dnf; then dnf -qy module disable postgresql; fi
 
 # System dependencies
 yum install -y \
+    gettext \
     rpm-build \
     rpm-devel \
     rpmlint \
@@ -65,6 +66,9 @@ yum install -y \
     diffutils \
     git
 
+# Use UTFF-8 as the locale
+localedef -f UTF-8 -i en_US en_US.UTF-8
+
 # Install FPM
 gem install fpm
 
@@ -74,6 +78,8 @@ mv jq-linux64 /usr/local/bin/jq
 chmod +x /usr/local/bin/jq
 EOF
 
+ENV LANG=en_US.UTF-8
+
 # Setup postgres separately from the base image for better caching
 FROM base AS base-postgres
 ARG PG_VERSION
@@ -82,19 +88,42 @@ RUN <<EOF
 export OS_NAME="$(source /etc/os-release; echo "${ID}")"
 export OS_VERSION="$(source /etc/os-release; echo "${VERSION_ID}")"
 
+export PG_ARCH
+case "$(uname -m)" in
+    amd64|x86_64)
+        PG_ARCH=x86_64
+        ;;
+
+    arm64|aarch64)
+        PG_ARCH=aarch64
+        ;;
+    *)
+        echo "Unsupported architecture! Expected one of amd64,x86_64,arm64,aarch64"
+        exit 2
+        ;;
+esac
+
 PG_REPO=
 if [ "${OS_NAME}" = "fedora" ]; then
-    PG_REPO="https://download.postgresql.org/pub/repos/yum/reporpms/F-${OS_VERSION}-x86_64/pgdg-fedora-repo-latest.noarch.rpm"
+    PG_REPO="https://download.postgresql.org/pub/repos/yum/reporpms/F-${OS_VERSION}-${PG_ARCH}/pgdg-fedora-repo-latest.noarch.rpm"
 else
-    PG_REPO="https://download.postgresql.org/pub/repos/yum/reporpms/EL-${OS_VERSION}-x86_64/pgdg-redhat-repo-latest.noarch.rpm"
+    PG_REPO="https://download.postgresql.org/pub/repos/yum/reporpms/EL-${OS_VERSION}-${PG_ARCH}/pgdg-redhat-repo-latest.noarch.rpm"
 fi
 
 # Install supported Postgres versions
 yum install -y "${PG_REPO}"
 yum install -y \
+    sudo \
     postgresql${PG_VERSION}-server \
     postgresql${PG_VERSION}-devel
+EOF
 
+## Build extension
+FROM base-postgres AS builder
+ARG PG_VERSION
+ARG RUST_VERSION
+
+RUN <<EOF
 # User with which package builds will run
 useradd -m -d /home/builder -s /bin/bash builder
 
@@ -102,11 +131,6 @@ useradd -m -d /home/builder -s /bin/bash builder
 mkdir -p /dist
 chmod a+rw /dist
 EOF
-
-## Build extension
-FROM base-postgres AS builder
-ARG PG_VERSION
-ARG RUST_VERSION
 
 USER builder
 WORKDIR /home/builder
@@ -123,7 +147,7 @@ EOF
 
 # Initialize PGX
 RUN <<EOF
-cargo install cargo-pgx
+cargo install cargo-pgx --git https://github.com/timescale/pgx --branch promscale-staging
 cargo pgx init --pg${PG_VERSION} /usr/pgsql-${PG_VERSION}/bin/pg_config
 EOF
 
@@ -140,3 +164,47 @@ tools/package --pg-version ${PG_VERSION} --out-dir /dist
 rm -rf target/
 rm -rf .cargo/
 EOF
+
+FROM packager AS tester
+ARG PG_VERSION
+ARG RELEASE_FILE_NAME
+
+USER root
+
+COPY dist/tester/timescale_timescaledb.repo /etc/yum.repos.d/
+
+RUN <<EOF
+export OS_VERSION="$(source /etc/os-release; echo "${VERSION_ID}")"
+echo "baseurl=https://packagecloud.io/timescale/timescaledb/el/${OS_VERSION}/\$basearch" >> /etc/yum.repos.d/timescale_timescaledb.repo
+
+yum update -y
+yum install -y "timescaledb-2-postgresql-${PG_VERSION}"
+
+# Listen on all interfaces by default
+sed -ri "s!^#?(listen_addresses)\s*=\s*\S+.*!\1 = '*'!" /usr/pgsql-${PG_VERSION}/share/postgresql.conf.sample
+EOF
+
+# Install package
+RUN rpm -i "/dist/${RELEASE_FILE_NAME}"
+
+USER postgres
+WORKDIR /var/lib/pgsql-${PG_VERSION}
+ENV PGDATA=/var/lib/pgsql/${PG_VERSION}/data \
+    PATH=/usr/pgsql-${PG_VERSION}/bin:$PATH
+
+# Initialize Postgres data directory
+RUN <<EOF
+initdb --username=postgres --pwfile=<(echo 'postgres') "${PGDATA}"
+
+timescaledb-tune -quiet -yes
+EOF
+
+COPY --chown=postgres dist/tester/entrypoint /usr/local/bin/tester
+
+# Listen on 5432 by default
+EXPOSE 5432
+# Postgres responds to SIGINT with a fast shutdown
+STOPSIGNAL SIGINT
+
+ENTRYPOINT ["tester"]
+CMD ["postgres"]

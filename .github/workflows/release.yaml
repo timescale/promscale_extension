@@ -29,20 +29,9 @@ jobs:
           codename: bullseye
           pkg_type: deb
         - name: linux
-          distro: ubuntu
-          version: 21.04
-          codename: hirsute
-          kernel: linux
-          pkg_type: deb
-        - name: linux
           distro: centos
           version: 7
           codename: 7
-          pkg_type: rpm
-        - name: linux
-          distro: centos
-          version: 8
-          codename: 8
           pkg_type: rpm
         postgres:
         - version: "12"
@@ -86,6 +75,7 @@ jobs:
         load: true
         platforms: ${{ matrix.os.name }}/${{ matrix.arch.platform }}
         file: dist/${{ matrix.os.pkg_type }}.dockerfile
+        target: packager
         build-args: |
           OS_NAME=${{ matrix.os.distro }}
           OS_VERSION=${{ matrix.os.version }}
@@ -103,6 +93,32 @@ jobs:
         docker cp ${container}:/dist/${{ steps.metadata.outputs.filename }} artifacts/${{ steps.metadata.outputs.outfile }}
         docker rm -f "${container}"
         ls -la artifacts/*
+
+    - name: Build Package Tester
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        load: true
+        platforms: ${{ matrix.os.name }}/${{ matrix.arch.platform }}
+        file: dist/${{ matrix.os.pkg_type }}.dockerfile
+        target: tester
+        build-args: |
+          OS_NAME=${{ matrix.os.distro }}
+          OS_VERSION=${{ matrix.os.version }}
+          PG_VERSION=${{ matrix.postgres.version }}
+          RUST_VERSION=${{ env.RUST_VERSION }}
+          RELEASE_FILE_NAME=${{ steps.metadata.outputs.filename }}
+        tags: ${{ steps.metadata.outputs.image }}-test
+
+    - name: Test Package
+      env:
+        PROMSCALE_VERSION: "0.8.0"
+        SERVER_NAME: pg${{ matrix.postgres.version }}-${{ matrix.os.distro }}${{ matrix.os.version }}
+      run: |
+        set -e
+        docker run --rm --name "${SERVER_NAME}" -e POSTGRES_PASSWORD=postgres --platform "${PLATFORM}" -dt "${{ steps.metadata.outputs.image }}-test";
+        docker run --rm --link "${SERVER_NAME}" --platform "${PLATFORM}" -t timescale/promscale:${PROMSCALE_VERSION} -db.uri "postgres://postgres:postgres@${SERVER_NAME}:5432/postgres?sslmode=disable" -startup.only;
+        docker rm -f "${SERVER_NAME}"
 
     - name: Upload Artifact for Job
       uses: actions/upload-artifact@v2

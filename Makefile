@@ -12,6 +12,13 @@ PG_VER ?= pg${PG_VERSION}
 # If set to a non-empty value, docker builds will be pushed to the registry
 PUSH ?=
 
+# Transform ARCH to its Docker platform equivalent
+ifeq ($(ARCH),arm64)
+	DOCKER_PLATFORM=linux/arm64
+endif
+ifeq ($(ARCH),x86_64)
+	DOCKER_PLATFORM=linux/amd64
+endif
 # Calculate the correct dockerfile to use when running the release target
 ifeq ($(OS_NAME),debian)
 	DOCKERFILE = deb.dockerfile
@@ -35,6 +42,7 @@ ifeq ($(OS_NAME),fedora)
 endif
 RELEASE_IMAGE_NAME = promscale-extension-pkg:$(EXT_VERSION)-$(OS_NAME)$(OS_VERSION)-$(PG_VER)
 RELEASE_FILE_NAME = promscale_extension-$(EXT_VERSION).$(PG_VER).$(OS_NAME)$(OS_VERSION).$(ARCH).$(PKG_TYPE)
+TESTER_NAME = pg$(PG_VERSION)-$(OS_NAME)$(OS_VERSION)
 
 .PHONY: help
 help:
@@ -70,15 +78,46 @@ release-builder: dist/$(DOCKERFILE) ## Build image with the release artifact for
 ifndef DOCKERFILE
 	$(error Unsupported OS_NAME '$(OS_NAME)'! Expected one of debian,ubuntu,centos,rhel,fedora)
 endif
-	docker buildx build --load \
+ifndef DOCKER_PLATFORM
+	$(error Unsupported ARCH '$(ARCH)'! Expected one of arm64,x86_64)
+endif
+	docker buildx build --load --platform $(DOCKER_PLATFORM) \
 		--build-arg OS_NAME=$(OS_NAME) \
 		--build-arg OS_VERSION=$(OS_VERSION) \
 		--build-arg PG_VERSION=$(PG_VERSION) \
 		--build-arg RUST_VERSION=$(RUST_VERSION) \
 		--build-arg RELEASE_FILE_NAME=$(RELEASE_FILE_NAME) \
+		--target packager \
 		-t $(RELEASE_IMAGE_NAME) \
 		-f dist/$(DOCKERFILE) \
 		.
+
+.PHONY: release-tester
+release-tester: dist/$(DOCKERFILE) ## Build image used for testing a specific release package
+ifndef DOCKERFILE
+	$(error Unsupported OS_NAME '$(OS_NAME)'! Expected one of debian,ubuntu,centos,rhel,fedora)
+endif
+ifndef DOCKER_PLATFORM
+	$(error Unsupported ARCH '$(ARCH)'! Expected one of arm64,x86_64)
+endif
+	docker buildx build --load --platform $(DOCKER_PLATFORM) \
+		--build-arg OS_NAME=$(OS_NAME) \
+		--build-arg OS_VERSION=$(OS_VERSION) \
+		--build-arg PG_VERSION=$(PG_VERSION) \
+		--build-arg RUST_VERSION=$(RUST_VERSION) \
+		--build-arg RELEASE_FILE_NAME=$(RELEASE_FILE_NAME) \
+		--target tester \
+		-t "$(RELEASE_IMAGE_NAME)-test" \
+		-f dist/$(DOCKERFILE) \
+		.
+
+.PHONY: release-test
+release-test: release-tester ## Test the currently selected release package
+	docker run --rm --name "$(TESTER_NAME)" -e POSTGRES_PASSWORD=postgres -dt "$(RELEASE_IMAGE_NAME)-test"; \
+	if ! docker run --rm --link "$(TESTER_NAME)" -it timescale/promscale:latest -db.uri "postgres://postgres:postgres@$(TESTER_NAME):5432/postgres?sslmode=allow" -startup.only; then \
+		echo "Encountered error while testing package $(RELEASE_FILE_NAME)"; \
+	fi; \
+	docker rm -f "$(TESTER_NAME)"
 
 .PHONY: docker-image-build-1 docker-image-build-2-12 docker-image-build-2-13 docker-image-build-2-14
 docker-image-build-1 docker-image-build-2-12 docker-image-build-2-13 docker-image-build-2-14: Dockerfile $(SQL_FILES) $(SRCS) Cargo.toml Cargo.lock $(RUST_SRCS)
