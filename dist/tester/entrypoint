@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+
+set -Eeo pipefail
+
+_pg_want_help() {
+     local arg
+     for arg; do
+        case "$arg" in
+            # postgres --help | grep 'then exit'
+            # leaving out -C on purpose since it always fails and is unhelpful:
+            -'?'|--help|--describe-config|-V|--version)
+            return 0
+            ;;
+        esac
+     done
+     return 1
+}
+
+# append POSTGRES_HOST_AUTH_METHOD to pg_hba.conf for "host" connections
+# all arguments will be passed along as arguments to `postgres` for getting the value of 'password_encryption'
+pg_setup_hba_conf() {
+    # default authentication method is md5 on versions before 14
+    # https://www.postgresql.org/about/news/postgresql-14-released-2318/
+    if [ "$1" = 'postgres' ]; then
+        shift
+    fi
+    local auth
+    # check the default/configured encryption and use that as the auth method
+    auth="$(postgres -C password_encryption "$@")"
+    : "${POSTGRES_HOST_AUTH_METHOD:=$auth}"
+    {
+        echo
+        if [ 'trust' = "$POSTGRES_HOST_AUTH_METHOD" ]; then
+            echo '# warning trust is enabled for all connections'
+            echo '# see https://www.postgresql.org/docs/12/auth-trust.html'
+        fi
+        echo "host all all all $POSTGRES_HOST_AUTH_METHOD"
+    } >> "$PGDATA/pg_hba.conf"
+}
+
+# If first argument is option-like, assume user wants to run the postgres server
+if [ "${1:0:1}" = '-' ]; then
+    set -- postgres "$@"
+fi
+
+if [ "$1" = 'postgres' ] && ! _pg_want_help "$@"; then
+    # If run as root, re-run script as postgres user
+    if [ "$(id -u)" = '0' ]; then
+        exec sudo -u postgres "$BASH_SOURCE" "$@"
+    fi
+
+    pg_setup_hba_conf "$@"
+fi
+
+exec "$@"
