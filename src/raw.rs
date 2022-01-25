@@ -60,27 +60,3 @@ macro_rules! raw_type {
 pub struct bytea(pub pg_sys::Datum);
 
 raw_type!(bytea, pg_sys::BYTEAOID, pg_sys::BYTEAARRAYOID);
-
-/// We define our own `TimestampTz` data type which wraps and has interop with the underlying \
-/// `pg_sys::TimestampTz` type on purpose. `pg_sys::TimestampTz` is just an `i64`, so if we were to\
-/// use that, it would be exposed on our interfaces as a `bigint`.
-pub struct TimestampTz(pub pg_sys::Datum);
-
-raw_type!(
-    TimestampTz,
-    pg_sys::TIMESTAMPTZOID,
-    pg_sys::TIMESTAMPTZARRAYOID
-);
-
-#[allow(clippy::from_over_into)]
-impl Into<pg_sys::TimestampTz> for TimestampTz {
-    fn into(self) -> pg_sys::TimestampTz {
-        self.0 as _
-    }
-}
-
-impl From<pg_sys::TimestampTz> for TimestampTz {
-    fn from(ts: pg_sys::TimestampTz) -> Self {
-        Self(ts as _)
-    }
-}

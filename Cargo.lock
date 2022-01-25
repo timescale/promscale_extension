@@ -254,9 +254,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.0.9"
+version = "3.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c506244a13c87262f84bf16369740d0b7c3850901b6a642aa41b031a710c473"
+checksum = "08799f92c961c7a1cf0cc398a9073da99e21ce388b46372c37f3191f2f3eed3e"
 dependencies = [
  "atty",
  "bitflags",
@@ -271,9 +271,9 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "3.0.6"
+version = "3.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "517358c28fcef6607bf6f76108e02afad7e82297d132a6b846dcc1fc3efcd153"
+checksum = "0fd2078197a22f338bd4fbf7d6387eb6f0d6a3c69e6cbc09f5c93e97321fd92a"
 dependencies = [
  "heck",
  "proc-macro-error",
@@ -284,9 +284,9 @@ dependencies = [
 
 [[package]]
 name = "color-eyre"
-version = "0.5.11"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f1885697ee8a177096d42f158922251a41973117f6d8a234cee94b9509157b7"
+checksum = "9d6ec7641ff3474b7593009c809db602c414cd97c7d47a78ed004162b74ff96c"
 dependencies = [
  "backtrace",
  "color-spantrace",
@@ -294,19 +294,19 @@ dependencies = [
  "indenter",
  "once_cell",
  "owo-colors",
- "tracing-error 0.1.2",
+ "tracing-error",
 ]
 
 [[package]]
 name = "color-spantrace"
-version = "0.1.6"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6eee477a4a8a72f4addd4de416eb56d54bc307b284d6601bafdee1f4ea462d1"
+checksum = "1ba75b3d9449ecdccb27ecbc479fdc0b87fa2dd43d2f8298f9bf0e59aacc8dce"
 dependencies = [
  "once_cell",
  "owo-colors",
  "tracing-core",
- "tracing-error 0.1.2",
+ "tracing-error",
 ]
 
 [[package]]
@@ -319,6 +319,12 @@ dependencies = [
  "lazy_static",
  "winapi 0.3.9",
 ]
+
+[[package]]
+name = "convert_case"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
 
 [[package]]
 name = "cortex-m"
@@ -343,9 +349,9 @@ dependencies = [
 
 [[package]]
 name = "crc32fast"
-version = "1.3.0"
+version = "1.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "738c290dfaea84fc1ca15ad9c168d083b05a714e1efddd8edaab678dc28d2836"
+checksum = "a2209c310e29876f7f0b2721e7e26b84aff178aa3da5d091f9bfbf47669e60e3"
 dependencies = [
  "cfg-if",
 ]
@@ -499,9 +505,9 @@ dependencies = [
 
 [[package]]
 name = "eyre"
-version = "0.6.5"
+version = "0.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "221239d1d5ea86bf5d6f91c9d6bc3646ffe471b08ff9b0f91c44f115ac969d2b"
+checksum = "bc225d8f637923fe585089fcf03e705c222131232d2c1fb622e84ecf725d0eb8"
 dependencies = [
  "indenter",
  "once_cell",
@@ -697,9 +703,9 @@ checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 
 [[package]]
 name = "heapless"
-version = "0.7.9"
+version = "0.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e476c64197665c3725621f0ac3f9e5209aa5e889e02a08b1daf5f16dc5fd952"
+checksum = "d076121838e03f862871315477528debffdb7462fb229216ecef91b1a3eb31eb"
 dependencies = [
  "atomic-polyfill",
  "hash32",
@@ -781,12 +787,6 @@ dependencies = [
 
 [[package]]
 name = "itoa"
-version = "0.4.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b71991ff56294aa922b450139ee08b3bfc70982c6b2c7562771375cf73542dd4"
-
-[[package]]
-name = "itoa"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1aab8fc367588b89dcee83ab0fd66b72b50b72fa1904d7095045ace2b0c81c35"
@@ -805,9 +805,9 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
 name = "libc"
-version = "0.2.112"
+version = "0.2.114"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b03d17f364a3a042d5e5d46b053bbbf82c92c9430c592dd4c064dc6ee997125"
+checksum = "b0005d08a8f7b65fb8073cb697aa0b12b631ed251ce73d862ce50eeb52ce3b50"
 
 [[package]]
 name = "libloading"
@@ -985,6 +985,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "num_threads"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97ba99ba6393e2c3734791401b66902d981cb03bf190af674ca69949b6d5fb15"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "object"
 version = "0.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1010,9 +1019,9 @@ dependencies = [
 
 [[package]]
 name = "owo-colors"
-version = "1.3.0"
+version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2386b4ebe91c2f7f51082d4cefa145d030e33a1842a96b12e4885cc3c01f7a55"
+checksum = "20448fd678ec04e6ea15bbe0476874af65e98a01515d667aa49f1434dc44ebf4"
 
 [[package]]
 name = "parking_lot"
@@ -1073,7 +1082,7 @@ dependencies = [
 [[package]]
 name = "pgx"
 version = "0.2.6"
-source = "git+https://github.com/timescale/pgx?branch=promscale-staging#95f7a205475dfe2f656537003f2dc3de47fd6398"
+source = "git+https://github.com/timescale/pgx?branch=promscale-staging#e05df835c86d4ab3af229a9728bcc74eb57d7bac"
 dependencies = [
  "atomic-traits",
  "bitflags",
@@ -1087,20 +1096,21 @@ dependencies = [
  "pgx-macros",
  "pgx-pg-sys",
  "pgx-utils",
+ "quote",
  "seahash",
  "serde",
  "serde_cbor",
  "serde_json",
  "time",
  "tracing",
- "tracing-error 0.2.0",
+ "tracing-error",
  "uuid",
 ]
 
 [[package]]
 name = "pgx-macros"
 version = "0.2.6"
-source = "git+https://github.com/timescale/pgx?branch=promscale-staging#95f7a205475dfe2f656537003f2dc3de47fd6398"
+source = "git+https://github.com/timescale/pgx?branch=promscale-staging#e05df835c86d4ab3af229a9728bcc74eb57d7bac"
 dependencies = [
  "pgx-utils",
  "proc-macro-crate",
@@ -1113,11 +1123,13 @@ dependencies = [
 [[package]]
 name = "pgx-pg-sys"
 version = "0.2.6"
-source = "git+https://github.com/timescale/pgx?branch=promscale-staging#95f7a205475dfe2f656537003f2dc3de47fd6398"
+source = "git+https://github.com/timescale/pgx?branch=promscale-staging#e05df835c86d4ab3af229a9728bcc74eb57d7bac"
 dependencies = [
  "bindgen",
  "build-deps",
+ "color-eyre",
  "colored",
+ "eyre",
  "memoffset",
  "num_cpus",
  "once_cell",
@@ -1132,9 +1144,10 @@ dependencies = [
 [[package]]
 name = "pgx-tests"
 version = "0.2.6"
-source = "git+https://github.com/timescale/pgx?branch=promscale-staging#95f7a205475dfe2f656537003f2dc3de47fd6398"
+source = "git+https://github.com/timescale/pgx?branch=promscale-staging#e05df835c86d4ab3af229a9728bcc74eb57d7bac"
 dependencies = [
  "colored",
+ "eyre",
  "lazy_static",
  "libc",
  "pgx",
@@ -1151,11 +1164,12 @@ dependencies = [
 [[package]]
 name = "pgx-utils"
 version = "0.2.6"
-source = "git+https://github.com/timescale/pgx?branch=promscale-staging#95f7a205475dfe2f656537003f2dc3de47fd6398"
+source = "git+https://github.com/timescale/pgx?branch=promscale-staging#e05df835c86d4ab3af229a9728bcc74eb57d7bac"
 dependencies = [
- "clap 3.0.9",
+ "clap 3.0.13",
  "color-eyre",
  "colored",
+ "convert_case",
  "dirs",
  "env_proxy",
  "eyre",
@@ -1171,8 +1185,8 @@ dependencies = [
  "syn",
  "toml",
  "tracing",
- "tracing-error 0.2.0",
- "tracing-subscriber 0.3.6",
+ "tracing-error",
+ "tracing-subscriber",
  "unescape",
  "url",
 ]
@@ -1314,9 +1328,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.14"
+version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47aa80447ce4daf1717500037052af176af5d38cc3e571d9ec1c7353fc10c87d"
+checksum = "864d3e96a899863136fc6e99f3d7cae289dafe43bf2c5ac19b70df7210c0a145"
 dependencies = [
  "proc-macro2",
 ]
@@ -1593,9 +1607,9 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.133"
+version = "1.0.136"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97565067517b60e2d1ea8b268e59ce036de907ac523ad83a0475da04e818989a"
+checksum = "ce31e24b01e1e524df96f1c2fdd054405f8d7376249a5110886fb4b658484789"
 dependencies = [
  "serde_derive",
 ]
@@ -1624,9 +1638,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.133"
+version = "1.0.136"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed201699328568d8d08208fdd080e3ff594e6c422e438b6705905da01005d537"
+checksum = "08597e7152fcd306f41838ed3e37be9eaeed2b61c42e2117266a554fab4662f9"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1635,11 +1649,11 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.75"
+version = "1.0.78"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c059c05b48c5c0067d4b4b2b4f0732dd65feb52daf7e0ea09cd87e7dadc1af79"
+checksum = "d23c1ba4cf0efd44be32017709280b32d1cea5c3f1275c3b6d9e8bc54f758085"
 dependencies = [
- "itoa 1.0.1",
+ "itoa",
  "ryu",
  "serde",
 ]
@@ -1696,9 +1710,9 @@ checksum = "f2dd574626839106c320a323308629dcb1acfc96e32a8cba364ddc61ac23ee83"
 
 [[package]]
 name = "socket2"
-version = "0.4.2"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5dc90fe6c7be1a323296982db1836d1ea9e47b6839496dde9a541bc496df3516"
+checksum = "66d72b759436ae32898a2af0a14218dbf55efde3feeb170eb623637db85ee1e0"
 dependencies = [
  "libc",
  "winapi 0.3.9",
@@ -1761,9 +1775,9 @@ checksum = "6bdef32e8150c2a081110b42772ffe7d7c9032b606bc226c8260fd97e0976601"
 
 [[package]]
 name = "syn"
-version = "1.0.85"
+version = "1.0.86"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a684ac3dcd8913827e18cd09a68384ee66c1de24157e3c556c9ab16d85695fb7"
+checksum = "8a65b3f4ffa0092e9887669db0eae07941f023991ab58ea44da8fe8e2d511c6b"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1816,21 +1830,22 @@ dependencies = [
 
 [[package]]
 name = "thread_local"
-version = "1.1.3"
+version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8018d24e04c95ac8790716a5987d0fec4f8b27249ffa0f7d33f1369bdfb88cbd"
+checksum = "5516c27b78311c50bf42c071425c560ac799b11c30b31f87e3081965fe5e0180"
 dependencies = [
  "once_cell",
 ]
 
 [[package]]
 name = "time"
-version = "0.3.5"
+version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41effe7cfa8af36f439fac33861b66b049edc6f9a32331e2312660529c1c24ad"
+checksum = "004cbc98f30fa233c61a38bc77e96a9106e65c88f2d3bef182ae952027e5753d"
 dependencies = [
- "itoa 0.4.8",
+ "itoa",
  "libc",
+ "num_threads",
  "time-macros",
 ]
 
@@ -1949,22 +1964,12 @@ dependencies = [
 
 [[package]]
 name = "tracing-error"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4d7c0b83d4a500748fa5879461652b361edf5c9d51ede2a2ac03875ca185e24"
-dependencies = [
- "tracing",
- "tracing-subscriber 0.2.25",
-]
-
-[[package]]
-name = "tracing-error"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d686ec1c0f384b1277f097b2f279a2ecc11afe8c133c1aabf036a27cb4cd206e"
 dependencies = [
  "tracing",
- "tracing-subscriber 0.3.6",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -1980,20 +1985,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-subscriber"
-version = "0.2.25"
+version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e0d2eaa99c3c2e41547cfa109e910a68ea03823cccad4a0525dcbc9b01e8c71"
-dependencies = [
- "sharded-slab",
- "thread_local",
- "tracing-core",
-]
-
-[[package]]
-name = "tracing-subscriber"
-version = "0.3.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77be66445c4eeebb934a7340f227bfe7b338173d3f8c00a60a5a58005c9faecf"
+checksum = "5312f325fe3588e277415f5a6cca1f4ccad0f248c4cd5a4bd33032d7286abc22"
 dependencies = [
  "ansi_term",
  "lazy_static",
@@ -2129,9 +2123,9 @@ checksum = "fd6fbd9a79829dd1ad0cc20627bf1ed606756a7f77edff7b66b7064f9cb327c6"
 
 [[package]]
 name = "which"
-version = "4.2.2"
+version = "4.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea187a8ef279bc014ec368c27a920da2024d2a711109bfbe3440585d5cf27ad9"
+checksum = "2a5a7e487e921cf220206864a94a89b6c6905bfc19f1057fa26a4cb360e5c1d2"
 dependencies = [
  "either",
  "lazy_static",
