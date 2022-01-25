@@ -5,27 +5,26 @@ use pgx::*;
 use crate::aggregate_utils::in_aggregate_context;
 use crate::aggregates::{GapfillDeltaTransition, Milliseconds};
 use crate::palloc::{Inner, InternalAsValue, ToInternal};
-use crate::raw::TimestampTz;
 
 #[allow(clippy::too_many_arguments)]
 #[pg_extern(immutable, parallel_safe)]
 pub fn prom_rate_transition(
     state: Internal,
-    lowest_time: TimestampTz,
-    greatest_time: TimestampTz,
+    lowest_time: pg_sys::TimestampTz,
+    greatest_time: pg_sys::TimestampTz,
     step_size: Milliseconds,
     range: Milliseconds, // the size of a window to calculate over
-    sample_time: TimestampTz,
+    sample_time: pg_sys::TimestampTz,
     sample_value: f64,
     fc: pg_sys::FunctionCallInfo,
 ) -> Internal {
     prom_rate_transition_inner(
         unsafe { state.to_inner() },
-        lowest_time.into(),
-        greatest_time.into(),
+        lowest_time,
+        greatest_time,
         step_size,
         range,
-        sample_time.into(),
+        sample_time,
         sample_value,
         fc,
     )

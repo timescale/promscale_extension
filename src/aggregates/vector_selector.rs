@@ -7,7 +7,7 @@ use crate::aggregates::{Milliseconds, STALE_NAN, USECS_PER_MS};
 use serde::{Deserialize, Serialize};
 
 use crate::palloc::{Inner, InternalAsValue, ToInternal};
-use crate::raw::{bytea, TimestampTz};
+use crate::raw::bytea;
 
 // a vector selector aggregate has the same semantics as parse.VectorSelector processing
 // in Prometheus. Namely, for all timestamps ts in the series:
@@ -21,21 +21,21 @@ use crate::raw::{bytea, TimestampTz};
 #[pg_extern(immutable, parallel_safe)]
 pub fn vector_selector_transition(
     state: Internal,
-    start_time: TimestampTz,
-    end_time: TimestampTz,
+    start_time: pg_sys::TimestampTz,
+    end_time: pg_sys::TimestampTz,
     bucket_width: Milliseconds,
     lookback: Milliseconds,
-    time: TimestampTz,
+    time: pg_sys::TimestampTz,
     value: f64,
     fcinfo: pg_sys::FunctionCallInfo,
 ) -> Internal {
     vector_selector_transition_inner(
         unsafe { state.to_inner() },
-        start_time.into(),
-        end_time.into(),
+        start_time,
+        end_time,
         bucket_width,
         lookback,
-        time.into(),
+        time,
         value,
         fcinfo,
     )
