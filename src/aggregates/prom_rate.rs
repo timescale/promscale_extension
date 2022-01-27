@@ -87,7 +87,7 @@ unsafe extern "C" fn gapfill_rate_transition(fcinfo: pg_sys::FunctionCallInfo) -
 // for proper behavior the input must be ORDER BY sample_time
 extension_sql!(
     r#"
-CREATE AGGREGATE @extschema@.prom_rate(
+CREATE OR REPLACE AGGREGATE @extschema@.prom_rate(
     lowest_time TIMESTAMPTZ,
     greatest_time TIMESTAMPTZ,
     step_size BIGINT,

@@ -86,7 +86,7 @@ unsafe extern "C" fn gapfill_increase_transition(
 // for proper behavior the input must be ORDER BY sample_time
 extension_sql!(
     r#"
-CREATE AGGREGATE @extschema@.prom_increase(
+CREATE OR REPLACE AGGREGATE @extschema@.prom_increase(
     lowest_time TIMESTAMPTZ,
     greatest_time TIMESTAMPTZ,
     step_size BIGINT,
