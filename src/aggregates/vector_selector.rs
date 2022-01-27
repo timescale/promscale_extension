@@ -136,7 +136,7 @@ fn vector_selector_combine_inner(
 
 extension_sql!(
     r#"
-CREATE AGGREGATE @extschema@.vector_selector(
+CREATE OR REPLACE AGGREGATE @extschema@.vector_selector(
     start_time TIMESTAMPTZ,
     end_time TIMESTAMPTZ,
     bucket_width BIGINT,
