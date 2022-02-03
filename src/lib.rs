@@ -5,6 +5,7 @@ mod aggregates;
 mod palloc;
 mod raw;
 mod schema;
+mod snappy;
 mod support;
 mod type_builder;
 mod util;
