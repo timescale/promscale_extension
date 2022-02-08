@@ -322,9 +322,9 @@ dependencies = [
 
 [[package]]
 name = "convert_case"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
+checksum = "fb4a24b1aaf0fd0ce8b45161144d6f42cd91677fd5940fd431183eb023b3a2b8"
 
 [[package]]
 name = "cortex-m"
@@ -420,6 +420,22 @@ checksum = "683d6b536309245c849479fba3da410962a43ed8e51c26b729208ec0ac2798d0"
 dependencies = [
  "generic-array",
 ]
+
+[[package]]
+name = "cstr_core"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "644828c273c063ab0d39486ba42a5d1f3a499d35529c759e763a9c6cb8a0fb08"
+dependencies = [
+ "cty",
+ "memchr",
+]
+
+[[package]]
+name = "cty"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b365fabc795046672053e29c954733ec3b05e4be654ab130fe8f1f94d7051f35"
 
 [[package]]
 name = "digest"
@@ -805,9 +821,9 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
 name = "libc"
-version = "0.2.114"
+version = "0.2.117"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0005d08a8f7b65fb8073cb697aa0b12b631ed251ce73d862ce50eeb52ce3b50"
+checksum = "e74d72e0f9b65b5b4ca49a346af3976df0f9c61d550727f349ecd559f251a26c"
 
 [[package]]
 name = "libloading"
@@ -1082,10 +1098,11 @@ dependencies = [
 [[package]]
 name = "pgx"
 version = "0.2.6"
-source = "git+https://github.com/timescale/pgx?branch=promscale-staging#e05df835c86d4ab3af229a9728bcc74eb57d7bac"
+source = "git+https://github.com/timescale/pgx?branch=promscale-staging#271be6a1039d52ae998f7b0bb16fc28480e44af0"
 dependencies = [
  "atomic-traits",
  "bitflags",
+ "cstr_core",
  "enum-primitive-derive",
  "eyre",
  "hash32",
@@ -1110,7 +1127,7 @@ dependencies = [
 [[package]]
 name = "pgx-macros"
 version = "0.2.6"
-source = "git+https://github.com/timescale/pgx?branch=promscale-staging#e05df835c86d4ab3af229a9728bcc74eb57d7bac"
+source = "git+https://github.com/timescale/pgx?branch=promscale-staging#271be6a1039d52ae998f7b0bb16fc28480e44af0"
 dependencies = [
  "pgx-utils",
  "proc-macro-crate",
@@ -1123,7 +1140,7 @@ dependencies = [
 [[package]]
 name = "pgx-pg-sys"
 version = "0.2.6"
-source = "git+https://github.com/timescale/pgx?branch=promscale-staging#e05df835c86d4ab3af229a9728bcc74eb57d7bac"
+source = "git+https://github.com/timescale/pgx?branch=promscale-staging#271be6a1039d52ae998f7b0bb16fc28480e44af0"
 dependencies = [
  "bindgen",
  "build-deps",
@@ -1144,7 +1161,7 @@ dependencies = [
 [[package]]
 name = "pgx-tests"
 version = "0.2.6"
-source = "git+https://github.com/timescale/pgx?branch=promscale-staging#e05df835c86d4ab3af229a9728bcc74eb57d7bac"
+source = "git+https://github.com/timescale/pgx?branch=promscale-staging#271be6a1039d52ae998f7b0bb16fc28480e44af0"
 dependencies = [
  "colored",
  "eyre",
@@ -1164,7 +1181,7 @@ dependencies = [
 [[package]]
 name = "pgx-utils"
 version = "0.2.6"
-source = "git+https://github.com/timescale/pgx?branch=promscale-staging#e05df835c86d4ab3af229a9728bcc74eb57d7bac"
+source = "git+https://github.com/timescale/pgx?branch=promscale-staging#271be6a1039d52ae998f7b0bb16fc28480e44af0"
 dependencies = [
  "clap 3.0.13",
  "color-eyre",
