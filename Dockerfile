@@ -64,6 +64,22 @@ COPY templates/ /build/promscale/templates/
 RUN --mount=type=cache,uid=70,gid=70,target=/build/promscale/.cargo/registry \
     make package
 
+FROM timescale/timescaledb:${TIMESCALEDB_VERSION}-${PG_VERSION_TAG} as pgextwlist-builder
+
+RUN \
+    apk add --no-cache --virtual .build-deps \
+        gcc \
+        libc-dev \
+        make \
+        git \
+        clang \
+        llvm
+
+RUN \
+    git clone --branch v1.12 --depth 1 https://github.com/dimitri/pgextwlist.git /pgextwlist && \
+    cd /pgextwlist && \
+    make
+
 # COPY over the new files to the image. Done as a seperate stage so we don't
 # ship the build tools.
 FROM timescale/timescaledb:${TIMESCALEDB_VERSION}-${PG_VERSION_TAG}
@@ -71,3 +87,5 @@ ARG PG_VERSION_TAG
 
 COPY --from=builder /build/promscale/target/release/promscale-${PG_VERSION_TAG}/usr/local/lib/postgresql /usr/local/lib/postgresql
 COPY --from=builder /build/promscale/target/release/promscale-${PG_VERSION_TAG}/usr/local/share/postgresql /usr/local/share/postgresql
+RUN mkdir -p /usr/local/lib/postgresql/plugins
+COPY --from=pgextwlist-builder /pgextwlist/pgextwlist.so /usr/local/lib/postgresql/plugins
