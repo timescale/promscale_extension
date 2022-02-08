@@ -318,10 +318,15 @@ impl VectorSelector {
         bucket_width: Milliseconds,
         lookback: Milliseconds,
     ) -> Self {
-        let num_buckets = ((end_time - start_time) / (bucket_width * USECS_PER_MS)) + 1;
-
-        let last_bucket_max_time =
-            end_time - ((end_time - start_time) % (bucket_width * USECS_PER_MS));
+        let (num_buckets, last_bucket_max_time) = {
+            if bucket_width == 0 {
+                (1, end_time)
+            } else {
+                let num_buckets = ((end_time - start_time) / (bucket_width * USECS_PER_MS)) + 1;
+                let max_time = end_time - ((end_time - start_time) % (bucket_width * USECS_PER_MS));
+                (num_buckets, max_time)
+            }
+        };
 
         VectorSelector {
             first_bucket_max_time: start_time,
@@ -694,6 +699,77 @@ mod tests {
                 Some(100_f64)
             ]
         );
+    }
+
+    /// ```text
+    ///                           t
+    ///                           |
+    ///  ts:  a
+    ///       ^-------------------|
+    /// out:                      a
+    ///       |------lookback-----|
+    /// ```
+    #[pg_test]
+    fn test_vector_selector_instant_vector() {
+        setup();
+        let result = Spi::get_one::<Vec<Option<f64>>>(
+            r#"
+            SELECT
+                vector_selector(
+                  '2000-01-02T16:00:00+00:00'::TIMESTAMPTZ
+                , '2000-01-02T16:00:00+00:00'::TIMESTAMPTZ
+                , 0
+                , 10 * 60 * 1000
+                , t
+                , v)
+            FROM gfv_test_table
+            WHERE t >= '2000-01-02T16:00:00+00:00'::TIMESTAMPTZ - '10 minutes'::INTERVAL
+            ;"#,
+        )
+        .expect("SQL query failed");
+        assert_eq!(result, vec![Some(100_f64),]);
+    }
+
+    #[pg_test]
+    fn test_vector_selector_instant_vector_bucket_nonzero() {
+        setup();
+        let result = Spi::get_one::<Vec<Option<f64>>>(
+            r#"
+            SELECT
+                vector_selector(
+                  '2000-01-02T16:00:00+00:00'::TIMESTAMPTZ
+                , '2000-01-02T16:00:00+00:00'::TIMESTAMPTZ
+                , 10 * 60 * 1000
+                , 10 * 60 * 1000
+                , t
+                , v)
+            FROM gfv_test_table
+            WHERE t >= '2000-01-02T16:00:00+00:00'::TIMESTAMPTZ - '10 minutes'::INTERVAL
+            ;"#,
+        )
+        .expect("SQL query failed");
+        assert_eq!(result, vec![Some(100_f64)]);
+    }
+
+    #[pg_test]
+    fn test_vector_selector_instant_vector_start_neq_end() {
+        setup();
+        let result = Spi::get_one::<Vec<Option<f64>>>(
+            r#"
+            SELECT
+                vector_selector(
+                  '2000-01-02T16:00:00+00:00'::TIMESTAMPTZ
+                , '2000-01-02T16:01:00+00:00'::TIMESTAMPTZ
+                , 0
+                , 10 * 60 * 1000
+                , t
+                , v)
+            FROM gfv_test_table
+            WHERE t >= '2000-01-02T16:00:00+00:00'::TIMESTAMPTZ - '10 minutes'::INTERVAL
+            ;"#,
+        )
+        .expect("SQL query failed");
+        assert_eq!(result, vec![Some(100_f64)]);
     }
 
     /// ```text
