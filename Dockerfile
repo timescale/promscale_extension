@@ -43,8 +43,14 @@ RUN --mount=type=cache,uid=70,gid=70,target=/build/promscale/.cargo/registry \
 
 USER root
 WORKDIR /build/promscale
-RUN chown postgres:postgres /build/promscale
+RUN chown -R postgres:postgres /build
 USER postgres
+
+# Pre-build extension dependencies
+RUN cd ../ && cargo pgx new promscale && cd promscale
+COPY Cargo.* Makefile /build/promscale/
+RUN --mount=type=cache,uid=70,gid=70,target=/build/promscale/.cargo/registry \
+    make package
 
 # Build extension
 COPY Cargo.* /build/promscale/
