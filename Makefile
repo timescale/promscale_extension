@@ -138,19 +138,19 @@ docker-image-ts1: docker-image-build-1
 .PHONY: docker-image-ts2-12
 docker-image-ts2-12: PG_VER=pg12
 docker-image-ts2-12: TIMESCALEDB_MAJOR=2
-docker-image-ts2-12: TIMESCALEDB_VER=2.5.0
+docker-image-ts2-12: TIMESCALEDB_VER=2.5.2
 docker-image-ts2-12: docker-image-build-2-12
 
 .PHONY: docker-image-ts2-13
 docker-image-ts2-13: PG_VER=pg13
 docker-image-ts2-13: TIMESCALEDB_MAJOR=2
-docker-image-ts2-13: TIMESCALEDB_VER=2.5.0
+docker-image-ts2-13: TIMESCALEDB_VER=2.5.2
 docker-image-ts2-13: docker-image-build-2-13
 
 .PHONY: docker-image-ts2-14
 docker-image-ts2-14: PG_VER=pg14
 docker-image-ts2-14: TIMESCALEDB_MAJOR=2
-docker-image-ts2-14: TIMESCALEDB_VER=2.5.0
+docker-image-ts2-14: TIMESCALEDB_VER=2.5.2
 docker-image-ts2-14: docker-image-build-2-14
 
 .PHONY: docker-image
