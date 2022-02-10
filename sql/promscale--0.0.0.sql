@@ -1,0 +1,2 @@
+-- This file is intentionally empty
+-- It's purpose is for upgrading Promscale installations that had no extension previously
