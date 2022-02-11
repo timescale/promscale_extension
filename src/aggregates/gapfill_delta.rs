@@ -27,7 +27,6 @@ unsafe extern "C" fn gapfill_delta_final(fcinfo: pg_sys::FunctionCallInfo) -> pg
 }
 
 #[derive(Serialize, Deserialize, PostgresType, Debug)]
-#[pgx(sql = false)]
 pub struct GapfillDeltaTransition {
     window: VecDeque<(pg_sys::TimestampTz, f64)>,
     // a Datum for each index in the array, 0 by convention if the value is NULL
