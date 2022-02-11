@@ -254,9 +254,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.0.13"
+version = "3.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08799f92c961c7a1cf0cc398a9073da99e21ce388b46372c37f3191f2f3eed3e"
+checksum = "b63edc3f163b3c71ec8aa23f9bd6070f77edbf3d1d198b164afa90ff00e4ec62"
 dependencies = [
  "atty",
  "bitflags",
@@ -271,9 +271,9 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "3.0.12"
+version = "3.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fd2078197a22f338bd4fbf7d6387eb6f0d6a3c69e6cbc09f5c93e97321fd92a"
+checksum = "9a1132dc3944b31c20dd8b906b3a9f0a5d0243e092d59171414969657ac6aa85"
 dependencies = [
  "heck",
  "proc-macro-error",
@@ -1097,8 +1097,8 @@ dependencies = [
 
 [[package]]
 name = "pgx"
-version = "0.2.6"
-source = "git+https://github.com/timescale/pgx?branch=promscale-staging#271be6a1039d52ae998f7b0bb16fc28480e44af0"
+version = "0.3.1"
+source = "git+https://github.com/timescale/pgx?branch=promscale-staging#ee52db6bbaa006f6f3674bddeff8516c3b914e71"
 dependencies = [
  "atomic-traits",
  "bitflags",
@@ -1126,8 +1126,8 @@ dependencies = [
 
 [[package]]
 name = "pgx-macros"
-version = "0.2.6"
-source = "git+https://github.com/timescale/pgx?branch=promscale-staging#271be6a1039d52ae998f7b0bb16fc28480e44af0"
+version = "0.3.1"
+source = "git+https://github.com/timescale/pgx?branch=promscale-staging#ee52db6bbaa006f6f3674bddeff8516c3b914e71"
 dependencies = [
  "pgx-utils",
  "proc-macro-crate",
@@ -1139,8 +1139,8 @@ dependencies = [
 
 [[package]]
 name = "pgx-pg-sys"
-version = "0.2.6"
-source = "git+https://github.com/timescale/pgx?branch=promscale-staging#271be6a1039d52ae998f7b0bb16fc28480e44af0"
+version = "0.3.1"
+source = "git+https://github.com/timescale/pgx?branch=promscale-staging#ee52db6bbaa006f6f3674bddeff8516c3b914e71"
 dependencies = [
  "bindgen",
  "build-deps",
@@ -1160,8 +1160,8 @@ dependencies = [
 
 [[package]]
 name = "pgx-tests"
-version = "0.2.6"
-source = "git+https://github.com/timescale/pgx?branch=promscale-staging#271be6a1039d52ae998f7b0bb16fc28480e44af0"
+version = "0.3.1"
+source = "git+https://github.com/timescale/pgx?branch=promscale-staging#ee52db6bbaa006f6f3674bddeff8516c3b914e71"
 dependencies = [
  "colored",
  "eyre",
@@ -1180,10 +1180,10 @@ dependencies = [
 
 [[package]]
 name = "pgx-utils"
-version = "0.2.6"
-source = "git+https://github.com/timescale/pgx?branch=promscale-staging#271be6a1039d52ae998f7b0bb16fc28480e44af0"
+version = "0.3.1"
+source = "git+https://github.com/timescale/pgx?branch=promscale-staging#ee52db6bbaa006f6f3674bddeff8516c3b914e71"
 dependencies = [
- "clap 3.0.13",
+ "clap 3.0.14",
  "color-eyre",
  "colored",
  "convert_case",
@@ -1949,9 +1949,9 @@ dependencies = [
 
 [[package]]
 name = "tracing"
-version = "0.1.29"
+version = "0.1.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "375a639232caf30edfc78e8d89b2d4c375515393e7af7e16f01cd96917fb2105"
+checksum = "2d8d93354fe2a8e50d5953f5ae2e47a3fc2ef03292e7ea46e3cc38f549525fb9"
 dependencies = [
  "cfg-if",
  "pin-project-lite",
@@ -1961,9 +1961,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-attributes"
-version = "0.1.18"
+version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4f480b8f81512e825f337ad51e94c1eb5d3bbdf2b363dcd01e2b19a9ffe3f8e"
+checksum = "8276d9a4a3a558d7b7ad5303ad50b53d58264641b82914b7ada36bd762e7a716"
 dependencies = [
  "proc-macro2",
  "quote",
