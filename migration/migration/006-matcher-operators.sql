@@ -9,13 +9,14 @@ CREATE DOMAIN prom_api.matcher_negative AS int[] NOT NULL;
 CREATE DOMAIN prom_api.label_key AS TEXT NOT NULL;
 CREATE DOMAIN prom_api.pattern AS TEXT NOT NULL;
 
+-- TODO (james): This function is also defined in idempotent/001-base.sql
 --wrapper around jsonb_each_text to give a better row_estimate
 --for labels (10 not 100)
 CREATE OR REPLACE FUNCTION _prom_catalog.label_jsonb_each_text(js jsonb, OUT key text, OUT value text)
  RETURNS SETOF record
- LANGUAGE SQL
+ LANGUAGE INTERNAL
  IMMUTABLE PARALLEL SAFE STRICT ROWS 10
-AS $function$ SELECT (jsonb_each_text(js)).* $function$;
+AS $function$jsonb_each_text$function$;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.count_jsonb_keys(j jsonb)
 RETURNS INT

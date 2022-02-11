@@ -636,17 +636,17 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_new_label_id(text, text) to prom_wri
 --for labels (10 not 100)
 CREATE OR REPLACE FUNCTION _prom_catalog.label_jsonb_each_text(js jsonb, OUT key text, OUT value text)
  RETURNS SETOF record
- LANGUAGE SQL
+ LANGUAGE INTERNAL
  IMMUTABLE PARALLEL SAFE STRICT ROWS 10
-AS $function$ SELECT (jsonb_each_text(js)).* $function$;
+AS $function$jsonb_each_text$function$;
 GRANT EXECUTE ON FUNCTION _prom_catalog.label_jsonb_each_text(jsonb) to prom_reader;
 
 --wrapper around unnest to give better row estimate (10 not 100)
 CREATE OR REPLACE FUNCTION _prom_catalog.label_unnest(label_array anyarray)
  RETURNS SETOF anyelement
- LANGUAGE SQL
+ LANGUAGE INTERNAL
  IMMUTABLE PARALLEL SAFE STRICT ROWS 10
-AS $function$ SELECT unnest(label_array) $function$;
+AS $function$array_unnest$function$;
 GRANT EXECUTE ON FUNCTION _prom_catalog.label_unnest(anyarray) to prom_reader;
 
 -- safe_approximate_row_count returns the approximate row count of a hypertable if timescaledb is installed
