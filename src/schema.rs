@@ -1,8 +1,7 @@
+//! This module serves to provide additional schema.rs generation which is not
+//! directly related to any functionality which this extension itself provides.
 use pgx::*;
 
-// First we need to define some objects which should be defined by `promscale`
-// This is mostly so that the extension can be installed standalone, which is
-// convenient for development.
 extension_sql!(
     r#"
 --security definer function that allows setting metadata with the promscale_prefix
@@ -17,3 +16,5 @@ LANGUAGE SQL VOLATILE SECURITY DEFINER;
 "#,
     name = "promscale_setup"
 );
+
+extension_sql_file!("../hand-written-migration.sql", name = "migration", finalize);
