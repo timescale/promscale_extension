@@ -7,17 +7,27 @@ on:
     - '.github/workflows/release.yaml'
     - 'dist/*'
     - 'tools/*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Docker tag'     
+        required: true
+        default: ''
 
 jobs:
   docker:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        docker:
-        - docker-image-ts2-14
-        - docker-image-ts2-13
-        - docker-image-ts2-12
-        - docker-image-ts1
+        pgversion:
+          - 12
+          - 13
+          - 14
+        tsversion:
+          - 2.5.2  
+        include:
+          - pgversion: 12
+            tsversion: 1.7.5
     steps:
       - uses: actions/checkout@v2
 
@@ -25,6 +35,44 @@ jobs:
         uses: docker/setup-buildx-action@v1
 
       - name: build docker image
-        run: make ${{ matrix.docker }}
+        run: PG_VER=pg${{ matrix.pgversion }} TIMESCALEDB_VER=${{ matrix.tsversion }} make docker-image-build
         env:
           DOCKER_BUILDKIT: 1
+
+      - name: Parse semver string
+        id: ts_version_semver
+        uses: booxmedialtd/ws-action-parse-semver@v1
+        with:
+          input_string: ${{ matrix.tsversion }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v1 
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push pr branch
+        uses: docker/build-push-action@v2
+        #if a PR and the PR is not on a forked repo
+        if: github.event_name != 'workflow_dispatch' && github.event.pull_request.head.repo.full_name == github.repository
+        with:
+          context: .
+          push: true
+          build-args: |
+            PG_VERSION_TAG=pg${{ matrix.pgversion }}
+            TIMESCALEDB_VERSION=${{ matrix.tsversion }}
+          tags: |
+            ghcr.io/timescale/dev_promscale_extension:${{github.head_ref}}-ts${{ steps.ts_version_semver.outputs.major }}-pg${{ matrix.pgversion }}
+            
+      - name: Build and push workflow dispatch
+        uses: docker/build-push-action@v2
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          context: .
+          push: true
+          build-args: |
+            PG_VERSION_TAG=pg${{ matrix.pgversion }}
+            TIMESCALEDB_VERSION=${{ matrix.tsversion }}
+          tags: |
+            ghcr.io/timescale/dev_promscale_extension:${{ github.event.inputs.tag }}-ts{{ steps.ts_version_semver.outputs.major }}-pg${{ matrix.pgversion }}

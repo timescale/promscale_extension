@@ -119,37 +119,33 @@ release-test: release-tester ## Test the currently selected release package
 	fi; \
 	docker rm -f "$(TESTER_NAME)"
 
-.PHONY: docker-image-build-1 docker-image-build-2-12 docker-image-build-2-13 docker-image-build-2-14
-docker-image-build-1 docker-image-build-2-12 docker-image-build-2-13 docker-image-build-2-14: Dockerfile $(SQL_FILES) $(SRCS) Cargo.toml Cargo.lock $(RUST_SRCS)
+.PHONY: docker-image-build docker-image-build-1 docker-image-build-2-12 docker-image-build-2-13 docker-image-build-2-14
+docker-image-build docker-image-build-1 docker-image-build-2-12 docker-image-build-2-13 docker-image-build-2-14: Dockerfile $(SQL_FILES) $(SRCS) Cargo.toml Cargo.lock $(RUST_SRCS) 
 	docker buildx build $(if $(PUSH),--push,--load) \
 		--build-arg TIMESCALEDB_VERSION=$(TIMESCALEDB_VER) \
 		--build-arg PG_VERSION_TAG=$(PG_VER) \
 		-t $(IMAGE_NAME):$(EXT_VERSION)-$(TIMESCALEDB_VER)-$(PG_VER) \
-		-t $(IMAGE_NAME):$(EXT_VERSION)-ts$(TIMESCALEDB_MAJOR)-$(PG_VER) \
-		-t $(IMAGE_NAME):latest-ts$(TIMESCALEDB_MAJOR)-$(PG_VER) \
+		-t $(IMAGE_NAME):$(EXT_VERSION)-ts$(word 1, $(subst ., ,$(TIMESCALEDB_VER)))-$(PG_VER) \
+		-t $(IMAGE_NAME):latest-ts$(word 1, $(subst ., ,$(TIMESCALEDB_VER)))-$(PG_VER) \
 		.
 
 .PHONY: docker-image-ts1
 docker-image-ts1: PG_VER=pg12
-docker-image-ts1: TIMESCALEDB_MAJOR=1
 docker-image-ts1: TIMESCALEDB_VER=1.7.5
 docker-image-ts1: docker-image-build-1
 
 .PHONY: docker-image-ts2-12
 docker-image-ts2-12: PG_VER=pg12
-docker-image-ts2-12: TIMESCALEDB_MAJOR=2
 docker-image-ts2-12: TIMESCALEDB_VER=2.5.2
 docker-image-ts2-12: docker-image-build-2-12
 
 .PHONY: docker-image-ts2-13
 docker-image-ts2-13: PG_VER=pg13
-docker-image-ts2-13: TIMESCALEDB_MAJOR=2
 docker-image-ts2-13: TIMESCALEDB_VER=2.5.2
 docker-image-ts2-13: docker-image-build-2-13
 
 .PHONY: docker-image-ts2-14
 docker-image-ts2-14: PG_VER=pg14
-docker-image-ts2-14: TIMESCALEDB_MAJOR=2
 docker-image-ts2-14: TIMESCALEDB_VER=2.5.2
 docker-image-ts2-14: docker-image-build-2-14
 
