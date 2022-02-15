@@ -127,29 +127,23 @@ $takeover_block$
         -- 012
         ALTER EXTENSION promscale ADD TABLE _ps_catalog.promscale_instance_information;
 
-        -- migration-table.sql
-        CREATE TABLE IF NOT EXISTS _ps_catalog.migration(
-              name TEXT NOT NULL PRIMARY KEY
-            , applied_at_version TEXT
-            , applied_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
-        );
-
         -- Bring migrations table up to speed
         INSERT INTO _ps_catalog.migration (name, applied_at_version)
         VALUES
-            ('001-utils.sql'                  , '0.5.0'),
-            ('002-users.sql'                  , '0.5.0'),
-            ('003-schemas.sql'                , '0.5.0'),
-            ('004-tag-operators.sql'          , '0.5.0'),
-            ('005-tables.sql'                 , '0.5.0'),
-            ('006-matcher-operators.sql'      , '0.5.0'),
-            ('007-install-uda.sql'            , '0.5.0'),
-            ('008-tables-ha.sql'              , '0.5.0'),
-            ('009-tables-metadata.sql'        , '0.5.0'),
-            ('010-tables-exemplar.sql'        , '0.5.0'),
-            ('011-tracing.sql'                , '0.5.0'),
-            ('012-tracing-well-known-tags.sql', '0.5.0'),
-            ('013-telemetry.sql'              , '0.5.0')
+            ('001-extension.sql', '0.5.0'),
+            ('002-utils.sql'                  , '0.5.0'),
+            ('003-users.sql'                  , '0.5.0'),
+            ('004-schemas.sql'                , '0.5.0'),
+            ('005-tag-operators.sql'          , '0.5.0'),
+            ('006-tables.sql'                 , '0.5.0'),
+            ('007-matcher-operators.sql'      , '0.5.0'),
+            ('008-install-uda.sql'            , '0.5.0'),
+            ('009-tables-ha.sql'              , '0.5.0'),
+            ('010-tables-metadata.sql'        , '0.5.0'),
+            ('011-tables-exemplar.sql'        , '0.5.0'),
+            ('012-tracing.sql'                , '0.5.0'),
+            ('013-tracing-well-known-tags.sql', '0.5.0'),
+            ('014-telemetry.sql'              , '0.5.0')
         ;
 
         SELECT array_to_string(array_agg(name), ',') INTO STRICT _placeholder FROM _ps_catalog.migration;
