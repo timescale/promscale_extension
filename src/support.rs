@@ -85,12 +85,6 @@ pub unsafe fn rewrite_fn_call_to_subquery(input: Internal) -> Internal {
     (sublink.into_pg() as *mut pg_sys::Node).internal()
 }
 
-extension_sql!(
-    "GRANT EXECUTE ON FUNCTION @extschema@.rewrite_fn_call_to_subquery(internal) TO prom_reader;",
-    name = "grant_execute_rewrite_fn_call_to_subquery_prom_reader",
-    requires = [rewrite_fn_call_to_subquery, "promscale_setup"]
-);
-
 /// Backwards compatibility
 #[no_mangle]
 pub extern "C" fn pg_finfo_make_call_subquery_support() -> &'static pg_sys::Pg_finfo_record {
