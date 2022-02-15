@@ -1,7 +1,9 @@
 .DEFAULT_GOAL := help
 
 ARCH ?= $(shell uname -m)
-EXT_VERSION ?= $(shell cargo pkgid | cut -d':' -f3)
+# This little workaround allows usage of the '#' character on both gnu make 3.8 and 4.3+
+H := \#
+EXT_VERSION ?= $(shell cargo pkgid | cut -d'$H' -f2 | cut -d':' -f2)
 IMAGE_NAME ?= timescaledev/promscale-extension
 OS_NAME ?= debian
 OS_VERSION ?= 11
@@ -62,14 +64,23 @@ build: ## Build the extension
 clean: ## Clean up latest build
 	cargo clean
 
+.PHONY: dependencies
+dependencies: ## Used in docker build to improve build caching
+	# both of these steps are also run in the `package` target, so we run them here to provide better caching
+	cargo pgx schema pg${PG_BUILD_VERSION} --out sql/promscale--${EXT_VERSION}.sql
+	cargo pgx package --pg-config ${PG_CONFIG}
+	rm sql/promscale--${EXT_VERSION}.sql
+
 .PHONY: package
 package: ## Generate extension artifacts for packaging
+	cargo pgx schema pg${PG_BUILD_VERSION} --out sql/promscale--${EXT_VERSION}.sql
+	bash create-upgrade-symlinks.sh
 	cargo pgx package --pg-config ${PG_CONFIG}
 
 .PHONY: install
 install: ## Install the extension in the Postgres found via pg_config
+	bash create-upgrade-symlinks.sh
 	cargo pgx install --pg-config ${PG_CONFIG}
-
 
 .PHONY: release
 release: release-builder ## Produces release artifacts based on OS_NAME, OS_VERSION, and PG_RELEASE_VERSION
