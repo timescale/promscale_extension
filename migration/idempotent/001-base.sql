@@ -1,6 +1,7 @@
 --NOTES
 --This code assumes that table names can only be 63 chars long
 
+GRANT EXECUTE ON FUNCTION _prom_ext.rewrite_fn_call_to_subquery(internal) TO prom_reader;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.get_default_chunk_interval()
     RETURNS INTERVAL
