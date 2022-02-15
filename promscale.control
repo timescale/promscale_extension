@@ -8,4 +8,4 @@ superuser = true
 trusted = true
 # comma-separated list of previous versions this version can be upgraded from
 # directly. This is used to generate upgrade scripts.
-# upgradeable_from = '0.3.0'
+# upgradeable_from = '0.0.0'

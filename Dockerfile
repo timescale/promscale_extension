@@ -50,11 +50,11 @@ USER postgres
 RUN cd ../ && cargo pgx new promscale && cd promscale
 COPY Cargo.* Makefile /build/promscale/
 RUN --mount=type=cache,uid=70,gid=70,target=/build/promscale/.cargo/registry \
-    make package
+    make dependencies
 
 # Build extension
 COPY Cargo.* /build/promscale/
-COPY promscale.control Makefile build.rs /build/promscale/
+COPY promscale.control Makefile build.rs create-upgrade-symlinks.sh /build/promscale/
 COPY .cargo/ /build/promscale/.cargo/
 COPY src/ /build/promscale/src/
 COPY sql/*.sql /build/promscale/sql/
