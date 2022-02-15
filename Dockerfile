@@ -48,9 +48,9 @@ USER postgres
 
 # Pre-build extension dependencies
 RUN cd ../ && cargo pgx new promscale && cd promscale
-COPY Cargo.* Makefile /build/promscale/
+COPY Cargo.* Makefile create-upgrade-symlinks.sh /build/promscale/
 RUN --mount=type=cache,uid=70,gid=70,target=/build/promscale/.cargo/registry \
-    make package
+    make prepackage
 
 # Build extension
 COPY Cargo.* /build/promscale/
