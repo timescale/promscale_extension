@@ -17,4 +17,8 @@ LANGUAGE SQL VOLATILE SECURITY DEFINER;
     name = "promscale_setup"
 );
 
-extension_sql_file!("../hand-written-migration.sql", name = "migration", finalize);
+extension_sql_file!(
+    "../hand-written-migration.sql",
+    name = "migration",
+    finalize
+);
