@@ -1,5 +1,3 @@
-CREATE SCHEMA IF NOT EXISTS _ps_catalog;
-
 CREATE TABLE _ps_catalog.migration(
   name TEXT NOT NULL PRIMARY KEY
 , applied_at_version TEXT

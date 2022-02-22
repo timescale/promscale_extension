@@ -8,14 +8,14 @@ $takeover_block$
         _do_takeover boolean = false;
         _placeholder text = '';
     BEGIN
-        SELECT count(*) FILTER (WHERE tablename = 'prom_schema_migrations') > 0 INTO STRICT _do_takeover FROM pg_tables;
-        IF _do_takeover <> true THEN
+        SELECT count(*) FILTER (WHERE schemaname = 'public' and tablename = 'prom_schema_migrations') > 0 INTO STRICT _do_takeover
+        FROM pg_tables;
+        IF _do_takeover != true THEN
             RAISE LOG 'Skipping takeover maneuver';
             RETURN;
         END IF;
 
-        -- Originally defined in pkg/pgmodel/migrate.go
-        ALTER EXTENSION promscale ADD TABLE public.prom_schema_migrations;
+        DROP TABLE public.prom_schema_migrations;
 
         -- 001/002
         ALTER EXTENSION promscale ADD SCHEMA _prom_catalog;
