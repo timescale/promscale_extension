@@ -21,8 +21,9 @@ WITH x(key, seq) AS
     ('grant_prom_reader_prom_writer'             ,  6),
     ('create_schemas'                            ,  7),
     ('tracing_types'                             ,  8),
-    ('_prom_catalog.do_decompress_chunks_after' ,  9),
-    ('_prom_catalog.compress_old_chunks'        , 10)
+    ('grant_all_roles_to_extowner'               ,  9),
+    ('_prom_catalog.do_decompress_chunks_after'  , 10),
+    ('_prom_catalog.compress_old_chunks'         , 11)
 )
 UPDATE _prom_catalog.remote_commands u SET seq = z.seq
 FROM

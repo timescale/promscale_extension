@@ -521,6 +521,7 @@ BEGIN
     CALL prom_api.execute_maintenance(log_verbose=>log_verbose);
 END
 $$ LANGUAGE PLPGSQL;
+GRANT EXECUTE ON PROCEDURE _prom_catalog.execute_maintenance_job(int, jsonb) TO prom_maintenance;
 
 CREATE OR REPLACE FUNCTION prom_api.config_maintenance_jobs(number_jobs int, new_schedule_interval interval, new_config jsonb = NULL)
 RETURNS BOOLEAN
