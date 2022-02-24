@@ -268,7 +268,7 @@ BEGIN
                     NEW.table_schema, NEW.table_name);
    EXECUTE format('GRANT SELECT ON TABLE %I.%I TO prom_reader', NEW.table_schema, NEW.table_name);
    EXECUTE format('GRANT SELECT, INSERT ON TABLE %I.%I TO prom_writer', NEW.table_schema, NEW.table_name);
-   EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I.%I TO prom_modifier', NEW.table_schema, NEW.table_name);
+   EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE, TRIGGER ON TABLE %I.%I TO prom_modifier', NEW.table_schema, NEW.table_name);
    EXECUTE format('CREATE UNIQUE INDEX data_series_id_time_%s ON %I.%I (series_id, time) INCLUDE (value)',
                     NEW.id, NEW.table_schema, NEW.table_name);
 
@@ -316,6 +316,8 @@ BEGIN
    EXECUTE format('GRANT SELECT ON TABLE prom_data_series.%I TO prom_reader', NEW.table_name);
    EXECUTE format('GRANT SELECT, INSERT ON TABLE prom_data_series.%I TO prom_writer', NEW.table_name);
    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE prom_data_series.%I TO prom_modifier', NEW.table_name);
+   EXECUTE format('ALTER TABLE %I.%I OWNER TO prom_modifier', NEW.table_schema, NEW.table_name);
+   EXECUTE format('ALTER TABLE prom_data_series.%1$I OWNER TO prom_modifier', NEW.table_name);
    RETURN NEW;
 END
 $func$
@@ -830,6 +832,7 @@ $$
     END;
 $$
 LANGUAGE plpgsql;
+GRANT EXECUTE ON FUNCTION prom_api.drop_metric(text) to prom_admin;
 
 --Get the label_id for a key, value pair
 -- no need for a get function only as users will not be using ids directly
@@ -2068,6 +2071,7 @@ BEGIN
 
     IF NOT view_exists THEN
         EXECUTE FORMAT('GRANT SELECT ON prom_series.%1$I TO prom_reader', view_name);
+        EXECUTE FORMAT('ALTER VIEW prom_series.%1$I OWNER TO prom_modifier', view_name);
     END IF;
     RETURN true;
 END
@@ -2125,6 +2129,7 @@ BEGIN
 
     IF NOT view_exists THEN
         EXECUTE FORMAT('GRANT SELECT ON prom_metric.%1$I TO prom_reader', table_name);
+        EXECUTE FORMAT('ALTER VIEW prom_metric.%1$I OWNER TO prom_modifier', table_name);
     END IF;
 
     RETURN true;
@@ -3056,6 +3061,8 @@ BEGIN
     END IF;
 END
 $func$ LANGUAGE PLPGSQL;
+-- TODO: prom_writer or prom_admin?
+GRANT EXECUTE ON PROCEDURE prom_api.add_prom_node(TEXT, BOOLEAN) TO prom_writer;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.insert_metric_row(
     metric_table name,

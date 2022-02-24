@@ -65,6 +65,18 @@ CALL _prom_catalog.execute_everywhere('grant_prom_reader_prom_writer',$ee$
     $$;
 $ee$);
 
+CALL _prom_catalog.execute_everywhere('grant_all_roles_to_extowner',$ee$
+    DO $$
+    BEGIN
+        GRANT prom_reader TO @extowner@ WITH ADMIN OPTION;
+        GRANT prom_writer TO @extowner@ WITH ADMIN OPTION;
+        GRANT prom_maintenance TO @extowner@ WITH ADMIN OPTION;
+        GRANT prom_modifier TO @extowner@ WITH ADMIN OPTION;
+        GRANT prom_admin TO @extowner@ WITH ADMIN OPTION;
+    END
+    $$;
+$ee$);
+
 -- TODO (james): possibly move these grants closer to their definitions? At
 --  definition time, the roles which we grant here haven't been created yet.
 GRANT EXECUTE ON FUNCTION _prom_ext.num_cpus() TO prom_reader;
@@ -74,3 +86,7 @@ GRANT EXECUTE ON FUNCTION _prom_ext.prom_rate(TIMESTAMPTZ, TIMESTAMPTZ, BIGINT, 
 GRANT EXECUTE ON FUNCTION _prom_ext.vector_selector(TIMESTAMPTZ, TIMESTAMPTZ, BIGINT, BIGINT, TIMESTAMPTZ, DOUBLE PRECISION) TO prom_reader;
 GRANT EXECUTE ON FUNCTION _prom_ext.update_tsprom_metadata(TEXT, TEXT, BOOLEAN) TO prom_writer;
 GRANT EXECUTE ON FUNCTION _prom_ext.rewrite_fn_call_to_subquery(internal) TO prom_reader;
+GRANT EXECUTE ON PROCEDURE _prom_catalog.execute_everywhere(text, text, boolean) TO prom_admin;
+GRANT EXECUTE ON PROCEDURE _prom_catalog.update_execute_everywhere_entry(text, text, boolean) TO prom_admin;
+GRANT SELECT ON TABLE _prom_catalog.remote_commands TO prom_reader;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _prom_catalog.remote_commands TO prom_admin;
