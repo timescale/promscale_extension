@@ -64,3 +64,15 @@ CALL _prom_catalog.execute_everywhere('grant_prom_reader_prom_writer',$ee$
     END
     $$;
 $ee$);
+
+CALL _prom_catalog.execute_everywhere('grant_all_roles_to_extowner',$ee$
+    DO $$
+    BEGIN
+        GRANT prom_reader TO @extowner@ WITH ADMIN OPTION;
+        GRANT prom_writer TO @extowner@ WITH ADMIN OPTION;
+        GRANT prom_maintenance TO @extowner@ WITH ADMIN OPTION;
+        GRANT prom_modifier TO @extowner@ WITH ADMIN OPTION;
+        GRANT prom_admin TO @extowner@ WITH ADMIN OPTION;
+    END
+    $$;
+$ee$);

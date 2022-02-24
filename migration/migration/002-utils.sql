@@ -9,8 +9,8 @@
     command TEXT
 );
 --only the prom owner has any permissions.
-GRANT ALL ON TABLE _prom_catalog.remote_commands to CURRENT_USER;
-GRANT ALL ON SEQUENCE _prom_catalog.remote_commands_seq_seq to CURRENT_USER;
+GRANT ALL ON TABLE _prom_catalog.remote_commands to @extowner@;
+GRANT ALL ON SEQUENCE _prom_catalog.remote_commands_seq_seq to @extowner@;
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.execute_everywhere(command_key text, command TEXT, transactional BOOLEAN = true)
 AS $func$

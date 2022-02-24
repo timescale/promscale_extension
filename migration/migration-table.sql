@@ -17,5 +17,6 @@ $migration_table$
             , applied_at_version TEXT
             , applied_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
         );
+
     END;
 $migration_table$;

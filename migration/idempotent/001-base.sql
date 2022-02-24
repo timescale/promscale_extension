@@ -831,6 +831,7 @@ $$
     END;
 $$
 LANGUAGE plpgsql;
+GRANT EXECUTE ON FUNCTION prom_api.drop_metric(text) to prom_admin;
 
 --Get the label_id for a key, value pair
 -- no need for a get function only as users will not be using ids directly
