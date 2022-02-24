@@ -1,3 +1,4 @@
+SET LOCAL search_path = pg_catalog;
 
 DO $$
     DECLARE
@@ -15,7 +16,7 @@ DO $$
             RETURN;
         END;
 
-        IF current_version = '' THEN
+        IF current_version OPERATOR(pg_catalog.=) '' THEN
             RAISE EXCEPTION 'the requisite version of the Promscale connector has not been installed'
             USING HINT='This extension should not be created manually. It will be created by the Promscale connector and requires the connector to be installed first.';
         END IF;
@@ -35,16 +36,16 @@ DO $$
         new_path TEXT;
     BEGIN
         SELECT value FROM public.prom_installation_info
-         WHERE key = 'extension schema'
+         WHERE key OPERATOR(pg_catalog.=) 'extension schema'
           INTO ext_schema;
         SELECT value FROM public.prom_installation_info
-         WHERE key = 'prometheus API schema'
+         WHERE key OPERATOR(pg_catalog.=) 'prometheus API schema'
           INTO prom_schema;
         SELECT value FROM public.prom_installation_info
-         WHERE key = 'catalog schema'
+         WHERE key OPERATOR(pg_catalog.=) 'catalog schema'
           INTO catalog_schema;
-        new_path := format('public,%s,%s,%s', ext_schema, prom_schema, catalog_schema);
-        PERFORM set_config('search_path', new_path, false);
+        new_path := pg_catalog.format('public,%s,%s,%s', ext_schema, prom_schema, catalog_schema);
+        PERFORM pg_catalog.set_config('search_path', new_path, false);
     END
 $$;
 
@@ -57,7 +58,7 @@ DO $$
     END
 $$;
 
-CREATE OR REPLACE FUNCTION @extschema@.make_call_subquery_support(internal) RETURNS INTERNAL
+CREATE FUNCTION @extschema@.make_call_subquery_support(internal) RETURNS INTERNAL
 AS '$libdir/promscale', 'make_call_subquery_support'
 LANGUAGE C IMMUTABLE STRICT;
 GRANT EXECUTE ON FUNCTION @extschema@.make_call_subquery_support(internal) TO prom_reader;
@@ -65,7 +66,7 @@ GRANT EXECUTE ON FUNCTION @extschema@.make_call_subquery_support(internal) TO pr
 
 --wrapper around jsonb_each_text to give a better row_estimate
 --for labels (10 not 100)
-CREATE OR REPLACE FUNCTION @extschema@.label_jsonb_each_text(js jsonb,  OUT key text, OUT value text)
+CREATE FUNCTION @extschema@.label_jsonb_each_text(js jsonb,  OUT key text, OUT value text)
  RETURNS SETOF record
  LANGUAGE internal
  IMMUTABLE PARALLEL SAFE STRICT ROWS 10
@@ -73,7 +74,7 @@ AS $function$jsonb_each_text$function$;
 GRANT EXECUTE ON FUNCTION @extschema@.label_jsonb_each_text(jsonb) TO prom_reader;
 
 --wrapper around unnest to give better row estimate (10 not 100)
-CREATE OR REPLACE FUNCTION @extschema@.label_unnest(label_array anyarray)
+CREATE FUNCTION @extschema@.label_unnest(label_array anyarray)
  RETURNS SETOF anyelement
  LANGUAGE internal
  IMMUTABLE PARALLEL SAFE STRICT ROWS 10
@@ -82,80 +83,81 @@ GRANT EXECUTE ON FUNCTION @extschema@.label_unnest(anyarray) TO prom_reader;
 
 ---------------------  comparison functions ---------------------
 
-CREATE OR REPLACE FUNCTION @extschema@.label_find_key_equal(key_to_match label_key, pat pattern)
-RETURNS matcher_positive
+CREATE FUNCTION @extschema@.label_find_key_equal(key_to_match prom_api.label_key, pat prom_api.pattern)
+RETURNS prom_api.matcher_positive
 AS $func$
-    SELECT COALESCE(array_agg(l.id), array[]::int[])::matcher_positive
-    FROM label l
-    WHERE l.key = key_to_match and l.value = pat
+    SELECT COALESCE(pg_catalog.array_agg(l.id), array[]::int[])::prom_api.matcher_positive
+    FROM _prom_catalog.label l
+    WHERE l.key OPERATOR(pg_catalog.=) key_to_match and l.value OPERATOR(pg_catalog.=) pat
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE
 SUPPORT @extschema@.make_call_subquery_support;
-GRANT EXECUTE ON FUNCTION @extschema@.label_find_key_equal(label_key, pattern) TO prom_reader;
+GRANT EXECUTE ON FUNCTION @extschema@.label_find_key_equal(prom_api.label_key, prom_api.pattern) TO prom_reader;
 
-CREATE OR REPLACE FUNCTION @extschema@.label_find_key_not_equal(key_to_match label_key, pat pattern)
-RETURNS matcher_negative
+CREATE FUNCTION @extschema@.label_find_key_not_equal(key_to_match prom_api.label_key, pat prom_api.pattern)
+RETURNS prom_api.matcher_negative
 AS $func$
-    SELECT COALESCE(array_agg(l.id), array[]::int[])::matcher_negative
-    FROM label l
-    WHERE l.key = key_to_match and l.value = pat
+    SELECT COALESCE(pg_catalog.array_agg(l.id), array[]::int[])::prom_api.matcher_negative
+    FROM _prom_catalog.label l
+    WHERE l.key OPERATOR(pg_catalog.=) key_to_match and l.value OPERATOR(pg_catalog.=) pat
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE
 SUPPORT @extschema@.make_call_subquery_support;
-GRANT EXECUTE ON FUNCTION @extschema@.label_find_key_not_equal(label_key, pattern) TO prom_reader;
+GRANT EXECUTE ON FUNCTION @extschema@.label_find_key_not_equal(prom_api.label_key, prom_api.pattern) TO prom_reader;
 
-CREATE OR REPLACE FUNCTION @extschema@.label_find_key_regex(key_to_match label_key, pat pattern)
-RETURNS matcher_positive
+CREATE FUNCTION @extschema@.label_find_key_regex(key_to_match prom_api.label_key, pat prom_api.pattern)
+RETURNS prom_api.matcher_positive
 AS $func$
-    SELECT COALESCE(array_agg(l.id), array[]::int[])::matcher_positive
-    FROM label l
-    WHERE l.key = key_to_match and l.value ~ pat
+    SELECT COALESCE(pg_catalog.array_agg(l.id), array[]::int[])::prom_api.matcher_positive
+    FROM _prom_catalog.label l
+    WHERE l.key OPERATOR(pg_catalog.=) key_to_match and l.value OPERATOR(pg_catalog.~) pat
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE
 SUPPORT @extschema@.make_call_subquery_support;
-GRANT EXECUTE ON FUNCTION @extschema@.label_find_key_regex(label_key, pattern) TO prom_reader;
+GRANT EXECUTE ON FUNCTION @extschema@.label_find_key_regex(prom_api.label_key, prom_api.pattern) TO prom_reader;
 
-CREATE OR REPLACE FUNCTION @extschema@.label_find_key_not_regex(key_to_match label_key, pat pattern)
-RETURNS matcher_negative
+CREATE FUNCTION @extschema@.label_find_key_not_regex(key_to_match prom_api.label_key, pat prom_api.pattern)
+RETURNS prom_api.matcher_negative
 AS $func$
-    SELECT COALESCE(array_agg(l.id), array[]::int[])::matcher_negative
-    FROM label l
-    WHERE l.key = key_to_match and l.value ~ pat
+    SELECT COALESCE(pg_catalog.array_agg(l.id), array[]::int[])::prom_api.matcher_negative
+    FROM _prom_catalog.label l
+    WHERE l.key OPERATOR(pg_catalog.=) key_to_match and l.value OPERATOR(pg_catalog.~) pat
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE
 SUPPORT @extschema@.make_call_subquery_support;
-GRANT EXECUTE ON FUNCTION @extschema@.label_find_key_not_regex(label_key, pattern) TO prom_reader;
+GRANT EXECUTE ON FUNCTION @extschema@.label_find_key_not_regex(prom_api.label_key, prom_api.pattern) TO prom_reader;
 
 CREATE OPERATOR @extschema@.== (
-    LEFTARG = label_key,
-    RIGHTARG = pattern,
+    LEFTARG = prom_api.label_key,
+    RIGHTARG = prom_api.pattern,
     FUNCTION = @extschema@.label_find_key_equal
 );
 
 CREATE OPERATOR @extschema@.!== (
-    LEFTARG = label_key,
-    RIGHTARG = pattern,
+    LEFTARG = prom_api.label_key,
+    RIGHTARG = prom_api.pattern,
     FUNCTION = @extschema@.label_find_key_not_equal
 );
 
 CREATE OPERATOR @extschema@.==~ (
-    LEFTARG = label_key,
-    RIGHTARG = pattern,
+    LEFTARG = prom_api.label_key,
+    RIGHTARG = prom_api.pattern,
     FUNCTION = @extschema@.label_find_key_regex
 );
 
 CREATE OPERATOR @extschema@.!=~ (
-    LEFTARG = label_key,
-    RIGHTARG = pattern,
+    LEFTARG = prom_api.label_key,
+    RIGHTARG = prom_api.pattern,
     FUNCTION = @extschema@.label_find_key_not_regex
 );
 
 --security definer function that allows setting metadata with the promscale_prefix
-CREATE OR REPLACE FUNCTION @extschema@.update_tsprom_metadata(meta_key text, meta_value text, send_telemetry BOOLEAN)
+CREATE FUNCTION @extschema@.update_tsprom_metadata(meta_key text, meta_value text, send_telemetry BOOLEAN)
 RETURNS VOID
+SET search_path TO pg_catalog
 AS $func$
     INSERT INTO _timescaledb_catalog.metadata(key, value, include_in_telemetry)
-    VALUES ('promscale_' || meta_key,meta_value, send_telemetry)
+    VALUES ('promscale_' OPERATOR(pg_catalog.||) meta_key,meta_value, send_telemetry)
     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, include_in_telemetry = EXCLUDED.include_in_telemetry
 $func$
 LANGUAGE SQL VOLATILE SECURITY DEFINER;
@@ -231,15 +233,15 @@ CREATE AGGREGATE @extschema@.prom_increase(
     finalfunc=@extschema@.prom_extrapolate_final
 );
 
-CREATE OR REPLACE FUNCTION @extschema@."vector_selector_transition"("state" internal, "start_time" TimestampTz, "end_time" TimestampTz, "bucket_width" bigint, "lookback" bigint, "time" TimestampTz, "val" double precision) RETURNS internal IMMUTABLE PARALLEL SAFE LANGUAGE c AS 'MODULE_PATHNAME', 'vector_selector_transition_wrapper';
+CREATE FUNCTION @extschema@."vector_selector_transition"("state" internal, "start_time" TimestampTz, "end_time" TimestampTz, "bucket_width" bigint, "lookback" bigint, "time" TimestampTz, "val" double precision) RETURNS internal IMMUTABLE PARALLEL SAFE LANGUAGE c AS 'MODULE_PATHNAME', 'vector_selector_transition_wrapper';
 -- ./src/lib.rs:337:0
-CREATE OR REPLACE FUNCTION @extschema@."vector_selector_final"("state" internal) RETURNS double precision[] IMMUTABLE PARALLEL SAFE LANGUAGE c AS 'MODULE_PATHNAME', 'vector_selector_final_wrapper';
+CREATE FUNCTION @extschema@."vector_selector_final"("state" internal) RETURNS double precision[] IMMUTABLE PARALLEL SAFE LANGUAGE c AS 'MODULE_PATHNAME', 'vector_selector_final_wrapper';
 -- ./src/lib.rs:345:0
-CREATE OR REPLACE FUNCTION @extschema@."vector_selector_serialize"("state" internal) RETURNS bytea IMMUTABLE STRICT PARALLEL SAFE LANGUAGE c AS 'MODULE_PATHNAME', 'vector_selector_serialize_wrapper';
+CREATE FUNCTION @extschema@."vector_selector_serialize"("state" internal) RETURNS bytea IMMUTABLE STRICT PARALLEL SAFE LANGUAGE c AS 'MODULE_PATHNAME', 'vector_selector_serialize_wrapper';
 -- ./src/lib.rs:350:0
-CREATE OR REPLACE FUNCTION @extschema@."vector_selector_deserialize"("bytes" bytea, "_internal" internal) RETURNS internal IMMUTABLE PARALLEL SAFE LANGUAGE c AS 'MODULE_PATHNAME', 'vector_selector_deserialize_wrapper';
+CREATE FUNCTION @extschema@."vector_selector_deserialize"("bytes" bytea, "_internal" internal) RETURNS internal IMMUTABLE PARALLEL SAFE LANGUAGE c AS 'MODULE_PATHNAME', 'vector_selector_deserialize_wrapper';
 -- ./src/lib.rs:358:0
-CREATE OR REPLACE FUNCTION @extschema@."vector_selector_combine"("state1" internal, "state2" internal) RETURNS internal IMMUTABLE PARALLEL SAFE LANGUAGE c AS 'MODULE_PATHNAME', 'vector_selector_combine_wrapper';
+CREATE FUNCTION @extschema@."vector_selector_combine"("state1" internal, "state2" internal) RETURNS internal IMMUTABLE PARALLEL SAFE LANGUAGE c AS 'MODULE_PATHNAME', 'vector_selector_combine_wrapper';
 CREATE AGGREGATE @extschema@.vector_selector(
     start_time timestamptz,
     end_time timestamptz,
