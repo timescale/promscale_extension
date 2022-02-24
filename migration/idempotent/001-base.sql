@@ -1,6 +1,48 @@
 --NOTES
 --This code assumes that table names can only be 63 chars long
 
+CREATE OR REPLACE PROCEDURE _prom_catalog.execute_everywhere(command_key text, command TEXT, transactional BOOLEAN = true)
+AS $func$
+BEGIN
+    IF command_key IS NOT NULL THEN
+       INSERT INTO _prom_catalog.remote_commands(key, command, transactional) VALUES(command_key, command, transactional)
+       ON CONFLICT (key) DO UPDATE SET command = excluded.command, transactional = excluded.transactional;
+    END IF;
+
+    EXECUTE command;
+    BEGIN
+        CALL public.distributed_exec(command);
+    EXCEPTION
+        WHEN undefined_function THEN
+            -- we're not on Timescale 2, just return
+            RETURN;
+        WHEN SQLSTATE '0A000' THEN
+            -- we're not the access node, just return
+            RETURN;
+    END;
+END
+$func$ LANGUAGE PLPGSQL
+--security definer to add jobs as the logged-in user
+SECURITY DEFINER
+--search path must be set for security definer
+SET search_path = pg_temp;
+GRANT EXECUTE ON PROCEDURE _prom_catalog.execute_everywhere(text, text, boolean) TO prom_admin;
+
+CREATE OR REPLACE PROCEDURE _prom_catalog.update_execute_everywhere_entry(command_key text, command TEXT, transactional BOOLEAN = true)
+AS $func$
+BEGIN
+    UPDATE _prom_catalog.remote_commands
+    SET
+        command=update_execute_everywhere_entry.command,
+        transactional=update_execute_everywhere_entry.transactional
+    WHERE key = command_key;
+END
+$func$ LANGUAGE PLPGSQL
+--security definer to add jobs as the logged-in user
+SECURITY DEFINER
+--search path must be set for security definer
+SET search_path = pg_temp;
+GRANT EXECUTE ON PROCEDURE _prom_catalog.update_execute_everywhere_entry(text, text, boolean) TO prom_admin;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.get_default_chunk_interval()
     RETURNS INTERVAL
@@ -268,7 +310,7 @@ BEGIN
                     NEW.table_schema, NEW.table_name);
    EXECUTE format('GRANT SELECT ON TABLE %I.%I TO prom_reader', NEW.table_schema, NEW.table_name);
    EXECUTE format('GRANT SELECT, INSERT ON TABLE %I.%I TO prom_writer', NEW.table_schema, NEW.table_name);
-   EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I.%I TO prom_modifier', NEW.table_schema, NEW.table_name);
+   EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE, TRIGGER ON TABLE %I.%I TO prom_modifier', NEW.table_schema, NEW.table_name);
    EXECUTE format('CREATE UNIQUE INDEX data_series_id_time_%s ON %I.%I (series_id, time) INCLUDE (value)',
                     NEW.id, NEW.table_schema, NEW.table_name);
 
@@ -316,6 +358,8 @@ BEGIN
    EXECUTE format('GRANT SELECT ON TABLE prom_data_series.%I TO prom_reader', NEW.table_name);
    EXECUTE format('GRANT SELECT, INSERT ON TABLE prom_data_series.%I TO prom_writer', NEW.table_name);
    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE prom_data_series.%I TO prom_modifier', NEW.table_name);
+   EXECUTE format('ALTER TABLE %I.%I OWNER TO prom_modifier', NEW.table_schema, NEW.table_name);
+   EXECUTE format('ALTER TABLE prom_data_series.%1$I OWNER TO prom_modifier', NEW.table_name);
    RETURN NEW;
 END
 $func$
@@ -830,6 +874,7 @@ $$
     END;
 $$
 LANGUAGE plpgsql;
+GRANT EXECUTE ON FUNCTION prom_api.drop_metric(text) to prom_admin;
 
 --Get the label_id for a key, value pair
 -- no need for a get function only as users will not be using ids directly
@@ -2068,6 +2113,7 @@ BEGIN
 
     IF NOT view_exists THEN
         EXECUTE FORMAT('GRANT SELECT ON prom_series.%1$I TO prom_reader', view_name);
+        EXECUTE FORMAT('ALTER VIEW prom_series.%1$I OWNER TO prom_modifier', view_name);
     END IF;
     RETURN true;
 END
@@ -2125,6 +2171,7 @@ BEGIN
 
     IF NOT view_exists THEN
         EXECUTE FORMAT('GRANT SELECT ON prom_metric.%1$I TO prom_reader', table_name);
+        EXECUTE FORMAT('ALTER VIEW prom_metric.%1$I OWNER TO prom_modifier', table_name);
     END IF;
 
     RETURN true;
@@ -3051,11 +3098,12 @@ BEGIN
     END LOOP;
 
     IF attach_to_existing_metrics THEN
-        PERFORM attach_data_node(node_name, hypertable => format('%I.%I', 'prom_data', table_name))
+        PERFORM public.attach_data_node(node_name, hypertable => format('%I.%I', 'prom_data', table_name))
         FROM _prom_catalog.metric;
     END IF;
 END
 $func$ LANGUAGE PLPGSQL;
+GRANT EXECUTE ON PROCEDURE prom_api.add_prom_node(TEXT, BOOLEAN) TO prom_writer;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.insert_metric_row(
     metric_table name,

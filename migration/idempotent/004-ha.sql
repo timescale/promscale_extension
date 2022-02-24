@@ -26,6 +26,7 @@ BEGIN
     RETURN NEW;
 END;
 $func$ LANGUAGE plpgsql VOLATILE;
+GRANT EXECUTE ON FUNCTION _prom_catalog.ha_leases_audit_fn() TO prom_writer;
 
 -- ha api functions
 CREATE OR REPLACE FUNCTION _prom_catalog.update_lease(cluster TEXT, writer TEXT, min_time TIMESTAMPTZ,
