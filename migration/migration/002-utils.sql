@@ -1,19 +1,17 @@
- --perms for schema will be addressed later;
- CREATE SCHEMA IF NOT EXISTS _prom_catalog;
+-- noinspection SqlNoDataSourceInspectionForFile
+
+--perms for schema will be addressed later;
+CREATE SCHEMA IF NOT EXISTS _prom_catalog;
 
 --table to save commands so they can be run when adding new nodes
- CREATE TABLE _prom_catalog.remote_commands(
+CREATE TABLE _prom_catalog.remote_commands(
     key TEXT PRIMARY KEY,
     seq SERIAL,
     transactional BOOLEAN,
     command TEXT
 );
---only the prom owner has any permissions.
 GRANT ALL ON TABLE _prom_catalog.remote_commands to @extowner@;
 GRANT ALL ON SEQUENCE _prom_catalog.remote_commands_seq_seq to @extowner@;
--- TODO: is this okay?
-GRANT SELECT ON TABLE _prom_catalog.remote_commands TO public;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _prom_catalog.remote_commands TO public;
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.execute_everywhere(command_key text, command TEXT, transactional BOOLEAN = true)
 AS $func$
@@ -35,10 +33,13 @@ BEGIN
             RETURN;
     END;
 END
-$func$ LANGUAGE PLPGSQL;
---redundant given schema settings but extra caution for this function
--- TODO: prom_writer or prom_admin?
-GRANT ALL ON PROCEDURE _prom_catalog.execute_everywhere(text, text, boolean) TO public;
+$func$ LANGUAGE PLPGSQL
+--security definer to add jobs as the logged-in user
+SECURITY DEFINER
+--search path must be set for security definer
+SET search_path = pg_temp;
+--redundant given schema settings but extra caution for security definers
+REVOKE ALL ON PROCEDURE _prom_catalog.execute_everywhere(text, text, boolean) FROM PUBLIC;
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.update_execute_everywhere_entry(command_key text, command TEXT, transactional BOOLEAN = true)
 AS $func$
@@ -49,8 +50,10 @@ BEGIN
         transactional=update_execute_everywhere_entry.transactional
     WHERE key = command_key;
 END
-$func$ LANGUAGE PLPGSQL;
---redundant given schema settings but extra caution for this function
--- REVOKE ALL ON PROCEDURE _prom_catalog.update_execute_everywhere_entry(text, text, boolean) FROM PUBLIC;
--- TODO: prom_writer or prom_admin?
-GRANT EXECUTE ON PROCEDURE _prom_catalog.update_execute_everywhere_entry(text, text, boolean) TO public;
+$func$ LANGUAGE PLPGSQL
+--security definer to add jobs as the logged-in user
+SECURITY DEFINER
+--search path must be set for security definer
+SET search_path = pg_temp;
+--redundant given schema settings but extra caution for security definers
+REVOKE ALL ON PROCEDURE _prom_catalog.update_execute_everywhere_entry(text, text, boolean) FROM PUBLIC;
