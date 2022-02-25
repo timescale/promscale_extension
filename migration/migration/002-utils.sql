@@ -11,6 +11,9 @@
 --only the prom owner has any permissions.
 GRANT ALL ON TABLE _prom_catalog.remote_commands to @extowner@;
 GRANT ALL ON SEQUENCE _prom_catalog.remote_commands_seq_seq to @extowner@;
+-- TODO: is this okay?
+GRANT SELECT ON TABLE _prom_catalog.remote_commands TO public;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _prom_catalog.remote_commands TO public;
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.execute_everywhere(command_key text, command TEXT, transactional BOOLEAN = true)
 AS $func$
@@ -22,7 +25,7 @@ BEGIN
 
     EXECUTE command;
     BEGIN
-        CALL distributed_exec(command);
+        CALL public.distributed_exec(command);
     EXCEPTION
         WHEN undefined_function THEN
             -- we're not on Timescale 2, just return
@@ -34,7 +37,8 @@ BEGIN
 END
 $func$ LANGUAGE PLPGSQL;
 --redundant given schema settings but extra caution for this function
-REVOKE ALL ON PROCEDURE _prom_catalog.execute_everywhere(text, text, boolean) FROM PUBLIC;
+-- TODO: prom_writer or prom_admin?
+GRANT ALL ON PROCEDURE _prom_catalog.execute_everywhere(text, text, boolean) TO public;
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.update_execute_everywhere_entry(command_key text, command TEXT, transactional BOOLEAN = true)
 AS $func$
@@ -47,4 +51,6 @@ BEGIN
 END
 $func$ LANGUAGE PLPGSQL;
 --redundant given schema settings but extra caution for this function
-REVOKE ALL ON PROCEDURE _prom_catalog.update_execute_everywhere_entry(text, text, boolean) FROM PUBLIC;
+-- REVOKE ALL ON PROCEDURE _prom_catalog.update_execute_everywhere_entry(text, text, boolean) FROM PUBLIC;
+-- TODO: prom_writer or prom_admin?
+GRANT EXECUTE ON PROCEDURE _prom_catalog.update_execute_everywhere_entry(text, text, boolean) TO public;

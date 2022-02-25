@@ -17,6 +17,8 @@ $migration_table$
             , applied_at_version TEXT
             , applied_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
         );
+        -- The prom_reader and prom_writer roles are not available yet
+        GRANT SELECT ON _ps_catalog.migration TO public;
 
     END;
 $migration_table$;

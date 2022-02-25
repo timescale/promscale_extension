@@ -23,6 +23,7 @@ AS $func$
     SELECT count(*)::int from (SELECT jsonb_object_keys(j)) v;
 $func$
 LANGUAGE SQL IMMUTABLE PARALLEL SAFE;
+GRANT EXECUTE ON FUNCTION _prom_catalog.count_jsonb_keys(jsonb) TO prom_reader;
 
 CREATE OR REPLACE FUNCTION prom_api.matcher(labels jsonb)
 RETURNS prom_api.matcher_positive
@@ -57,6 +58,7 @@ AS $func$
     SELECT labels @> ARRAY[label_value]::TEXT[]
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE;
+GRANT EXECUTE ON FUNCTION _prom_catalog.label_value_contains(prom_api.label_value_array, TEXT) TO prom_reader;
 
 CREATE OPERATOR prom_api.@> (
     LEFTARG = prom_api.label_value_array,

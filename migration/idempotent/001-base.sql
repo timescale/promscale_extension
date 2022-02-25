@@ -3058,6 +3058,8 @@ BEGIN
     END IF;
 END
 $func$ LANGUAGE PLPGSQL;
+-- TODO: prom_writer or prom_admin?
+GRANT EXECUTE ON PROCEDURE prom_api.add_prom_node(TEXT, BOOLEAN) TO prom_writer;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.insert_metric_row(
     metric_table name,
