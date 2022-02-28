@@ -1,0 +1,10 @@
+# This dockerfile is a helper for quick iteration on the extension SQL
+# To use, first run: `make docker-image-ts2-14`, then edit SQL and run `make docker-quick-ts2-14`
+ARG PG_VERSION_TAG
+ARG TIMESCALEDB_VERSION
+ARG EXTENSION_VERSION
+FROM timescaledev/promscale-extension:${EXTENSION_VERSION}-${TIMESCALEDB_VERSION}-${PG_VERSION_TAG}
+
+ARG EXTENSION_VERSION
+COPY sql/promscale-${EXTENSION_VERSION}.sql /usr/local/share/postgresql/extension/promscale--${EXTENSION_VERSION}.sql
+

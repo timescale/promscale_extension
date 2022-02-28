@@ -164,6 +164,21 @@ docker-image-ts2-14: TIMESCALEDB_MAJOR=2
 docker-image-ts2-14: TIMESCALEDB_VER=2.5.2
 docker-image-ts2-14: docker-image-build-2-14
 
+.PHONY: docker-quick-ts2-14
+docker-quick-ts2-14: PG_VER=pg14
+docker-quick-ts2-14: TIMESCALEDB_MAJOR=2
+docker-quick-ts2-14: TIMESCALEDB_VER=2.5.2
+docker-quick-ts2-14: ## A quick way to rebuild the extension image with only SQL changes
+	cargo pgx schema pg14
+	docker build -f Dockerfile.quick \
+		--build-arg TIMESCALEDB_VERSION=$(TIMESCALEDB_VER) \
+		--build-arg PG_VERSION_TAG=$(PG_VER) \
+		--build-arg EXTENSION_VERSION=$(EXT_VERSION) \
+		-t $(IMAGE_NAME):$(EXT_VERSION)-$(TIMESCALEDB_VER)-$(PG_VER) \
+		-t $(IMAGE_NAME):$(EXT_VERSION)-ts$(TIMESCALEDB_MAJOR)-$(PG_VER) \
+		-t $(IMAGE_NAME):latest-ts$(TIMESCALEDB_MAJOR)-$(PG_VER) \
+		.
+
 .PHONY: docker-image
 docker-image: docker-image-ts2-14 docker-image-ts2-13 docker-image-ts2-12 docker-image-ts1 ## Build Timescale images with the extension
 
