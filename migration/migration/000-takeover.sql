@@ -6,7 +6,6 @@ DO
 $takeover_block$
     DECLARE
         _do_takeover boolean = false;
-        _placeholder text = '';
     BEGIN
         SELECT count(*) FILTER (WHERE schemaname = 'public' AND tablename = 'prom_schema_migrations') > 0
         INTO STRICT _do_takeover
@@ -146,7 +145,92 @@ $takeover_block$
             ('014-telemetry.sql'              , '0.5.0')
         ;
 
-        SELECT array_to_string(array_agg(name), ',') INTO STRICT _placeholder FROM _ps_catalog.migration;
+        PERFORM pg_catalog.pg_extension_config_dump('_prom_catalog.default', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_prom_catalog.exemplar', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_prom_catalog.exemplar_label_key_position', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_prom_catalog.ha_leases', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_prom_catalog.ha_leases_logs', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_prom_catalog.ids_epoch', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_prom_catalog.label', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_prom_catalog.label_key', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_prom_catalog.label_key_position', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_prom_catalog.metadata', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_prom_catalog.metric', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_prom_catalog.remote_commands', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_catalog.migration', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_catalog.promscale_instance_information', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.event', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.instrumentation_lib', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.link', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.operation', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.schema_url', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.span', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_1', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_10', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_11', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_12', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_13', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_14', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_15', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_16', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_17', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_18', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_19', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_2', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_20', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_21', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_22', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_23', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_24', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_25', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_26', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_27', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_28', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_29', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_3', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_30', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_31', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_32', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_33', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_34', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_35', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_36', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_37', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_38', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_39', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_4', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_40', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_41', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_42', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_43', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_44', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_45', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_46', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_47', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_48', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_49', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_5', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_50', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_51', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_52', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_53', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_54', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_55', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_56', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_57', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_58', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_59', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_6', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_60', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_61', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_62', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_63', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_64', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_7', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_8', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_9', '');
+        PERFORM pg_catalog.pg_extension_config_dump('_ps_trace.tag_key', '');
+        PERFORM pg_catalog.pg_extension_config_dump('public.prom_installation_info', '');
 
     END;
 $takeover_block$;
