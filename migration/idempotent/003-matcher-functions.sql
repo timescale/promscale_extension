@@ -89,7 +89,8 @@ AS $func$
     FROM _prom_catalog.label l
     WHERE l.key = key_to_match and l.value = pat
 $func$
-LANGUAGE SQL STABLE PARALLEL SAFE;
+LANGUAGE SQL STABLE PARALLEL SAFE
+SUPPORT _prom_ext.rewrite_fn_call_to_subquery;
 GRANT EXECUTE ON FUNCTION _prom_catalog.label_find_key_equal(prom_api.label_key, prom_api.pattern) TO prom_reader;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.label_find_key_not_equal(key_to_match prom_api.label_key, pat prom_api.pattern)
@@ -99,7 +100,8 @@ AS $func$
     FROM _prom_catalog.label l
     WHERE l.key = key_to_match and l.value = pat
 $func$
-LANGUAGE SQL STABLE PARALLEL SAFE;
+LANGUAGE SQL STABLE PARALLEL SAFE
+SUPPORT _prom_ext.rewrite_fn_call_to_subquery;
 GRANT EXECUTE ON FUNCTION _prom_catalog.label_find_key_not_equal(prom_api.label_key, prom_api.pattern) TO prom_reader;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.label_find_key_regex(key_to_match prom_api.label_key, pat prom_api.pattern)
@@ -109,7 +111,8 @@ AS $func$
     FROM _prom_catalog.label l
     WHERE l.key = key_to_match and l.value ~ pat
 $func$
-LANGUAGE SQL STABLE PARALLEL SAFE;
+LANGUAGE SQL STABLE PARALLEL SAFE
+SUPPORT _prom_ext.rewrite_fn_call_to_subquery;
 GRANT EXECUTE ON FUNCTION _prom_catalog.label_find_key_regex(prom_api.label_key, prom_api.pattern) TO prom_reader;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.label_find_key_not_regex(key_to_match prom_api.label_key, pat prom_api.pattern)
@@ -119,7 +122,8 @@ AS $func$
     FROM _prom_catalog.label l
     WHERE l.key = key_to_match and l.value ~ pat
 $func$
-LANGUAGE SQL STABLE PARALLEL SAFE;
+LANGUAGE SQL STABLE PARALLEL SAFE
+SUPPORT _prom_ext.rewrite_fn_call_to_subquery;
 GRANT EXECUTE ON FUNCTION _prom_catalog.label_find_key_not_regex(prom_api.label_key, prom_api.pattern) TO prom_reader;
 
 --------------------- op == !== ==~ !=~ ------------------------

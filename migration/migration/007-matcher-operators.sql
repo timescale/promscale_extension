@@ -136,6 +136,31 @@ $func$
 LANGUAGE SQL STABLE PARALLEL SAFE
 SUPPORT _prom_ext.rewrite_fn_call_to_subquery;
 
+-- TODO (james): should these operators be in the _prom_catalog schema, or a "public" schema?
+CREATE OPERATOR _prom_catalog.== (
+    LEFTARG = prom_api.label_key,
+    RIGHTARG = prom_api.pattern,
+    FUNCTION = _prom_catalog.label_find_key_equal
+);
+
+CREATE OPERATOR _prom_catalog.!== (
+    LEFTARG = prom_api.label_key,
+    RIGHTARG = prom_api.pattern,
+    FUNCTION = _prom_catalog.label_find_key_not_equal
+);
+
+CREATE OPERATOR _prom_catalog.==~ (
+    LEFTARG = prom_api.label_key,
+    RIGHTARG = prom_api.pattern,
+    FUNCTION = _prom_catalog.label_find_key_regex
+);
+
+CREATE OPERATOR _prom_catalog.!=~ (
+    LEFTARG = prom_api.label_key,
+    RIGHTARG = prom_api.pattern,
+    FUNCTION = _prom_catalog.label_find_key_not_regex
+);
+
 CREATE OR REPLACE FUNCTION _prom_catalog.match_equals(labels prom_api.label_array, _op ps_tag.tag_op_equals)
 RETURNS boolean
 AS $func$
