@@ -541,7 +541,7 @@ AS $func$
     TRUNCATE _ps_trace.schema_url RESTART IDENTITY CASCADE;
     TRUNCATE _ps_trace.tag RESTART IDENTITY;
     DELETE FROM _ps_trace.tag_key WHERE id >= 1000; -- keep the "standard" tag keys
-    PERFORM setval('_ps_trace.tag_key_id_seq', 1000);
+    SELECT setval('_ps_trace.tag_key_id_seq', 1000);
 $func$
 LANGUAGE sql VOLATILE
 -- TODO (james): security definer isn't actually required here. This is a permissions issue because no TRUNCATE on
