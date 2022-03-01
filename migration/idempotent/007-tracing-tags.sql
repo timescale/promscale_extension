@@ -445,7 +445,7 @@ AS $func$
     ) a on (true)
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE STRICT;
-GRANT EXECUTE ON FUNCTION ps_trace.jsonb(ps_trace.tag_map, tag_k[]) TO prom_reader;
+GRANT EXECUTE ON FUNCTION ps_trace.jsonb(ps_trace.tag_map, ps_trace.tag_k[]) TO prom_reader;
 
 -------------------------------------------------------------------------------
 -- val

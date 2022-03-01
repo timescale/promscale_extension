@@ -659,7 +659,7 @@ AS
 $$
 BEGIN
     IF _prom_catalog.get_timescale_major_version() >= 2 THEN
-        RETURN (SELECT * FROM approximate_row_count(table_name_input));
+        RETURN (SELECT * FROM public.approximate_row_count(table_name_input));
     ELSE
         IF _prom_catalog.is_timescaledb_installed()
             AND (SELECT count(*) > 0
@@ -871,7 +871,7 @@ RETURNS prom_api.label_array AS $$
               _prom_catalog.get_or_create_label_key_pos(js->>'__name__', e.key)) idx,
             coalesce(l.id,
               _prom_catalog.get_or_create_label_id(e.key, e.value)) val
-        FROM label_jsonb_each_text(js) e
+        FROM _prom_catalog.label_jsonb_each_text(js) e
              LEFT JOIN _prom_catalog.label l
                ON (l.key = e.key AND l.value = e.value)
             LEFT JOIN _prom_catalog.label_key_position lkp

@@ -70,10 +70,10 @@ $$
         SELECT count(*)::TEXT INTO result FROM _prom_catalog.metric;
         PERFORM _ps_catalog.apply_telemetry('metrics_total', result);
 
-        SELECT sum(hypertable_size(format('prom_data.%I', table_name)))::TEXT INTO result FROM _prom_catalog.metric;
+        SELECT sum(public.hypertable_size(format('prom_data.%I', table_name)))::TEXT INTO result FROM _prom_catalog.metric;
         PERFORM _ps_catalog.apply_telemetry('metrics_bytes_total', result);
 
-        SELECT approximate_row_count('_prom_catalog.series')::TEXT INTO result;
+        SELECT public.approximate_row_count('_prom_catalog.series')::TEXT INTO result;
         PERFORM _ps_catalog.apply_telemetry('metrics_series_total_approx', result);
 
         SELECT count(*)::TEXT INTO result FROM _prom_catalog.label WHERE key = '__tenant__';
@@ -104,16 +104,16 @@ $$
                         n_distinct
                     ELSE
                         --negative values represent number of distinct elements as a proportion of the total
-                        -n_distinct * approximate_row_count('_ps_trace.span')
+                        -n_distinct * public.approximate_row_count('_ps_trace.span')
                 END)::TEXT INTO result
         FROM pg_stats
         WHERE schemaname='_ps_trace' AND tablename='span' AND attname='trace_id' AND inherited;
         PERFORM _ps_catalog.apply_telemetry('traces_total_approx', result);
 
-        SELECT approximate_row_count('_ps_trace.span')::TEXT INTO result;
+        SELECT public.approximate_row_count('_ps_trace.span')::TEXT INTO result;
         PERFORM _ps_catalog.apply_telemetry('traces_spans_total_approx', result);
 
-        SELECT hypertable_size('_ps_trace.span')::TEXT INTO result;
+        SELECT public.hypertable_size('_ps_trace.span')::TEXT INTO result;
         PERFORM _ps_catalog.apply_telemetry('traces_spans_bytes_total', result);
 
         -- Others.
