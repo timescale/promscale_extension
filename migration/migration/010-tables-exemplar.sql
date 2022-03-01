@@ -16,4 +16,4 @@ CREATE TABLE IF NOT EXISTS _prom_catalog.exemplar (
 GRANT SELECT ON TABLE _prom_catalog.exemplar TO prom_reader;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _prom_catalog.exemplar TO prom_writer;
 
-GRANT USAGE, SELECT ON SEQUENCE exemplar_id_seq TO prom_writer;
+GRANT USAGE, SELECT ON SEQUENCE _prom_catalog.exemplar_id_seq TO prom_writer;

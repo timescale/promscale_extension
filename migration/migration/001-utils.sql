@@ -22,7 +22,7 @@ BEGIN
 
     EXECUTE command;
     BEGIN
-        CALL distributed_exec(command);
+        CALL public.distributed_exec(command);
     EXCEPTION
         WHEN undefined_function THEN
             -- we're not on Timescale 2, just return
