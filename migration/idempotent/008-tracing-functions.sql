@@ -543,7 +543,10 @@ AS $func$
     DELETE FROM _ps_trace.tag_key WHERE id >= 1000; -- keep the "standard" tag keys
     PERFORM setval('_ps_trace.tag_key_id_seq', 1000);
 $func$
-LANGUAGE sql VOLATILE;
+LANGUAGE sql VOLATILE
+-- TODO (james): security definer isn't actually required here. This is a permissions issue because no TRUNCATE on
+-- link, event, span, ... for prom_modifier.
+SECURITY DEFINER;
 GRANT EXECUTE ON FUNCTION ps_trace.delete_all_traces() TO prom_writer;
 COMMENT ON FUNCTION ps_trace.delete_all_traces IS
 $$WARNING: this function deletes all spans and related tracing data in the system and restores it to a "just installed" state.$$;
