@@ -89,18 +89,9 @@ RETURNS BOOLEAN AS
 $$
 BEGIN
     IF _prom_catalog.is_timescaledb_installed() THEN
-        IF _prom_catalog.get_timescale_major_version() >= 2 THEN
-            -- TimescaleDB 2.x
-            RETURN (SELECT current_setting('timescaledb.license') = 'apache');
-        ELSE
-            -- TimescaleDB 1.x
-            -- Note: We cannot use current_setting() in 1.x, otherwise we get permission errors as
-            -- we need to be superuser. We should not enforce the use of superuser. Hence, we take
-            -- help of a view.
-            RETURN (SELECT edition = 'apache' FROM timescaledb_information.license);
-        END IF;
+        RETURN (SELECT current_setting('timescaledb.license') = 'apache');
     END IF;
-    RETURN false;
+RETURN false;
 END;
 $$
 LANGUAGE plpgsql;
@@ -109,19 +100,9 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.is_timescaledb_oss() TO prom_reader;
 CREATE OR REPLACE FUNCTION _prom_catalog.is_multinode()
     RETURNS BOOLEAN
 AS $func$
-DECLARE
-    is_distributed BOOLEAN = false;
-BEGIN
-    IF _prom_catalog.get_timescale_major_version() >= 2 THEN
-        SELECT count(*) > 0 FROM timescaledb_information.data_nodes
-            INTO is_distributed;
-    END IF;
-    RETURN is_distributed;
-EXCEPTION WHEN SQLSTATE '42P01' THEN -- Timescale 1.x, never distributed
-    RETURN false;
-END
+    SELECT count(*) > 0 FROM timescaledb_information.data_nodes
 $func$
-LANGUAGE PLPGSQL STABLE;
+LANGUAGE sql STABLE;
 GRANT EXECUTE ON FUNCTION _prom_catalog.is_multinode() TO prom_reader;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.get_default_compression_setting()
