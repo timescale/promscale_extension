@@ -821,6 +821,10 @@ $$
             PERFORM pg_advisory_xact_lock(5585198506344173278);
         END IF;
         SELECT table_name, id INTO hypertable_name, deletable_metric_id FROM _prom_catalog.metric WHERE metric_name=metric_name_to_be_dropped;
+        IF hypertable_name IS NULL OR deletable_metric_id IS NULL THEN
+            RAISE NOTICE 'No metric name "%" found', metric_name_to_be_dropped;
+            RETURN;
+        END IF;
         RAISE NOTICE 'deleting "%" metric with metric_id as "%" and table_name as "%"', metric_name_to_be_dropped, deletable_metric_id, hypertable_name;
         EXECUTE FORMAT('DROP VIEW prom_series.%1$I;', hypertable_name);
         EXECUTE FORMAT('DROP VIEW prom_metric.%1$I;', hypertable_name);
