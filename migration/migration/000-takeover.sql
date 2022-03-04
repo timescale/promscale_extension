@@ -82,8 +82,6 @@ BEGIN
             , ('FUNCTION', '_prom_catalog.match_not_equals(prom_api.label_array, ps_tag.tag_op_not_equals)')
             , ('FUNCTION', '_prom_catalog.match_regexp_matches(prom_api.label_array, ps_tag.tag_op_regexp_matches)')
             , ('FUNCTION', '_prom_catalog.match_regexp_not_matches(prom_api.label_array, ps_tag.tag_op_regexp_not_matches)')
-            , ('FUNCTION', '_prom_catalog.get_timescale_major_version()')
-            , ('FUNCTION', '_prom_catalog.ha_leases_audit_fn()')
             , ('TYPE', 'ps_tag.tag_op_jsonb_path_exists')
             , ('TYPE', 'ps_tag.tag_op_regexp_matches')
             , ('TYPE', 'ps_tag.tag_op_regexp_not_matches')
@@ -118,8 +116,11 @@ BEGIN
             ) x(objtype, objname)
         )
         LOOP
-            EXECUTE format('ALTER %s promscale ADD SCHEMA %s', _rec.objtype, _rec.objname);
-            EXECUTE format('ALTER %s %s OWNER TO %I', _rec.objtype, _rec.objname, @extowner@);
+            -- extension is installed into _prom_ext schema. thus cannot add it to the extension
+            IF NOT (_rec.objtype = 'SCHEMA' AND _rec.objname = '_prom_ext') THEN
+                EXECUTE format('ALTER EXTENSION promscale ADD %s %s', _rec.objtype, _rec.objname);
+            END IF;
+            EXECUTE format('ALTER %s %s OWNER TO %I', _rec.objtype, _rec.objname, '@extowner@');
 
             IF _rec.objtype = 'TABLE' THEN
                 EXECUTE format($sql$SELECT pg_catalog.pg_extension_config_dump(%L, '')$sql$, _rec.objname);
@@ -137,7 +138,7 @@ BEGIN
         FOR _i IN 1.._max
         LOOP
             EXECUTE format($sql$ALTER EXTENSION promscale ADD TABLE _ps_trace.tag_%s;$sql$, _i);
-            EXECUTE format($sql$ALTER TABLE _ps_trace.tag_%s OWNER TO %I$sql$, _i, @extowner@);
+            EXECUTE format($sql$ALTER TABLE _ps_trace.tag_%s OWNER TO %I$sql$, _i, '@extowner@');
             EXECUTE format($sql$SELECT pg_catalog.pg_extension_config_dump('_ps_trace.tag_%s', '')$sql$, _i);
        END LOOP;
     END
