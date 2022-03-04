@@ -230,13 +230,14 @@ fi
 
 echo "Building.."
 cd "${ROOT_DIR}"
+export PATH="${pg_config_dir}:${PATH}" 
 
-PATH="${pg_config_dir}:${PATH}" make all PG_CONFIG="${pg_config_dir}/pg_config"
-PATH="${pg_config_dir}:${PATH}" mkdir -p "target/release/promscale-pg${pg_version}/$(pg_config --pkglibdir)"
-PATH="${pg_config_dir}:${PATH}" mkdir -p "target/release/promscale-pg${pg_version}/$(pg_config --sharedir)/extension/"
-PATH="${pg_config_dir}:${PATH}" cp -H "./promscale.so" "target/release/promscale-pg${pg_version}/$(pg_config --pkglibdir)/"
-PATH="${pg_config_dir}:${PATH}" cp -H "./promscale.control" "target/release/promscale-pg${pg_version}/$(pg_config --sharedir)/extension"
-PATH="${pg_config_dir}:${PATH}" cp -HR "./sql/." "target/release/promscale-pg${pg_version}/$(pg_config --sharedir)/extension"
+make all
+mkdir -p "target/release/promscale-pg${pg_version}/$(pg_config --pkglibdir)"
+mkdir -p "target/release/promscale-pg${pg_version}/$(pg_config --sharedir)/extension/"
+cp -H "./promscale.so" "target/release/promscale-pg${pg_version}/$(pg_config --pkglibdir)/"
+cp -H "./promscale.control" "target/release/promscale-pg${pg_version}/$(pg_config --sharedir)/extension"
+cp -HR "./sql/." "target/release/promscale-pg${pg_version}/$(pg_config --sharedir)/extension"
 
 # echo "Post-processing build.."
 ## cargo run --manifest-path tools/post-install/Cargo.toml -- --dir "target/release/promscale-pg${pg_version}"
