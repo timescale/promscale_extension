@@ -147,7 +147,7 @@ EOF
 
 # Initialize PGX
 RUN <<EOF
-cargo install cargo-pgx --git https://github.com/timescale/pgx --branch promscale-staging
+cargo install cargo-pgx --version 0.2.6
 cargo pgx init --pg${PG_VERSION} /usr/pgsql-${PG_VERSION}/bin/pg_config
 EOF
 
