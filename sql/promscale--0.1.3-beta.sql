@@ -250,11 +250,11 @@ CREATE AGGREGATE @extschema@.vector_selector(
     sample_time timestamptz,
     sample_value DOUBLE PRECISION)
 (
-    sfunc = vector_selector_transition,
+    sfunc = @extschema@.vector_selector_transition,
     stype = internal,
-    finalfunc = vector_selector_final,
-    combinefunc = vector_selector_combine,
-    serialfunc = vector_selector_serialize,
-    deserialfunc = vector_selector_deserialize,
+    finalfunc = @extschema@.vector_selector_final,
+    combinefunc = @extschema@.vector_selector_combine,
+    serialfunc = @extschema@.vector_selector_serialize,
+    deserialfunc = @extschema@.vector_selector_deserialize,
     parallel = safe
 );
