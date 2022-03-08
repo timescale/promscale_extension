@@ -76,6 +76,16 @@ jobs:
           cache-from: type=gha,scope=${{matrix.base}}-${{matrix.pgversion}}-${{matrix.tsversion}}
           cache-to: type=gha,mode=max,scope=${{matrix.base}}-${{matrix.pgversion}}-${{matrix.tsversion}}
 
+      - name: Run end-to-end tests
+        uses: actions-rs/cargo@v1
+        # Note: we skip pg12 because the docker images don't work currently. See https://github.com/timescale/promscale_extension/issues/109.
+        if: ${{ matrix.pgversion != 12 }}
+        with:
+          command: test
+          args: -p e2e
+        env:
+          TS_DOCKER_IMAGE: ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
+
   # This allows us to set a single job which must pass in GitHub's branch protection rules,
   # otherwise we have to keep updating them as we add or remove postgres versions etc.
   docker-result:

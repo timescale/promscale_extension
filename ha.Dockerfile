@@ -46,6 +46,7 @@ USER postgres
 COPY --chown=postgres:postgres Cargo.* /build/promscale/
 COPY --chown=postgres:postgres promscale.control Makefile build.rs create-upgrade-symlinks.sh /build/promscale/
 COPY --chown=postgres:postgres .cargo/ /build/promscale/.cargo/
+COPY --chown=postgres:postgres e2e/ /build/promscale/e2e/
 COPY --chown=postgres:postgres src/ /build/promscale/src/
 COPY --chown=postgres:postgres sql/*.sql /build/promscale/sql/
 COPY --chown=postgres:postgres migration/ /build/promscale/migration

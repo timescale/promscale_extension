@@ -4,6 +4,7 @@ dist/*.rpm
 dist/*.deb
 dist/*.tar
 target/
+*/target/
 *.md
 !CHANGELOG.md
 LICENSE
