@@ -2,5 +2,5 @@
 dist/*.rpm
 dist/*.deb
 dist/*.tar
-/target
+target
 hand-written-migration.sql
