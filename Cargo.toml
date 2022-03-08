@@ -1,3 +1,6 @@
+[workspace]
+members = ["e2e"]
+
 [package]
 name = "promscale"
 version = "0.5.0"
@@ -44,3 +47,6 @@ pgx-tests = "0.3.1"
 pgx = { git = "https://github.com/timescale/pgx", branch = "promscale-staging" }
 pgx-macros = { git = "https://github.com/timescale/pgx", branch = "promscale-staging" }
 pgx-tests = { git = "https://github.com/timescale/pgx", branch = "promscale-staging" }
+
+# from e2e workspace
+test-generator = { git = "https://github.com/JamesGuthrie/test-generator" }
