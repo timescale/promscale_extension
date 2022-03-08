@@ -47,6 +47,7 @@ BEGIN
         , ('_prom_catalog.metric')
         , ('_prom_catalog.remote_commands')
         , ('_prom_catalog.series')
+        , ('_ps_catalog.migration')
         , ('_ps_catalog.promscale_instance_information')
         , ('_ps_trace.event')
         , ('_ps_trace.instrumentation_lib')
