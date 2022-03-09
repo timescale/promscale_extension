@@ -4,7 +4,7 @@ $migration_table$
     DECLARE
         _current_user_id oid = NULL;
         _ps_catalog_schema_owner_id oid = NULL;
-        _migration_table_owner_id text = NULL;
+        _migration_table_owner_id oid = NULL;
     BEGIN
         SELECT pg_user.usesysid
         INTO STRICT _current_user_id
