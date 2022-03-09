@@ -1,3 +1,5 @@
+
+
 DO $block$
 DECLARE
     _rec record;
@@ -345,6 +347,40 @@ BEGIN
         EXECUTE format($sql$ALTER TABLE _ps_trace.tag_%s OWNER TO %I$sql$, _i, '@extowner@');
         EXECUTE format($sql$SELECT pg_catalog.pg_extension_config_dump('_ps_trace.tag_%s', '')$sql$, _i);
    END LOOP;
+END
+$block$
+;
+
+DO $block$
+BEGIN
+    CREATE TABLE _ps_catalog.migration(
+      name TEXT NOT NULL PRIMARY KEY
+    , applied_at_version TEXT
+    , applied_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT clock_timestamp()
+    );
+
+    PERFORM pg_catalog.pg_extension_config_dump('_ps_catalog.migration', '');
+
+    DROP TABLE public.prom_schema_migrations;
+
+    -- Bring migrations table up to speed
+    INSERT INTO _ps_catalog.migration (name, applied_at_version)
+    VALUES
+        ('001-extension.sql'              , '0.0.0'),
+        ('002-utils.sql'                  , '0.0.0'),
+        ('003-users.sql'                  , '0.0.0'),
+        ('004-schemas.sql'                , '0.0.0'),
+        ('005-tag-operators.sql'          , '0.0.0'),
+        ('006-tables.sql'                 , '0.0.0'),
+        ('007-matcher-operators.sql'      , '0.0.0'),
+        ('008-install-uda.sql'            , '0.0.0'),
+        ('009-tables-ha.sql'              , '0.0.0'),
+        ('010-tables-metadata.sql'        , '0.0.0'),
+        ('011-tables-exemplar.sql'        , '0.0.0'),
+        ('012-tracing.sql'                , '0.0.0'),
+        ('013-tracing-well-known-tags.sql', '0.0.0'),
+        ('014-telemetry.sql'              , '0.0.0')
+    ;
 END
 $block$
 ;
