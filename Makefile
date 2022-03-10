@@ -135,13 +135,15 @@ release-test: release-tester ## Test the currently selected release package
 	docker rm -f "$(TESTER_NAME)"
 
 .PHONY: docker-image-build-12 docker-image-build-13 docker-image-build-14
-docker-image-build-12 docker-image-build-13 docker-image-build-14: Dockerfile $(SQL_FILES) $(SRCS) Cargo.toml Cargo.lock $(RUST_SRCS)
+docker-image-build-12 docker-image-build-13 docker-image-build-14: alpine.Dockerfile $(SQL_FILES) $(SRCS) Cargo.toml Cargo.lock $(RUST_SRCS)
 	docker buildx build $(if $(PUSH),--push,--load) \
 		--build-arg TIMESCALEDB_VERSION=$(TIMESCALEDB_VER) \
 		--build-arg PG_VERSION_TAG=$(PG_BUILD_VER) \
+		-t local/dev_promscale_extension:head-ts2-$(PG_BUILD_VER) \
 		-t $(IMAGE_NAME):$(EXT_VERSION)-$(TIMESCALEDB_VER)-$(PG_BUILD_VER) \
 		-t $(IMAGE_NAME):$(EXT_VERSION)-ts$(TIMESCALEDB_MAJOR)-$(PG_BUILD_VER) \
 		-t $(IMAGE_NAME):latest-ts$(TIMESCALEDB_MAJOR)-$(PG_BUILD_VER) \
+        -f alpine.Dockerfile \
 		.
 
 .PHONY: docker-image-12
@@ -162,7 +164,7 @@ docker-image: docker-image-14 docker-image-13 docker-image-12 ## Build Timescale
 .PHONY: docker-quick-build-12 docker-quick-build-13 docker-quick-build-14
 docker-quick-build-12 docker-quick-build-13 docker-quick-build-14: ## A quick way to rebuild the extension image with only SQL changes
 	cargo pgx schema $(PG_BUILD_VER)
-	docker build -f Dockerfile.quick \
+	docker build -f quick.Dockerfile \
 		--build-arg TIMESCALEDB_VERSION=$(TIMESCALEDB_VER) \
 		--build-arg PG_VERSION_TAG=$(PG_BUILD_VER) \
 		--build-arg EXTENSION_VERSION=$(EXT_VERSION) \
