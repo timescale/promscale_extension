@@ -11,6 +11,8 @@ PG_VERSION ?= `${PG_CONFIG} --version | awk -F'[ \. ]' '{print $$2}'`
 PG_VER ?= pg${PG_VERSION}
 # If set to a non-empty value, docker builds will be pushed to the registry
 PUSH ?=
+TIMESCALEDB_MAJOR=2
+TIMESCALEDB_VER=2.6.0
 
 # Transform ARCH to its Docker platform equivalent
 ifeq ($(ARCH),arm64)
@@ -131,20 +133,14 @@ docker-image-build-12 docker-image-build-13 docker-image-build-14: Dockerfile $(
 
 .PHONY: docker-image-12
 docker-image-12: PG_VER=pg12
-docker-image-12: TIMESCALEDB_MAJOR=2
-docker-image-12: TIMESCALEDB_VER=2.6.0
 docker-image-12: docker-image-build-12
 
 .PHONY: docker-image-13
 docker-image-13: PG_VER=pg13
-docker-image-13: TIMESCALEDB_MAJOR=2
-docker-image-13: TIMESCALEDB_VER=2.6.0
 docker-image-13: docker-image-build-13
 
 .PHONY: docker-image-14
 docker-image-14: PG_VER=pg14
-docker-image-14: TIMESCALEDB_MAJOR=2
-docker-image-14: TIMESCALEDB_VER=2.6.0
 docker-image-14: docker-image-build-14
 
 .PHONY: docker-image
@@ -164,20 +160,14 @@ docker-quick-build-12 docker-quick-build-13 docker-quick-build-14: ## A quick wa
 
 .PHONY: docker-quick-14
 docker-quick-14: PG_VER=pg14
-docker-quick-14: TIMESCALEDB_MAJOR=2
-docker-quick-14: TIMESCALEDB_VER=2.5.2
 docker-quick-14: docker-quick-build-14
 
 .PHONY: docker-quick-13
 docker-quick-13: PG_VER=pg13
-docker-quick-13: TIMESCALEDB_MAJOR=2
-docker-quick-13: TIMESCALEDB_VER=2.5.2
 docker-quick-13: docker-quick-build-13
 
 .PHONY: docker-quick-12
 docker-quick-12: PG_VER=pg12
-docker-quick-12: TIMESCALEDB_MAJOR=2
-docker-quick-12: TIMESCALEDB_VER=2.5.2
 docker-quick-12: docker-quick-build-12
 
 .PHONY: setup-buildx
