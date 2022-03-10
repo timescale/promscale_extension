@@ -17,7 +17,6 @@ jobs:
         - docker-image-ts2-14
         - docker-image-ts2-13
         - docker-image-ts2-12
-        - docker-image-ts1
     steps:
       - uses: actions/checkout@v2
 
