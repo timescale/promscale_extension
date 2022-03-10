@@ -351,6 +351,33 @@ END
 $block$
 ;
 
+-- metric related tables and views that are dynamically generated
+-- need to be discovered and ownership transferred
+DO $block$
+DECLARE
+    _rec record;
+BEGIN
+    FOR _rec IN
+    (
+        SELECT
+            CASE k.relkind
+                WHEN 'r' THEN 'TABLE'
+                WHEN 'v' THEN 'VIEW'
+            END AS typ,
+            n.nspname,
+            k.relname
+        FROM pg_class k
+        INNER JOIN pg_namespace n ON (k.relnamespace = n.oid)
+        WHERE k.relkind in ('r', 'v')
+        AND n.nspname in ('prom_metric', 'prom_series', 'prom_data_series', 'prom_data')
+    )
+    LOOP
+        EXECUTE format($sql$ALTER %s %I.%I OWNER TO prom_modifier$sql$, _rec.typ, _rec.nspname, _rec.relname);
+   END LOOP;
+END
+$block$
+;
+
 DO $block$
 BEGIN
     CREATE TABLE _ps_catalog.migration(
@@ -384,3 +411,32 @@ BEGIN
 END
 $block$
 ;
+
+GRANT EXECUTE ON FUNCTION _prom_catalog.count_jsonb_keys(jsonb) TO prom_reader;
+
+ALTER PROCEDURE _prom_catalog.execute_everywhere(text, text, boolean)
+    SECURITY DEFINER
+    SET search_path = pg_temp;
+GRANT EXECUTE ON PROCEDURE _prom_catalog.execute_everywhere(text, text, boolean) TO prom_admin;
+
+GRANT EXECUTE ON FUNCTION _prom_catalog.label_value_contains(prom_api.label_value_array, TEXT) TO prom_reader;
+
+ALTER PROCEDURE _prom_catalog.update_execute_everywhere_entry(text, text, boolean)
+    SECURITY DEFINER
+    SET search_path = pg_temp;
+GRANT EXECUTE ON PROCEDURE _prom_catalog.update_execute_everywhere_entry(text, text, boolean) TO prom_admin;
+
+GRANT SELECT ON TABLE _prom_catalog.remote_commands TO prom_reader;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _prom_catalog.remote_commands TO prom_admin;
+
+CALL _prom_catalog.execute_everywhere('grant_all_roles_to_extowner',$ee$
+    DO $$
+    BEGIN
+        GRANT prom_reader TO @extowner@ WITH ADMIN OPTION;
+        GRANT prom_writer TO @extowner@ WITH ADMIN OPTION;
+        GRANT prom_maintenance TO @extowner@ WITH ADMIN OPTION;
+        GRANT prom_modifier TO @extowner@ WITH ADMIN OPTION;
+        GRANT prom_admin TO @extowner@ WITH ADMIN OPTION;
+    END
+    $$;
+$ee$);
