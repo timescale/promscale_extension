@@ -119,8 +119,8 @@ release-test: release-tester ## Test the currently selected release package
 	fi; \
 	docker rm -f "$(TESTER_NAME)"
 
-.PHONY: docker-image-build-2-12 docker-image-build-2-13 docker-image-build-2-14
-docker-image-build-2-12 docker-image-build-2-13 docker-image-build-2-14: Dockerfile $(SQL_FILES) $(SRCS) Cargo.toml Cargo.lock $(RUST_SRCS)
+.PHONY: docker-image-build-12 docker-image-build-13 docker-image-build-14
+docker-image-build-12 docker-image-build-13 docker-image-build-14: Dockerfile $(SQL_FILES) $(SRCS) Cargo.toml Cargo.lock $(RUST_SRCS)
 	docker buildx build $(if $(PUSH),--push,--load) \
 		--build-arg TIMESCALEDB_VERSION=$(TIMESCALEDB_VER) \
 		--build-arg PG_VERSION_TAG=$(PG_VER) \
@@ -129,29 +129,29 @@ docker-image-build-2-12 docker-image-build-2-13 docker-image-build-2-14: Dockerf
 		-t $(IMAGE_NAME):latest-ts$(TIMESCALEDB_MAJOR)-$(PG_VER) \
 		.
 
-.PHONY: docker-image-ts2-12
-docker-image-ts2-12: PG_VER=pg12
-docker-image-ts2-12: TIMESCALEDB_MAJOR=2
-docker-image-ts2-12: TIMESCALEDB_VER=2.6.0
-docker-image-ts2-12: docker-image-build-2-12
+.PHONY: docker-image-12
+docker-image-12: PG_VER=pg12
+docker-image-12: TIMESCALEDB_MAJOR=2
+docker-image-12: TIMESCALEDB_VER=2.6.0
+docker-image-12: docker-image-build-12
 
-.PHONY: docker-image-ts2-13
-docker-image-ts2-13: PG_VER=pg13
-docker-image-ts2-13: TIMESCALEDB_MAJOR=2
-docker-image-ts2-13: TIMESCALEDB_VER=2.6.0
-docker-image-ts2-13: docker-image-build-2-13
+.PHONY: docker-image-13
+docker-image-13: PG_VER=pg13
+docker-image-13: TIMESCALEDB_MAJOR=2
+docker-image-13: TIMESCALEDB_VER=2.6.0
+docker-image-13: docker-image-build-13
 
-.PHONY: docker-image-ts2-14
-docker-image-ts2-14: PG_VER=pg14
-docker-image-ts2-14: TIMESCALEDB_MAJOR=2
-docker-image-ts2-14: TIMESCALEDB_VER=2.6.0
-docker-image-ts2-14: docker-image-build-2-14
+.PHONY: docker-image-14
+docker-image-14: PG_VER=pg14
+docker-image-14: TIMESCALEDB_MAJOR=2
+docker-image-14: TIMESCALEDB_VER=2.6.0
+docker-image-14: docker-image-build-14
 
 .PHONY: docker-image
-docker-image: docker-image-ts2-14 docker-image-ts2-13 docker-image-ts2-12 ## Build Timescale images with the extension
+docker-image: docker-image-14 docker-image-13 docker-image-12 ## Build Timescale images with the extension
 
-.PHONY: docker-quick-build-2-12 docker-quick-build-2-13 docker-quick-build-2-14
-docker-quick-build-2-12 docker-quick-build-2-13 docker-quick-build-2-14: ## A quick way to rebuild the extension image with only SQL changes
+.PHONY: docker-quick-build-12 docker-quick-build-13 docker-quick-build-14
+docker-quick-build-12 docker-quick-build-13 docker-quick-build-14: ## A quick way to rebuild the extension image with only SQL changes
 	cargo pgx schema $(PG_VER)
 	docker build -f Dockerfile.quick \
 		--build-arg TIMESCALEDB_VERSION=$(TIMESCALEDB_VER) \
@@ -162,23 +162,23 @@ docker-quick-build-2-12 docker-quick-build-2-13 docker-quick-build-2-14: ## A qu
 		-t $(IMAGE_NAME):latest-ts$(TIMESCALEDB_MAJOR)-$(PG_VER) \
 		.
 
-.PHONY: docker-quick-ts2-14
-docker-quick-ts2-14: PG_VER=pg14
-docker-quick-ts2-14: TIMESCALEDB_MAJOR=2
-docker-quick-ts2-14: TIMESCALEDB_VER=2.5.2
-docker-quick-ts2-14: docker-quick-build-2-14
+.PHONY: docker-quick-14
+docker-quick-14: PG_VER=pg14
+docker-quick-14: TIMESCALEDB_MAJOR=2
+docker-quick-14: TIMESCALEDB_VER=2.5.2
+docker-quick-14: docker-quick-build-14
 
-.PHONY: docker-quick-ts2-13
-docker-quick-ts2-13: PG_VER=pg13
-docker-quick-ts2-13: TIMESCALEDB_MAJOR=2
-docker-quick-ts2-13: TIMESCALEDB_VER=2.5.2
-docker-quick-ts2-13: docker-quick-build-2-13
+.PHONY: docker-quick-13
+docker-quick-13: PG_VER=pg13
+docker-quick-13: TIMESCALEDB_MAJOR=2
+docker-quick-13: TIMESCALEDB_VER=2.5.2
+docker-quick-13: docker-quick-build-13
 
-.PHONY: docker-quick-ts2-12
-docker-quick-ts2-12: PG_VER=pg12
-docker-quick-ts2-12: TIMESCALEDB_MAJOR=2
-docker-quick-ts2-12: TIMESCALEDB_VER=2.5.2
-docker-quick-ts2-12: docker-quick-build-2-12
+.PHONY: docker-quick-12
+docker-quick-12: PG_VER=pg12
+docker-quick-12: TIMESCALEDB_MAJOR=2
+docker-quick-12: TIMESCALEDB_VER=2.5.2
+docker-quick-12: docker-quick-build-12
 
 .PHONY: setup-buildx
 setup-buildx: ## Setup a Buildx builder

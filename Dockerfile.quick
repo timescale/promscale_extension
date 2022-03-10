@@ -1,5 +1,5 @@
 # This dockerfile is a helper for quick iteration on the extension SQL
-# To use, first run: `make docker-image-ts2-14`, then edit SQL and run `make docker-quick-ts2-14`
+# To use, first run: `make docker-image-14`, then edit SQL and run `make docker-quick-14`
 ARG PG_VERSION_TAG
 ARG TIMESCALEDB_VERSION
 ARG EXTENSION_VERSION

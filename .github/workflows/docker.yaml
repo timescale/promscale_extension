@@ -14,9 +14,9 @@ jobs:
     strategy:
       matrix:
         docker:
-        - docker-image-ts2-14
-        - docker-image-ts2-13
-        - docker-image-ts2-12
+        - docker-image-14
+        - docker-image-13
+        - docker-image-12
     steps:
       - uses: actions/checkout@v2
 
