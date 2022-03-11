@@ -355,7 +355,7 @@ BEGIN
             _value
         FROM _ps_trace.tag_key k
         WHERE k.key = _key
-        ON CONFLICT (key, value) DO
+        ON CONFLICT (key, pg_catalog.md5(value::TEXT)) DO
         UPDATE SET tag_type = t.tag_type | EXCLUDED.tag_type
         WHERE t.tag_type & EXCLUDED.tag_type = 0;
 
@@ -386,7 +386,7 @@ AS $func$
         SELECT a.key_id, a.id
         FROM _ps_trace.tag a
         WHERE x.key = a.key
-        AND x.value = a.value
+        AND pg_catalog.md5(x.value::TEXT) = pg_catalog.md5(a.value::TEXT)
         LIMIT 1
     ) a on (true)
 $func$

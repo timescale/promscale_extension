@@ -58,10 +58,10 @@ CREATE TABLE _ps_trace.tag
     tag_type ps_trace.tag_type NOT NULL,
     key_id bigint NOT NULL,
     key ps_trace.tag_k NOT NULL REFERENCES _ps_trace.tag_key (key) ON DELETE CASCADE,
-    value ps_trace.tag_v NOT NULL,
-    UNIQUE (key, value) INCLUDE (id, key_id)
+    value ps_trace.tag_v NOT NULL
 )
 PARTITION BY HASH (key);
+CREATE UNIQUE INDEX tag_key_value_id_key_id_key ON _ps_trace.tag (key, pg_catalog.md5(value::TEXT)) INCLUDE (id, key_id);
 GRANT SELECT ON TABLE _ps_trace.tag TO prom_reader;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.tag TO prom_writer;
 GRANT USAGE ON SEQUENCE _ps_trace.tag_id_seq TO prom_writer;
