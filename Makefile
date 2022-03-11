@@ -1,14 +1,14 @@
 .DEFAULT_GOAL := help
 
-ARCH ?= `uname -m`
-EXT_VERSION ?= `cargo pkgid | cut -d':' -f3`
+ARCH ?= $(shell uname -m)
+EXT_VERSION ?= $(shell cargo pkgid | cut -d':' -f3)
 IMAGE_NAME ?= timescaledev/promscale-extension
 OS_NAME ?= debian
 OS_VERSION ?= 11
-RUST_VERSION ?= `rustc --version | cut -d' ' -f2`
+RUST_VERSION ?= $(shell rustc --version | cut -d' ' -f2)
 PG_CONFIG ?= pg_config
-PG_VERSION ?= `${PG_CONFIG} --version | awk -F'[ \. ]' '{print $$2}'`
-PG_VER ?= pg${PG_VERSION}
+PG_VERSION = $(shell ${PG_CONFIG} --version | awk -F'[ \. ]' '{print $$2}')
+PG_VER = pg${PG_VERSION}
 # If set to a non-empty value, docker builds will be pushed to the registry
 PUSH ?=
 TIMESCALEDB_MAJOR=2
