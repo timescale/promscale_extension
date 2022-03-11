@@ -91,3 +91,4 @@ GRANT EXECUTE ON PROCEDURE _prom_catalog.execute_everywhere(text, text, boolean)
 GRANT EXECUTE ON PROCEDURE _prom_catalog.update_execute_everywhere_entry(text, text, boolean) TO prom_admin;
 GRANT SELECT ON TABLE _prom_catalog.remote_commands TO prom_reader;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _prom_catalog.remote_commands TO prom_admin;
+GRANT SELECT ON TABLE _ps_catalog.migration TO prom_reader;
