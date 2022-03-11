@@ -1,6 +1,48 @@
 --NOTES
 --This code assumes that table names can only be 63 chars long
 
+CREATE OR REPLACE PROCEDURE _prom_catalog.execute_everywhere(command_key text, command TEXT, transactional BOOLEAN = true)
+AS $func$
+BEGIN
+    IF command_key IS NOT NULL THEN
+       INSERT INTO _prom_catalog.remote_commands(key, command, transactional) VALUES(command_key, command, transactional)
+       ON CONFLICT (key) DO UPDATE SET command = excluded.command, transactional = excluded.transactional;
+    END IF;
+
+    EXECUTE command;
+    BEGIN
+        CALL public.distributed_exec(command);
+    EXCEPTION
+        WHEN undefined_function THEN
+            -- we're not on Timescale 2, just return
+            RETURN;
+        WHEN SQLSTATE '0A000' THEN
+            -- we're not the access node, just return
+            RETURN;
+    END;
+END
+$func$ LANGUAGE PLPGSQL
+--security definer to add jobs as the logged-in user
+SECURITY DEFINER
+--search path must be set for security definer
+SET search_path = pg_temp;
+GRANT EXECUTE ON PROCEDURE _prom_catalog.execute_everywhere(text, text, boolean) TO prom_admin;
+
+CREATE OR REPLACE PROCEDURE _prom_catalog.update_execute_everywhere_entry(command_key text, command TEXT, transactional BOOLEAN = true)
+AS $func$
+BEGIN
+    UPDATE _prom_catalog.remote_commands
+    SET
+        command=update_execute_everywhere_entry.command,
+        transactional=update_execute_everywhere_entry.transactional
+    WHERE key = command_key;
+END
+$func$ LANGUAGE PLPGSQL
+--security definer to add jobs as the logged-in user
+SECURITY DEFINER
+--search path must be set for security definer
+SET search_path = pg_temp;
+GRANT EXECUTE ON PROCEDURE _prom_catalog.update_execute_everywhere_entry(text, text, boolean) TO prom_admin;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.get_default_chunk_interval()
     RETURNS INTERVAL
