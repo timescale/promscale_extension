@@ -186,6 +186,7 @@ AS $func$
     SELECT jsonb_build_object(a.key_id, a.id)
     FROM _ps_trace.tag a
     WHERE a.key = _op.tag_key
+    AND _prom_ext.jsonb_digest(a.value) = _prom_ext.jsonb_digest(_op.value)
     AND a.value = _op.value
     LIMIT 1
 $func$

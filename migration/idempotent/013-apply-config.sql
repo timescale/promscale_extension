@@ -64,6 +64,7 @@ $block$;
 -- TODO (james): possibly move these grants closer to their definitions? At
 --  definition time, the roles which we grant here haven't been created yet.
 GRANT EXECUTE ON FUNCTION _prom_ext.num_cpus() TO prom_reader;
+GRANT EXECUTE ON FUNCTION _prom_ext.jsonb_digest(JSONB) TO prom_reader;
 GRANT EXECUTE ON FUNCTION _prom_ext.prom_delta(TIMESTAMPTZ, TIMESTAMPTZ, BIGINT, BIGINT, TIMESTAMPTZ, DOUBLE PRECISION) TO prom_reader;
 GRANT EXECUTE ON FUNCTION _prom_ext.prom_increase(TIMESTAMPTZ, TIMESTAMPTZ, BIGINT, BIGINT, TIMESTAMPTZ, DOUBLE PRECISION) TO prom_reader;
 GRANT EXECUTE ON FUNCTION _prom_ext.prom_rate(TIMESTAMPTZ, TIMESTAMPTZ, BIGINT, BIGINT, TIMESTAMPTZ, DOUBLE PRECISION) TO prom_reader;
