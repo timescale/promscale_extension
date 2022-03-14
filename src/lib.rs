@@ -1,12 +1,9 @@
 use pgx::*;
 
-mod aggregate_utils;
 mod aggregates;
 mod palloc;
-mod raw;
 mod schema;
 mod support;
-mod type_builder;
 mod util;
 
 pg_module_magic!();

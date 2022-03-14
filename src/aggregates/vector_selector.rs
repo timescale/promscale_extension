@@ -140,168 +140,17 @@ use pgx::*;
 
 use pgx::error;
 
-use crate::aggregate_utils::in_aggregate_context;
 use crate::aggregates::{Milliseconds, STALE_NAN, USECS_PER_MS};
 use serde::{Deserialize, Serialize};
 
-use crate::palloc::{Inner, InternalAsValue, ToInternal};
-use crate::raw::bytea;
-
-/// Note that for performance, this aggregate is parallel-izable, combinable, and does not expect
-/// ordered inputs.
-#[allow(clippy::too_many_arguments)]
-#[pg_extern(immutable, parallel_safe)]
-pub fn vector_selector_transition(
-    state: Internal,
-    start_time: pg_sys::TimestampTz,
-    end_time: pg_sys::TimestampTz,
-    bucket_width: Milliseconds,
-    lookback: Milliseconds,
-    time: pg_sys::TimestampTz,
-    value: f64,
-    fcinfo: pg_sys::FunctionCallInfo,
-) -> Internal {
-    vector_selector_transition_inner(
-        unsafe { state.to_inner() },
-        start_time,
-        end_time,
-        bucket_width,
-        lookback,
-        time,
-        value,
-        fcinfo,
-    )
-    .internal()
-}
-
-#[allow(clippy::too_many_arguments)]
-fn vector_selector_transition_inner(
-    state: Option<Inner<VectorSelector>>,
-    start_time: pg_sys::TimestampTz,
-    end_time: pg_sys::TimestampTz,
-    bucket_width: Milliseconds,
-    lookback: Milliseconds,
-    time: pg_sys::TimestampTz,
-    value: f64,
-    fcinfo: pg_sys::FunctionCallInfo,
-) -> Option<Inner<VectorSelector>> {
-    unsafe {
-        in_aggregate_context(fcinfo, || {
-            let mut state = state.unwrap_or_else(|| {
-                let state: Inner<VectorSelector> =
-                    VectorSelector::new(start_time, end_time, bucket_width, lookback).into();
-                state
-            });
-
-            state.insert(time, value);
-
-            Some(state)
-        })
-    }
-}
-
-#[pg_extern(immutable, parallel_safe)]
-pub fn vector_selector_final(
-    state: Internal, /* Option<Inner<VectorSelector>> */
-) -> Option<Vec<Option<f64>>> {
-    let state: Option<Inner<VectorSelector>> = unsafe { state.to_inner() };
-    state.map(|s| s.to_pg_array())
-}
-
-#[pg_extern(immutable, parallel_safe, strict)]
-pub fn vector_selector_serialize(state: Internal) -> bytea {
-    let state: &mut VectorSelector = unsafe {
-        // This is safe as long as this function is defined as `strict`, in
-        // which case PG knows that NULL -> NULL and so it will not call this
-        // function with NULL values
-        state.get_mut().unwrap()
-    };
-    crate::do_serialize!(state)
-}
-
-#[pg_extern(immutable, parallel_safe, strict)]
-pub fn vector_selector_deserialize(bytes: bytea, _internal: Internal) -> Internal {
-    let v: VectorSelector = crate::do_deserialize!(bytes, VectorSelector);
-    Inner::from(v).internal()
-}
-
-#[pg_extern(immutable, parallel_safe)]
-pub fn vector_selector_combine(
-    state1: Internal,
-    state2: Internal,
-    fcinfo: pg_sys::FunctionCallInfo,
-) -> Internal {
-    vector_selector_combine_inner(
-        unsafe { state1.to_inner() },
-        unsafe { state2.to_inner() },
-        fcinfo,
-    )
-    .internal()
-}
-
-fn vector_selector_combine_inner(
-    state1: Option<Inner<VectorSelector>>,
-    state2: Option<Inner<VectorSelector>>,
-    fcinfo: pg_sys::FunctionCallInfo,
-) -> Option<Inner<VectorSelector>> {
-    unsafe {
-        in_aggregate_context(fcinfo, || {
-            match (state1, state2) {
-                (None, None) => None,
-                (None, Some(state2)) => {
-                    let s = state2.clone();
-                    Some(s.into())
-                }
-                (Some(state1), None) => {
-                    let s = state1.clone();
-                    Some(s.into())
-                } //should I make these return themselves?
-                (Some(state1), Some(state2)) => {
-                    let mut s1 = state1.clone(); // is there a way to avoid if it doesn't need it
-                    s1.combine(&state2);
-                    Some(s1.into())
-                }
-            }
-        })
-    }
-}
-
-extension_sql!(
-    r#"
-CREATE OR REPLACE AGGREGATE @extschema@.vector_selector(
-    start_time TIMESTAMPTZ,
-    end_time TIMESTAMPTZ,
-    bucket_width BIGINT,
-    lookback BIGINT,
-    sample_time TIMESTAMPTZ,
-    sample_value DOUBLE PRECISION)
-(
-    sfunc = vector_selector_transition,
-    stype = internal,
-    finalfunc = vector_selector_final,
-    combinefunc = vector_selector_combine,
-    serialfunc = vector_selector_serialize,
-    deserialfunc = vector_selector_deserialize,
-    parallel = safe
-);
-"#,
-    name = "create_vector_selector_aggregate",
-    requires = [
-        vector_selector_transition,
-        vector_selector_final,
-        vector_selector_combine,
-        vector_selector_serialize,
-        vector_selector_deserialize
-    ]
-);
-
-// The internal state consists of a vector non-overlapping sample buckets. Each bucket
-// has a corresponding (virtual) timestamp corresponding to the ts series
-// described above. The timestamp represents the maximum value stored in the
-// bucket (inclusive). The minimum value is defined by the maximum value of
-// the previous bucket (exclusive).
-// the value stored inside the bucket is the last sample in the bucket (sample with highest timestamp)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// The internal state consists of a vector non-overlapping sample buckets. Each bucket
+/// has a corresponding (virtual) timestamp corresponding to the ts series
+/// described above. The timestamp represents the maximum value stored in the
+/// bucket (inclusive). The minimum value is defined by the maximum value of
+/// the previous bucket (exclusive).
+/// the value stored inside the bucket is the last sample in the bucket (sample with highest timestamp)
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Serialize, Deserialize, PostgresType)]
 pub struct VectorSelector {
     first_bucket_max_time: pg_sys::TimestampTz,
     last_bucket_max_time: pg_sys::TimestampTz,
@@ -338,7 +187,7 @@ impl VectorSelector {
         }
     }
 
-    fn combine(&mut self, other: &Inner<VectorSelector>) {
+    fn combine_with(&mut self, other: &VectorSelector) {
         if self.first_bucket_max_time != other.first_bucket_max_time
             || self.last_bucket_max_time != other.last_bucket_max_time
             || self.end_time != other.end_time
@@ -456,6 +305,61 @@ impl VectorSelector {
 
     pub fn to_pg_array(&self) -> Vec<Option<f64>> {
         self.results()
+    }
+}
+
+#[pg_aggregate]
+impl Aggregate for VectorSelector {
+    type State = Option<Self>;
+    type Args = (
+        name!(lowest_time, pg_sys::TimestampTz),
+        name!(greatest_time, pg_sys::TimestampTz),
+        name!(bucket_width, Milliseconds),
+        name!(lookback, Milliseconds),
+        name!(sample_time, pg_sys::TimestampTz),
+        name!(sample_value, f64),
+    );
+    type Finalize = Option<Vec<Option<f64>>>;
+
+    const PARALLEL: Option<ParallelOption> = Some(ParallelOption::Safe);
+
+    const NAME: &'static str = "vector_selector";
+
+    fn state(
+        state: Self::State,
+        (start_time, end_time, bucket_width, lookback, time, value): Self::Args,
+        _: pg_sys::FunctionCallInfo,
+    ) -> Self::State {
+        let mut state = state
+            .unwrap_or_else(|| VectorSelector::new(start_time, end_time, bucket_width, lookback));
+
+        state.insert(time, value);
+
+        Some(state)
+    }
+
+    fn finalize(
+        current: Self::State,
+        _: Self::OrderedSetArgs,
+        _: pg_sys::FunctionCallInfo,
+    ) -> Self::Finalize {
+        current.map(|c| c.to_pg_array())
+    }
+
+    fn combine(
+        state1: Self::State,
+        state2: Self::State,
+        _: pg_sys::FunctionCallInfo,
+    ) -> Self::State {
+        match (state1, state2) {
+            (None, None) => None,
+            (None, Some(state2)) => Some(state2),
+            (Some(state1), None) => Some(state1),
+            (Some(mut state1), Some(state2)) => {
+                state1.combine_with(&state2);
+                Some(state1)
+            }
+        }
     }
 }
 
