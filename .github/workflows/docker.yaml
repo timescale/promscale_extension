@@ -62,3 +62,19 @@ jobs:
           # Note: it's necessary to use a different cache scope to achieve caching for both Ubuntu and Alpine images
           cache-from: type=gha,scope=${{matrix.base}}
           cache-to: type=gha,mode=max,scope=${{matrix.base}}
+
+  # This allows us to set a single job which must pass in GitHub's branch protection rules,
+  # otherwise we have to keep updating them as we add or remove postgres versions etc.
+  docker-result:
+    name: docker result
+    if: always()
+    needs:
+      - docker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark the job as a success
+        if: needs.docker.result == 'success'
+        run: exit 0
+      - name: Mark the job as a failure
+        if: needs.docker.result != 'success'
+        run: exit 1
