@@ -1,82 +1,65 @@
 
 DO $block$
 DECLARE
-    _schema text;
+    _old_search_path text;
+    _sql text;
 BEGIN
-    FOR _schema IN
+    EXECUTE 'SHOW search_path' INTO STRICT _old_search_path;
+    SET search_path TO pg_temp;
+    FOR _sql IN
     (
-        values
-          ('_prom_catalog')
-        , ('_prom_ext')
-        , ('_ps_catalog')
-        , ('_ps_trace')
-        , ('prom_api')
-        , ('prom_data')
-        , ('prom_data_exemplar')
-        , ('prom_data_series')
-        , ('prom_info')
-        , ('prom_metric')
-        , ('prom_series')
-        , ('ps_tag')
-        , ('ps_trace')
+        -- find functions and procedures which belong to the extension
+        -- so we can revoke execute from public on them
+        SELECT format($$REVOKE ALL ON %s %I.%I(%s) FROM public$$, 
+            CASE prokind
+                WHEN 'f' THEN 'FUNCTION'
+                WHEN 'p' THEN 'PROCEDURE'
+            END,
+            n.nspname, 
+            k.proname,
+            pg_get_function_identity_arguments(k.oid)
+        )
+        FROM pg_catalog.pg_depend d
+        INNER JOIN pg_catalog.pg_extension e ON (d.refobjid = e.oid)
+        INNER JOIN pg_catalog.pg_proc k ON (d.objid = k.oid)
+        INNER JOIN pg_namespace n ON (k.pronamespace = n.oid)
+        WHERE d.refclassid = 'pg_catalog.pg_extension'::pg_catalog.regclass
+        AND d.deptype = 'e'
+        AND e.extname = 'promscale'
+        AND k.prokind IN ('f', 'p')
+        ORDER BY n.nspname, k.proname
     )
     LOOP
-        EXECUTE format('REVOKE ALL ON ALL FUNCTIONS IN SCHEMA %I FROM PUBLIC', _schema);
-        EXECUTE format('REVOKE ALL ON ALL PROCEDURES IN SCHEMA %I FROM PUBLIC', _schema);
+        EXECUTE _sql;
     END LOOP;
+    EXECUTE format('SET search_path TO %s', _old_search_path);
 END;
 $block$;
 
 DO $block$
 DECLARE
-    _table text;
+    _sql text;
 BEGIN
-    FOR _table IN
+    FOR _sql IN
     (
-        values
-          ('_prom_catalog.default')
-        , ('_prom_catalog.exemplar')
-        , ('_prom_catalog.exemplar_label_key_position')
-        , ('_prom_catalog.ha_leases')
-        , ('_prom_catalog.ha_leases_logs')
-        , ('_prom_catalog.ids_epoch')
-        , ('_prom_catalog.label')
-        , ('_prom_catalog.label_key')
-        , ('_prom_catalog.label_key_position')
-        , ('_prom_catalog.metadata')
-        , ('_prom_catalog.metric')
-        , ('_prom_catalog.remote_commands')
-        , ('_prom_catalog.series')
-        , ('_ps_catalog.migration')
-        , ('_ps_catalog.promscale_instance_information')
-        , ('_ps_trace.event')
-        , ('_ps_trace.instrumentation_lib')
-        , ('_ps_trace.link')
-        , ('_ps_trace.operation')
-        , ('_ps_trace.schema_url')
-        , ('_ps_trace.span')
-        , ('_ps_trace.tag')
-        , ('_ps_trace.tag_key')
-        , ('public.prom_installation_info')
+        -- find tables which belong to the extension so we can mark them to have
+        -- their data dumped by pg_dump
+        SELECT format($$SELECT pg_catalog.pg_extension_config_dump('%I.%I', '')$$, n.nspname, k.relname)
+        FROM pg_catalog.pg_depend d
+        INNER JOIN pg_catalog.pg_extension e ON (d.refobjid = e.oid)
+        INNER JOIN pg_catalog.pg_class k ON (d.objid = k.oid)
+        INNER JOIN pg_namespace n ON (k.relnamespace = n.oid)
+        WHERE d.refclassid = 'pg_catalog.pg_extension'::pg_catalog.regclass
+        AND d.deptype = 'e'
+        AND e.extname = 'promscale'
+        AND k.relkind IN ('r', 'p')
+        ORDER BY n.nspname, k.relname
     )
     LOOP
-        EXECUTE format($sql$SELECT pg_catalog.pg_extension_config_dump(%L, '')$sql$, _table);
+        EXECUTE _sql;
     END LOOP;
 END;
 $block$;
-
-DO $block$
-DECLARE
-    _i bigint;
-    _max bigint = 64;
-BEGIN
-    FOR _i IN 1.._max
-    LOOP
-        EXECUTE format($sql$SELECT pg_catalog.pg_extension_config_dump('_ps_trace.tag_%s', '')$sql$, _i);
-   END LOOP;
-END
-$block$
-;
 
 -- TODO (james): possibly move these grants closer to their definitions? At
 --  definition time, the roles which we grant here haven't been created yet.
