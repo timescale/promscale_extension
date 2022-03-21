@@ -8,6 +8,7 @@ CREATE TABLE _prom_catalog.remote_commands(
     transactional BOOLEAN,
     command TEXT
 );
+GRANT ALL ON SEQUENCE _prom_catalog.remote_commands_seq_seq TO current_user;
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.execute_everywhere(command_key text, command TEXT, transactional BOOLEAN = true)
 AS $func$

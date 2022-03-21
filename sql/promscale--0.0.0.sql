@@ -1,5 +1,13 @@
 DROP TABLE public.prom_schema_migrations;
 
+REVOKE EXECUTE ON FUNCTION ps_trace.delete_all_traces() FROM prom_writer;
+REVOKE EXECUTE ON PROCEDURE prom_api.add_prom_node(TEXT, BOOLEAN) FROM prom_writer;
+
+DROP OPERATOR IF EXISTS prom_api.!== (prom_api.label_key, prom_api.pattern);
+DROP OPERATOR IF EXISTS prom_api.!=~ (prom_api.label_key, prom_api.pattern);
+DROP OPERATOR IF EXISTS prom_api.== (prom_api.label_key, prom_api.pattern);
+DROP OPERATOR IF EXISTS prom_api.==~ (prom_api.label_key, prom_api.pattern);
+
 DO $block$
 DECLARE
     _rec record;
@@ -372,6 +380,29 @@ END;
 $block$
 ;
 
+DO $block$
+DECLARE
+    _rec record;
+BEGIN
+    FOR _rec IN
+    (
+        SELECT m.*
+        FROM _prom_catalog.metric m
+        WHERE table_schema = 'prom_data'
+        ORDER BY m.table_schema, m.table_name
+    )
+    LOOP
+        EXECUTE format($sql$ALTER TABLE %I.%I OWNER TO %I$sql$, _rec.table_schema, _rec.table_name, current_user);
+        EXECUTE format($sql$GRANT TRIGGER ON TABLE %I.%I TO prom_modifier$sql$, _rec.table_schema, _rec.table_name);
+        EXECUTE format($sql$ALTER TABLE prom_data_series.%I OWNER TO %I$sql$, _rec.series_table, current_user);
+        EXECUTE format($sql$ALTER VIEW prom_series.%I OWNER TO %I$sql$, _rec.series_table, current_user);
+        EXECUTE format($sql$ALTER VIEW prom_metric.%I OWNER TO %I$sql$, _rec.table_name, current_user);
+    END LOOP;
+END;
+$block$
+;
+
+
 -- metric related tables and views that are dynamically generated
 -- need to be discovered and ownership transferred
 DO $block$
@@ -394,6 +425,7 @@ BEGIN
     )
     LOOP
         EXECUTE format($sql$ALTER %s %I.%I OWNER TO %I$sql$, _rec.typ, _rec.nspname, _rec.relname, current_user);
+
    END LOOP;
 END
 $block$

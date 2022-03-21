@@ -9,4 +9,5 @@ ARG EXTENSION_VERSION
 COPY sql/promscale-${EXTENSION_VERSION}.sql /usr/local/share/postgresql/extension/promscale--${EXTENSION_VERSION}.sql
 # TODO (james): This probably needs to be extended to be created for all `upgradeable_from` in promscale.control
 COPY sql/promscale-${EXTENSION_VERSION}.sql /usr/local/share/postgresql/extension/promscale--0.0.0--${EXTENSION_VERSION}.sql
-
+# TODO (john): for now, we need the "takeover" script copied too since it's still not final
+COPY sql/promscale--0.0.0.sql /usr/local/share/postgresql/extension/promscale--0.0.0.sql
