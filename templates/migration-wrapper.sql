@@ -3,14 +3,20 @@
 DO
 $outer_migration_block$
 DECLARE
-    _already_applied bool = false;
-    _migration       _ps_catalog.migration = row ('{{filename}}', '{{version}}');
+    _migration_name TEXT = NULL;
+    _body_differs BOOL = false;
+    _migration _ps_catalog.migration = row ('{{filename}}', '{{version}}');
+    _body TEXT = $migrationbody${{body}}$migrationbody$;
 BEGIN
-    SELECT count(*) FILTER (WHERE name = _migration.name) > 0
-    INTO STRICT _already_applied
-    FROM _ps_catalog.migration;
-    IF _already_applied THEN
+    SELECT migration.name, migration.body <> _body
+    INTO _migration_name, _body_differs
+    FROM _ps_catalog.migration
+    WHERE name = _migration.name;
+    IF _migration_name IS NOT NULL THEN
         RAISE LOG 'Migration "{{filename}}" already applied, skipping';
+        IF _body_differs THEN
+            RAISE WARNING 'Checksum of migration "{{filename}}" has changed';
+        END IF;
         RETURN;
     END IF;
 
@@ -20,7 +26,7 @@ BEGIN
 END;
 $inner_migration_block$;
 
-    INSERT INTO _ps_catalog.migration (name, applied_at_version) VALUES (_migration.name, _migration.applied_at_version);
+    INSERT INTO _ps_catalog.migration (name, applied_at_version, body) VALUES (_migration.name, _migration.applied_at_version, _body);
     RAISE LOG 'Applied migration {{filename}}';
 END;
 $outer_migration_block$;

@@ -11,14 +11,14 @@ use std::{env, fs};
 struct MigrationWrapper<'a> {
     filename: &'a str,
     version: &'a str,
-    body: String,
+    body: &'a str,
 }
 
 #[derive(Template)]
 #[template(path = "idempotent-wrapper.sql", escape = "none")]
 struct IdempotentWrapper<'a> {
     filename: &'a str,
-    body: String,
+    body: &'a str,
 }
 
 const MIGRATION_FILE_NAME: &str = "hand-written-migration.sql";
@@ -90,19 +90,19 @@ fn wrap(path: &Path, sql_type: &SqlType) -> String {
     let version = env!("CARGO_PKG_VERSION");
     let body = read_file(path);
     match sql_type {
-        SqlType::Migration => wrap_migration_file(filename, version, body),
-        SqlType::Idempotent => wrap_idempotent_file(filename, version, body),
+        SqlType::Migration => wrap_migration_file(filename, version, &body),
+        SqlType::Idempotent => wrap_idempotent_file(filename, version, &body),
     }
 }
 
-fn wrap_idempotent_file(filename: &str, _version: &str, body: String) -> String {
+fn wrap_idempotent_file(filename: &str, _version: &str, body: &str) -> String {
     let idempotent_wrapper = IdempotentWrapper { filename, body };
     idempotent_wrapper
         .render()
         .expect("unable to render template")
 }
 
-fn wrap_migration_file(filename: &str, version: &str, body: String) -> String {
+fn wrap_migration_file(filename: &str, version: &str, body: &str) -> String {
     let migration_wrapper = MigrationWrapper {
         filename,
         version,
