@@ -6,7 +6,7 @@ use pgx::*;
 extension_sql!(
     "",
     name = "pseudo_create_types",
-    creates = [Type(bytea), Type(TimestampTz),],
+    creates = [Type(bytea), Type(TimestampTz)],
 );
 
 macro_rules! raw_type {
