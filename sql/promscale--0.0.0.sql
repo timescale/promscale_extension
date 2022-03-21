@@ -1,5 +1,7 @@
 DROP TABLE public.prom_schema_migrations;
 
+REVOKE EXECUTE ON FUNCTION ps_trace.delete_all_traces() FROM prom_writer;
+
 DO $block$
 DECLARE
     _rec record;
@@ -371,6 +373,27 @@ BEGIN
 END;
 $block$
 ;
+
+DO $block$
+DECLARE
+    _rec record;
+BEGIN
+    FOR _rec IN
+    (
+        SELECT m.*
+        FROM _prom_catalog.metric m
+        order by m.table_schema, m.table_name
+    )
+    LOOP
+        EXECUTE format($sql$ALTER TABLE %I.%I OWNER TO %I$sql$, _rec.table_schema, _rec.table_name, current_user);
+        EXECUTE format($sql$ALTER TABLE prom_data_series.%I OWNER TO %I$sql$, _rec.table_name, current_user);
+        EXECUTE format($sql$ALTER VIEW prom_series.%I OWNER TO %I$sql$, _rec.table_name, current_user);
+        EXECUTE format($sql$ALTER VIEW prom_metric.%I OWNER TO %I$sql$, _rec.table_name, current_user);
+    END LOOP;
+END;
+$block$
+;
+
 
 -- metric related tables and views that are dynamically generated
 -- need to be discovered and ownership transferred
