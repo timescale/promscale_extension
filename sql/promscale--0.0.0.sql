@@ -351,6 +351,27 @@ END
 $block$
 ;
 
+DO $block$
+DECLARE
+    _rec record;
+BEGIN
+    FOR _rec IN
+    (
+        SELECT c.schema_name, c.table_name
+        FROM _timescaledb_catalog.hypertable h
+        INNER JOIN _timescaledb_catalog.hypertable c
+        ON (h.compressed_hypertable_id = c.id)
+        WHERE h.schema_name = '_ps_trace'
+        AND h.table_name IN ('span', 'link', 'event')
+    )
+    LOOP
+        EXECUTE format($sql$ALTER EXTENSION promscale ADD TABLE %I.%I;$sql$, _rec.schema_name, _rec.table_name);
+        EXECUTE format($sql$SELECT pg_catalog.pg_extension_config_dump('%I.%I', '')$sql$, _rec.schema_name, _rec.table_name);
+    END LOOP;
+END;
+$block$
+;
+
 -- metric related tables and views that are dynamically generated
 -- need to be discovered and ownership transferred
 DO $block$
