@@ -1,6 +1,7 @@
 name: docker
 on:
   pull_request:
+    types: [ opened, synchronize, reopened, closed ]
     paths-ignore:
     - '.github/workflows/ci.yaml'
     - '.github/workflows/lint.yaml'
@@ -13,8 +14,9 @@ on:
       - master
 
 jobs:
-  docker:
+  docker-build:
     runs-on: ubuntu-latest
+    if: ${{ github.event.action != 'closed' }}
     strategy:
       matrix:
         pgversion:
@@ -67,9 +69,9 @@ jobs:
   # otherwise we have to keep updating them as we add or remove postgres versions etc.
   docker-result:
     name: docker result
-    if: always()
+    if: ${{ github.event.action != 'closed' }}
     needs:
-      - docker
+      - docker-build
     runs-on: ubuntu-latest
     steps:
       - name: Mark the job as a success
@@ -78,3 +80,31 @@ jobs:
       - name: Mark the job as a failure
         if: needs.docker.result != 'success'
         run: exit 1
+
+  docker-clean:
+    name: clean docker
+    if: ${{ github.event.action == 'closed' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gather metadata
+        id: metadata
+        run: |
+          branch_name=$(echo ${{github.event.pull_request.head.ref}} | sed 's#/#-#')
+          echo "::set-output name=branch_name::${branch_name}"
+
+      - name: Delete image
+        uses: bots-house/ghcr-delete-image-action@v1.0.0
+        with:
+          owner: timescale
+          name: dev_promscale_extension
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{steps.metadata.outputs.branch_name}}
+
+      - name: Delete alpine image
+        uses: bots-house/ghcr-delete-image-action@v1.0.0
+        with:
+          owner: timescale
+          name: dev_promscale_extension
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{steps.metadata.outputs.branch_name}}-alpine
+
