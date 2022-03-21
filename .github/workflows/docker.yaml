@@ -1,6 +1,7 @@
 name: docker
 on:
   pull_request:
+    types: [ opened, synchronize, reopened, closed ]
     paths-ignore:
     - '.github/workflows/ci.yaml'
     - '.github/workflows/lint.yaml'
@@ -13,8 +14,9 @@ on:
       - master
 
 jobs:
-  docker:
+  docker-build:
     runs-on: ubuntu-latest
+    if: ${{ github.event.action != 'closed' }}
     strategy:
       matrix:
         pgversion:
@@ -67,14 +69,49 @@ jobs:
   # otherwise we have to keep updating them as we add or remove postgres versions etc.
   docker-result:
     name: docker result
-    if: always()
+    if: ${{ github.event.action != 'closed' }}
     needs:
-      - docker
+      - docker-build
     runs-on: ubuntu-latest
     steps:
       - name: Mark the job as a success
-        if: needs.docker.result == 'success'
+        if: needs.docker-build.result == 'success'
         run: exit 0
       - name: Mark the job as a failure
-        if: needs.docker.result != 'success'
+        if: needs.docker-build.result != 'success'
         run: exit 1
+
+  docker-clean:
+    name: clean docker
+    if: ${{ github.event.action == 'closed' }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        pgversion:
+          - 14
+          - 13
+          - 12
+        tsversion:
+          - 2.6.0
+        base:
+          - ha
+          - alpine
+    steps:
+      - name: Gather metadata
+        id: metadata
+        run: |
+          tsmajor=$(echo ${{matrix.tsversion}} | cut -d. -f1)
+          branch_name=$(echo ${{github.event.pull_request.head.ref}} | sed 's#/#-#')
+          build_type_suffix=$(echo "-${{matrix.base}}" | sed 's/-ha//')
+          echo "::set-output name=tsmajor::${tsmajor}"
+          echo "::set-output name=branch_name::${branch_name}"
+          echo "::set-output name=build_type_suffix::${build_type_suffix}"
+
+      - name: Delete image
+        uses: bots-house/ghcr-delete-image-action@v1.0.0
+        with:
+          owner: timescale
+          name: dev_promscale_extension
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{steps.metadata.outputs.branch_name}}-ts${{steps.metadata.outputs.tsmajor}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
+
