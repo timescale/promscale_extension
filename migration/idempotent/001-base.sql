@@ -21,11 +21,7 @@ BEGIN
             RETURN;
     END;
 END
-$func$ LANGUAGE PLPGSQL
---security definer to add jobs as the logged-in user
-SECURITY DEFINER
---search path must be set for security definer
-SET search_path = pg_temp;
+$func$ LANGUAGE PLPGSQL;
 GRANT EXECUTE ON PROCEDURE _prom_catalog.execute_everywhere(text, text, boolean) TO prom_admin;
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.update_execute_everywhere_entry(command_key text, command TEXT, transactional BOOLEAN = true)
@@ -37,11 +33,7 @@ BEGIN
         transactional=update_execute_everywhere_entry.transactional
     WHERE key = command_key;
 END
-$func$ LANGUAGE PLPGSQL
---security definer to add jobs as the logged-in user
-SECURITY DEFINER
---search path must be set for security definer
-SET search_path = pg_temp;
+$func$ LANGUAGE PLPGSQL;
 GRANT EXECUTE ON PROCEDURE _prom_catalog.update_execute_everywhere_entry(text, text, boolean) TO prom_admin;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.get_default_chunk_interval()

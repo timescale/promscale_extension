@@ -168,6 +168,7 @@ docker-quick-build-12 docker-quick-build-13 docker-quick-build-14: ## A quick wa
 		--build-arg TIMESCALEDB_VERSION=$(TIMESCALEDB_VER) \
 		--build-arg PG_VERSION_TAG=$(PG_BUILD_VER) \
 		--build-arg EXTENSION_VERSION=$(EXT_VERSION) \
+		-t local/dev_promscale_extension:head-ts2-$(PG_BUILD_VER) \
 		-t $(IMAGE_NAME):$(EXT_VERSION)-$(TIMESCALEDB_VER)-$(PG_BUILD_VER) \
 		-t $(IMAGE_NAME):$(EXT_VERSION)-ts$(TIMESCALEDB_MAJOR)-$(PG_BUILD_VER) \
 		-t $(IMAGE_NAME):latest-ts$(TIMESCALEDB_MAJOR)-$(PG_BUILD_VER) \

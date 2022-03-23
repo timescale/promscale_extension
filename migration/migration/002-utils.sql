@@ -8,8 +8,6 @@ CREATE TABLE _prom_catalog.remote_commands(
     transactional BOOLEAN,
     command TEXT
 );
-GRANT ALL ON TABLE _prom_catalog.remote_commands to @extowner@;
-GRANT ALL ON SEQUENCE _prom_catalog.remote_commands_seq_seq to @extowner@;
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.execute_everywhere(command_key text, command TEXT, transactional BOOLEAN = true)
 AS $func$
@@ -31,12 +29,7 @@ BEGIN
             RETURN;
     END;
 END
-$func$ LANGUAGE PLPGSQL
---security definer to add jobs as the logged-in user
-SECURITY DEFINER
---search path must be set for security definer
-SET search_path = pg_temp;
---redundant given schema settings but extra caution for security definers
+$func$ LANGUAGE PLPGSQL;
 REVOKE ALL ON PROCEDURE _prom_catalog.execute_everywhere(text, text, boolean) FROM PUBLIC;
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.update_execute_everywhere_entry(command_key text, command TEXT, transactional BOOLEAN = true)
@@ -48,10 +41,5 @@ BEGIN
         transactional=update_execute_everywhere_entry.transactional
     WHERE key = command_key;
 END
-$func$ LANGUAGE PLPGSQL
---security definer to add jobs as the logged-in user
-SECURITY DEFINER
---search path must be set for security definer
-SET search_path = pg_temp;
---redundant given schema settings but extra caution for security definers
+$func$ LANGUAGE PLPGSQL;
 REVOKE ALL ON PROCEDURE _prom_catalog.update_execute_everywhere_entry(text, text, boolean) FROM PUBLIC;
