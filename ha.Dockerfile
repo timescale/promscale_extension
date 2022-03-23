@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1.3-labs
 ARG PG_VERSION=14
+ARG TIMESCALEDB_VERSION=2
 FROM ubuntu:21.10 as builder
 ARG PG_VERSION
 
@@ -52,7 +53,7 @@ COPY --chown=postgres:postgres templates/ /build/promscale/templates/
 
 RUN make package
 
-FROM timescale/timescaledb-ha:pg${PG_VERSION}-latest
+FROM timescale/timescaledb-ha:pg${PG_VERSION}-ts${TIMESCALEDB_VERSION}-latest
 ARG PG_VERSION
 COPY --from=builder --chown=root:postgres /build/promscale/target/release/promscale-pg${PG_VERSION}/usr/lib/postgresql /usr/lib/postgresql
 COPY --from=builder --chown=root:postgres /build/promscale/target/release/promscale-pg${PG_VERSION}/usr/share/postgresql /usr/share/postgresql

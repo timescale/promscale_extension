@@ -1,10 +1,10 @@
-ARG PG_VERSION_TAG=pg14
-ARG TIMESCALEDB_VERSION=2.6.0
-FROM timescale/timescaledb:${TIMESCALEDB_VERSION}-${PG_VERSION_TAG} as builder
+ARG PG_VERSION=14
+ARG TIMESCALEDB_VERSION=2
+FROM timescale/timescaledb:${TIMESCALEDB_VERSION}-pg${PG_VERSION} as builder
 
 MAINTAINER Timescale https://www.timescale.com
 ARG RUST_VERSION=1.58.1
-ARG PG_VERSION_TAG
+ARG PG_VERSION
 
 RUN \
     apk add --no-cache --virtual .build-deps \
@@ -39,7 +39,7 @@ RUN \
 ENV RUSTFLAGS="-C target-feature=-crt-static"
 RUN --mount=type=cache,uid=70,gid=70,target=/build/promscale/.cargo/registry \
     cargo install cargo-pgx --git https://github.com/timescale/pgx --branch promscale-staging --rev ee52db6b && \
-    cargo pgx init --${PG_VERSION_TAG} $(which pg_config)
+    cargo pgx init --pg${PG_VERSION} $(which pg_config)
 
 USER root
 WORKDIR /build/promscale
@@ -64,7 +64,7 @@ COPY templates/ /build/promscale/templates/
 RUN --mount=type=cache,uid=70,gid=70,target=/build/promscale/.cargo/registry \
     make package
 
-FROM timescale/timescaledb:${TIMESCALEDB_VERSION}-${PG_VERSION_TAG} as pgextwlist-builder
+FROM timescale/timescaledb:${TIMESCALEDB_VERSION}-pg${PG_VERSION} as pgextwlist-builder
 
 RUN \
     apk add --no-cache --virtual .build-deps \
@@ -82,10 +82,10 @@ RUN \
 
 # COPY over the new files to the image. Done as a seperate stage so we don't
 # ship the build tools.
-FROM timescale/timescaledb:${TIMESCALEDB_VERSION}-${PG_VERSION_TAG}
-ARG PG_VERSION_TAG
+FROM timescale/timescaledb:${TIMESCALEDB_VERSION}-pg${PG_VERSION}
+ARG PG_VERSION
 
-COPY --from=builder /build/promscale/target/release/promscale-${PG_VERSION_TAG}/usr/local/lib/postgresql /usr/local/lib/postgresql
-COPY --from=builder /build/promscale/target/release/promscale-${PG_VERSION_TAG}/usr/local/share/postgresql /usr/local/share/postgresql
+COPY --from=builder /build/promscale/target/release/promscale-pg${PG_VERSION}/usr/local/lib/postgresql /usr/local/lib/postgresql
+COPY --from=builder /build/promscale/target/release/promscale-pg${PG_VERSION}/usr/local/share/postgresql /usr/local/share/postgresql
 RUN mkdir -p /usr/local/lib/postgresql/plugins
 COPY --from=pgextwlist-builder /pgextwlist/pgextwlist.so /usr/local/lib/postgresql/plugins

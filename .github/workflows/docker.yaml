@@ -53,8 +53,8 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           build-args: |
-            PG_VER=pg${{ matrix.pgversion }}
-            TIMESCALEDB_VER=${{ matrix.tsversion }}
+            PG_VERSION=${{ matrix.pgversion }}
+            TIMESCALEDB_VERSION=${{ steps.metadata.outputs.tsmajor }}
           context: .
           file: ${{matrix.base}}.Dockerfile
           push: true
