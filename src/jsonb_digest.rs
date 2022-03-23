@@ -5,7 +5,7 @@ use sha2::{Digest, Sha512};
 /// A custom SHA512 based JSONB digest.
 ///
 /// Save for hash collisions, for any pair of `j1` and `j2` the statement
-/// `SELECT jsonb_digest(j1) == jsonb_digest(j2)`
+/// `SELECT jsonb_digest(j1) = jsonb_digest(j2)`
 /// is true iff `j1 == j2` are _semantically_ equivalent.
 ///
 /// There is a couple of alternatives, unfortunately neither
@@ -32,13 +32,14 @@ pub fn jsonb_digest(jsonb: Jsonb) -> Vec<u8> {
 
     // Based on https://github.com/postgres/postgres/blob/27b77ecf9f4d5be211900eda54d8155ada50d696/src/include/utils/jsonb.h#L193
     // I'm making an assumption here, that object key order
-    // should remain stable in the foreseeble future.
+    // should remain stable in the foreseeable future.
     //
     // Additionally, there's a test that checks that a hardcoded value didn't change.
     let mut hasher = Sha512::new();
     jsonb.tokens().enumerate().for_each(|(idx, token)| {
         hasher.update(idx.to_le_bytes());
         match token {
+            // Scalars
             Null => hasher.update(0x01u8.to_le_bytes()),
             Bool(true) => hasher.update(0x02u8.to_le_bytes()),
             Bool(false) => hasher.update(0x03u8.to_le_bytes()),
@@ -50,14 +51,14 @@ pub fn jsonb_digest(jsonb: Jsonb) -> Vec<u8> {
                 hasher.update(0x05u8.to_le_bytes());
                 hasher.update(numeric.to_str().as_bytes())
             }
-            //
+            // Objects
             Key(str) => {
                 hasher.update(0x0Au8.to_le_bytes());
                 hasher.update(str.as_bytes())
             }
             BeginObject => hasher.update(0x0Bu8.to_le_bytes()),
             EndObject => hasher.update(0x0Cu8.to_le_bytes()),
-            //
+            // Arrays
             BeginArray => hasher.update(0x0Du8.to_le_bytes()),
             EndArray => hasher.update(0x0Eu8.to_le_bytes()),
         }
@@ -83,7 +84,10 @@ mod tests {
             "1",
             "-1.01",
             "1.01",
+            "[null]",
+            "null",
             "true",
+            "false",
             r#""""#,
             r#""x""#,
             r#"{"a": "b"}"#,
@@ -154,7 +158,7 @@ mod tests {
             INSERT INTO json_digest_test (j) 
             SELECT jsonb_object_agg(n::text, n)
             FROM generate_series(1, 20000) AS gs (n);
-        "#,
+            "#,
         );
         let digest = Spi::get_one::<Vec<u8>>(
             r#"
@@ -165,5 +169,56 @@ mod tests {
         .expect("SQL query failed");
 
         assert_eq!(digest.len(), 64);
+    }
+
+    use proptest::prelude::*;
+    use serde_json::{json, Value};
+
+    #[pg_test]
+    fn test_jsonb_digest_prop_based() {
+        // Notice: it's advisable to increase the number of cases 10x when making changes
+        proptest!(ProptestConfig::with_cases(1000), |(j1 in arb_json(), j2 in arb_json())|{
+            let (cmp, d1, d2) = jsonb_digest_cmp_json_run(j1, j2);
+            if cmp { prop_assert_eq!(d1, d2) }
+            else { prop_assert_ne!(d1, d2) }
+        })
+    }
+
+    fn jsonb_digest_cmp_json_run(j1: Value, j2: Value) -> (bool, String, String) {
+        let (cmp, d1, d2) = Spi::get_three_with_args::<bool, String, String>(
+            r#"
+            SELECT (j1 = j2), jsonb_digest(j1)::text, jsonb_digest(j2)::text
+            FROM (SELECT $1::JSONB AS j1, $2::JSONB AS j2) AS jsons;
+            "#,
+            vec![j1, j2]
+                .into_iter()
+                .map(|json| (PgBuiltInOids::JSONBOID.oid(), pgx::JsonB(json).into_datum()))
+                .collect(),
+        );
+        (cmp.unwrap(), d1.unwrap(), d2.unwrap())
+    }
+
+    fn arb_json() -> impl Strategy<Value = serde_json::Value> {
+        let leaf = prop_oneof![
+            Just(Value::Null),
+            any::<bool>().prop_map(Value::Bool),
+            any::<f64>().prop_map(|v| json!(v)),
+            "[\\w\\s]*".prop_map(Value::String),
+        ];
+        let expected_max_collection_size = 10u32;
+        let sz_range = 0..expected_max_collection_size as usize;
+        leaf.prop_recursive(
+            8,   // levels deep
+            256, // Shoot for maximum size of 256 nodes
+            expected_max_collection_size,
+            move |inner| {
+                prop_oneof![
+                    // Take the inner strategy and make the two recursive cases.
+                    prop::collection::vec(inner.clone(), sz_range.clone()).prop_map(Value::Array),
+                    prop::collection::hash_map("\\w+", inner, sz_range.clone())
+                        .prop_map(|kvs| Value::Object(serde_json::Map::from_iter(kvs.into_iter()))),
+                ]
+            },
+        )
     }
 }

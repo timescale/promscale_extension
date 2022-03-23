@@ -25,13 +25,12 @@ pub struct Jsonb<'a> {
 impl<'a> Jsonb<'a> {
     /// Traverses the entire JSON object recursively, emitting [`Token`] objects.
     pub fn tokens(&'a self) -> TokenIterator<'a> {
-        unsafe {
-            let pg_jsonb_iter =
-                JsonbIteratorInit(&mut (*self.pg_jsonb).root as *mut JsonbContainer);
-            TokenIterator {
-                pg_jsonb_iter,
-                _marker: std::marker::PhantomData,
-            }
+        let pg_jsonb_iter =
+            unsafe { JsonbIteratorInit(&mut (*self.pg_jsonb).root as *mut JsonbContainer) };
+        TokenIterator {
+            pg_jsonb_iter,
+            raw_scalar: false,
+            _marker: std::marker::PhantomData,
         }
     }
 }
@@ -109,6 +108,7 @@ pub enum Token<'a> {
 
 pub struct TokenIterator<'a> {
     pg_jsonb_iter: *mut JsonbIterator,
+    raw_scalar: bool,
     _marker: std::marker::PhantomData<Jsonb<'a>>,
 }
 
@@ -127,8 +127,21 @@ impl<'a> Iterator for TokenIterator<'a> {
         };
         match r {
             JsonbIteratorToken_WJB_DONE => None,
-            JsonbIteratorToken_WJB_BEGIN_ARRAY => Some(Token::BeginArray),
-            JsonbIteratorToken_WJB_END_ARRAY => Some(Token::EndArray),
+            JsonbIteratorToken_WJB_BEGIN_ARRAY => {
+                if unsafe { jsonb_val.val.array.rawScalar } {
+                    self.raw_scalar = true;
+                    self.next()
+                } else {
+                    Some(Token::BeginArray)
+                }
+            }
+            JsonbIteratorToken_WJB_END_ARRAY => {
+                if self.raw_scalar {
+                    self.next()
+                } else {
+                    Some(Token::EndArray)
+                }
+            }
             JsonbIteratorToken_WJB_BEGIN_OBJECT => Some(Token::BeginObject),
             JsonbIteratorToken_WJB_END_OBJECT => Some(Token::EndObject),
             JsonbIteratorToken_WJB_KEY => {
@@ -155,16 +168,15 @@ impl<'a> Iterator for TokenIterator<'a> {
 }
 
 impl<'a> TokenIterator<'a> {
+    /// It's only safe to call this function when the caller has
+    /// validated the [`JsonbValue`]'s type is [`jbvType_jbvString`].
     #[inline]
-    fn extract_string_value(jsonb_val: &mut JsonbValue) -> &'a str {
-        unsafe {
-            let str_val = jsonb_val.val.string;
-
-            std::str::from_utf8_unchecked(std::slice::from_raw_parts::<'a, _>(
-                str_val.val as *mut u8,
-                str_val.len as usize,
-            ))
-        }
+    unsafe fn extract_string_value(jsonb_val: &mut JsonbValue) -> &'a str {
+        let str_val = jsonb_val.val.string;
+        std::str::from_utf8_unchecked(std::slice::from_raw_parts::<'a, _>(
+            str_val.val as *mut u8,
+            str_val.len as usize,
+        ))
     }
 
     #[inline]
@@ -172,10 +184,12 @@ impl<'a> TokenIterator<'a> {
     fn extract_value_token(jsonb_val: &mut JsonbValue) -> Token<'a> {
         match jsonb_val.type_ as jbvType {
             jbvType_jbvNull => Token::Null,
-            jbvType_jbvString => Token::String(TokenIterator::extract_string_value(jsonb_val)),
-            jbvType_jbvNumeric => Token::Numeric(JsonbNormalizedNumeric::new(unsafe {
-                jsonb_val.val.numeric
-            })),
+            jbvType_jbvString => {
+                Token::String(unsafe { TokenIterator::extract_string_value(jsonb_val) })
+            }
+            jbvType_jbvNumeric => {
+                Token::Numeric(unsafe { JsonbNormalizedNumeric::extract_numeric_value(jsonb_val) })
+            }
             jbvType_jbvBool => Token::Bool(unsafe { jsonb_val.val.boolean }),
             t => {
                 panic!("invalid scalar jsonb type: {}", t)
@@ -199,15 +213,16 @@ impl Drop for TokenIterator<'_> {
 ///
 /// An additional wrapper is introduced to avoid allocating [`String`]
 /// unless absolutely required.
-#[derive(Debug)]
 pub struct JsonbNormalizedNumeric {
     numeric_str: *mut std::os::raw::c_char,
 }
 
 impl JsonbNormalizedNumeric {
+    /// It's only safe to call this function when the caller has
+    /// validated the [`JsonbValue`]'s type is [`jbvType_jbvNumeric`].
     #[inline]
-    fn new(numeric_data: pg_sys::Numeric) -> JsonbNormalizedNumeric {
-        let numeric_str = unsafe { numeric_normalize(numeric_data) };
+    unsafe fn extract_numeric_value(jsonb_val: &mut JsonbValue) -> JsonbNormalizedNumeric {
+        let numeric_str = numeric_normalize(jsonb_val.val.numeric);
         JsonbNormalizedNumeric { numeric_str }
     }
 
@@ -227,5 +242,13 @@ impl JsonbNormalizedNumeric {
 impl Drop for JsonbNormalizedNumeric {
     fn drop(&mut self) {
         unsafe { pfree(self.numeric_str as void_mut_ptr) }
+    }
+}
+
+impl core::fmt::Debug for JsonbNormalizedNumeric {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("JsonbNormalizedNumeric")
+            .field("numeric", &self.to_str().to_string())
+            .finish()
     }
 }
