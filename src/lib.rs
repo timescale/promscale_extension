@@ -2,6 +2,8 @@ use pgx::*;
 
 mod aggregate_utils;
 mod aggregates;
+mod iterable_jsonb;
+mod jsonb_digest;
 mod palloc;
 mod raw;
 mod schema;
