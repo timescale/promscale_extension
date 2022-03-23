@@ -11,8 +11,6 @@ RUST_VERSION ?= $(shell rustc --version | cut -d' ' -f2)
 PG_CONFIG ?= pg_config
 PG_RELEASE_VERSION ?= $(shell ${PG_CONFIG} --version | awk -F'[ \. ]' '{print $$2}')
 PG_BUILD_VERSION = $(shell ${PG_CONFIG} --version | awk -F'[ \. ]' '{print $$2}')
-PG_RELEASE_VER = pg${PG_RELEASE_VERSION}
-PG_BUILD_VER = pg${PG_BUILD_VERSION}
 # If set to a non-empty value, docker builds will be pushed to the registry
 PUSH ?=
 TIMESCALEDB_MAJOR=2
@@ -46,9 +44,9 @@ ifeq ($(OS_NAME),fedora)
 	DOCKERFILE = rpm.dockerfile
 	PKG_TYPE = rpm
 endif
-RELEASE_IMAGE_NAME = promscale-extension-pkg:$(EXT_VERSION)-$(OS_NAME)$(OS_VERSION)-$(PG_RELEASE_VER)
-RELEASE_FILE_NAME = promscale_extension-$(EXT_VERSION).$(PG_RELEASE_VER).$(OS_NAME)$(OS_VERSION).$(ARCH).$(PKG_TYPE)
-TESTER_NAME = $(PG_RELEASE_VER)-$(OS_NAME)$(OS_VERSION)
+RELEASE_IMAGE_NAME = promscale-extension-pkg:$(EXT_VERSION)-$(OS_NAME)$(OS_VERSION)-pg$(PG_RELEASE_VERSION)
+RELEASE_FILE_NAME = promscale_extension-$(EXT_VERSION).pg$(PG_RELEASE_VERSION).$(OS_NAME)$(OS_VERSION).$(ARCH).$(PKG_TYPE)
+TESTER_NAME = pg$(PG_RELEASE_VERSION)-$(OS_NAME)$(OS_VERSION)
 
 .PHONY: help
 help:
@@ -138,24 +136,24 @@ release-test: release-tester ## Test the currently selected release package
 docker-image-build-12 docker-image-build-13 docker-image-build-14: alpine.Dockerfile $(SQL_FILES) $(SRCS) Cargo.toml Cargo.lock $(RUST_SRCS)
 	docker buildx build $(if $(PUSH),--push,--load) \
 		--build-arg TIMESCALEDB_VERSION=$(TIMESCALEDB_VER) \
-		--build-arg PG_VERSION_TAG=$(PG_BUILD_VER) \
-		-t local/dev_promscale_extension:head-ts2-$(PG_BUILD_VER) \
-		-t $(IMAGE_NAME):$(EXT_VERSION)-$(TIMESCALEDB_VER)-$(PG_BUILD_VER) \
-		-t $(IMAGE_NAME):$(EXT_VERSION)-ts$(TIMESCALEDB_MAJOR)-$(PG_BUILD_VER) \
-		-t $(IMAGE_NAME):latest-ts$(TIMESCALEDB_MAJOR)-$(PG_BUILD_VER) \
+		--build-arg PG_VERSION=$(PG_BUILD_VERSION) \
+		-t local/dev_promscale_extension:head-ts2-pg$(PG_BUILD_VERSION) \
+		-t $(IMAGE_NAME):$(EXT_VERSION)-$(TIMESCALEDB_VER)-pg$(PG_BUILD_VERSION) \
+		-t $(IMAGE_NAME):$(EXT_VERSION)-ts$(TIMESCALEDB_MAJOR)-pg$(PG_BUILD_VERSION) \
+		-t $(IMAGE_NAME):latest-ts$(TIMESCALEDB_MAJOR)-pg$(PG_BUILD_VERSION) \
         -f alpine.Dockerfile \
 		.
 
 .PHONY: docker-image-12
-docker-image-12: PG_BUILD_VER=pg12
+docker-image-12: PG_BUILD_VERSION=12
 docker-image-12: docker-image-build-12
 
 .PHONY: docker-image-13
-docker-image-13: PG_BUILD_VER=pg13
+docker-image-13: PG_BUILD_VERSION=13
 docker-image-13: docker-image-build-13
 
 .PHONY: docker-image-14
-docker-image-14: PG_BUILD_VER=pg14
+docker-image-14: PG_BUILD_VERSION=14
 docker-image-14: docker-image-build-14
 
 .PHONY: docker-image
@@ -163,27 +161,27 @@ docker-image: docker-image-14 docker-image-13 docker-image-12 ## Build Timescale
 
 .PHONY: docker-quick-build-12 docker-quick-build-13 docker-quick-build-14
 docker-quick-build-12 docker-quick-build-13 docker-quick-build-14: ## A quick way to rebuild the extension image with only SQL changes
-	cargo pgx schema $(PG_BUILD_VER)
+	cargo pgx schema pg$(PG_BUILD_VERSION)
 	docker build -f quick.Dockerfile \
 		--build-arg TIMESCALEDB_VERSION=$(TIMESCALEDB_VER) \
-		--build-arg PG_VERSION_TAG=$(PG_BUILD_VER) \
+		--build-arg PG_VERSION=$(PG_BUILD_VERSION) \
 		--build-arg EXTENSION_VERSION=$(EXT_VERSION) \
-		-t local/dev_promscale_extension:head-ts2-$(PG_BUILD_VER) \
-		-t $(IMAGE_NAME):$(EXT_VERSION)-$(TIMESCALEDB_VER)-$(PG_BUILD_VER) \
-		-t $(IMAGE_NAME):$(EXT_VERSION)-ts$(TIMESCALEDB_MAJOR)-$(PG_BUILD_VER) \
-		-t $(IMAGE_NAME):latest-ts$(TIMESCALEDB_MAJOR)-$(PG_BUILD_VER) \
+		-t local/dev_promscale_extension:head-ts2-pg$(PG_BUILD_VERSION) \
+		-t $(IMAGE_NAME):$(EXT_VERSION)-$(TIMESCALEDB_VER)-pg$(PG_BUILD_VERSION) \
+		-t $(IMAGE_NAME):$(EXT_VERSION)-ts$(TIMESCALEDB_MAJOR)-pg$(PG_BUILD_VERSION) \
+		-t $(IMAGE_NAME):latest-ts$(TIMESCALEDB_MAJOR)-pg$(PG_BUILD_VERSION) \
 		.
 
 .PHONY: docker-quick-14
-docker-quick-14: PG_BUILD_VER=pg14
+docker-quick-14: PG_BUILD_VERSION=14
 docker-quick-14: docker-quick-build-14
 
 .PHONY: docker-quick-13
-docker-quick-13: PG_BUILD_VER=pg13
+docker-quick-13: PG_BUILD_VERSION=13
 docker-quick-13: docker-quick-build-13
 
 .PHONY: docker-quick-12
-docker-quick-12: PG_BUILD_VER=pg12
+docker-quick-12: PG_BUILD_VERSION=12
 docker-quick-12: docker-quick-build-12
 
 .PHONY: setup-buildx
