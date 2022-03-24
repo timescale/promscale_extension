@@ -3,7 +3,7 @@
 ARG PG_VERSION
 ARG TIMESCALEDB_VERSION_MAJOR
 ARG EXTENSION_VERSION
-FROM ghcr.io/timescale/dev_promscale_extension:${EXTENSION_VERSION}-ts${TIMESCALEDB_VERSION_MAJOR}-pg${PG_VERSION}
+FROM local/dev_promscale_extension:head-ts${TIMESCALEDB_VERSION_MAJOR}-pg${PG_VERSION}
 
 ARG EXTENSION_VERSION
 COPY sql/promscale-${EXTENSION_VERSION}.sql /usr/local/share/postgresql/extension/promscale--${EXTENSION_VERSION}.sql
