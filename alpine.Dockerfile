@@ -1,6 +1,6 @@
 ARG PG_VERSION=14
-ARG TIMESCALEDB_VERSION=2
-FROM timescale/timescaledb:${TIMESCALEDB_VERSION}-pg${PG_VERSION} as builder
+ARG TIMESCALEDB_VERSION_FULL=2.6.0
+FROM timescale/timescaledb:${TIMESCALEDB_VERSION_FULL}-pg${PG_VERSION} as builder
 
 MAINTAINER Timescale https://www.timescale.com
 ARG RUST_VERSION=1.58.1
@@ -64,7 +64,7 @@ COPY templates/ /build/promscale/templates/
 RUN --mount=type=cache,uid=70,gid=70,target=/build/promscale/.cargo/registry \
     make package
 
-FROM timescale/timescaledb:${TIMESCALEDB_VERSION}-pg${PG_VERSION} as pgextwlist-builder
+FROM timescale/timescaledb:${TIMESCALEDB_VERSION_FULL}-pg${PG_VERSION} as pgextwlist-builder
 
 RUN \
     apk add --no-cache --virtual .build-deps \
@@ -82,7 +82,7 @@ RUN \
 
 # COPY over the new files to the image. Done as a seperate stage so we don't
 # ship the build tools.
-FROM timescale/timescaledb:${TIMESCALEDB_VERSION}-pg${PG_VERSION}
+FROM timescale/timescaledb:${TIMESCALEDB_VERSION_FULL}-pg${PG_VERSION}
 ARG PG_VERSION
 
 COPY --from=builder /build/promscale/target/release/promscale-pg${PG_VERSION}/usr/local/lib/postgresql /usr/local/lib/postgresql
