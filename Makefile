@@ -13,8 +13,9 @@ PG_RELEASE_VERSION ?= $(shell ${PG_CONFIG} --version | awk -F'[ \. ]' '{print $$
 PG_BUILD_VERSION = $(shell ${PG_CONFIG} --version | awk -F'[ \. ]' '{print $$2}')
 # If set to a non-empty value, docker builds will be pushed to the registry
 PUSH ?=
-TIMESCALEDB_MAJOR=2
-TIMESCALEDB_VER=2.6.0
+TIMESCALEDB_VERSION_FULL=2.6.0
+TIMESCALEDB_VERSION_MAJMIN=$(shell echo $(TIMESCALEDB_VERSION_FULL) | cut -d. -f 1,2)
+TIMESCALEDB_VERSION_MAJOR=$(shell echo $(TIMESCALEDB_VERSION_FULL) | cut -d. -f 1)
 
 # Transform ARCH to its Docker platform equivalent
 ifeq ($(ARCH),arm64)
@@ -135,12 +136,14 @@ release-test: release-tester ## Test the currently selected release package
 .PHONY: docker-image-build-12 docker-image-build-13 docker-image-build-14
 docker-image-build-12 docker-image-build-13 docker-image-build-14: alpine.Dockerfile $(SQL_FILES) $(SRCS) Cargo.toml Cargo.lock $(RUST_SRCS)
 	docker buildx build $(if $(PUSH),--push,--load) \
-		--build-arg TIMESCALEDB_VERSION=$(TIMESCALEDB_VER) \
+		--build-arg TIMESCALEDB_VERSION_FULL=$(TIMESCALEDB_VERSION_FULL) \
+		--build-arg TIMESCALEDB_VERSION_MAJOR=$(TIMESCALEDB_VERSION_MAJOR) \
+		--build-arg TIMESCALEDB_VERSION_MAJMIN=$(TIMESCALEDB_VERSION_MAJMIN) \
 		--build-arg PG_VERSION=$(PG_BUILD_VERSION) \
-		-t local/dev_promscale_extension:head-ts2-pg$(PG_BUILD_VERSION) \
-		-t $(IMAGE_NAME):$(EXT_VERSION)-$(TIMESCALEDB_VER)-pg$(PG_BUILD_VERSION) \
-		-t $(IMAGE_NAME):$(EXT_VERSION)-ts$(TIMESCALEDB_MAJOR)-pg$(PG_BUILD_VERSION) \
-		-t $(IMAGE_NAME):latest-ts$(TIMESCALEDB_MAJOR)-pg$(PG_BUILD_VERSION) \
+		-t local/dev_promscale_extension:head-ts$(TIMESCALEDB_VERSION_MAJOR)-pg$(PG_BUILD_VERSION) \
+		-t $(IMAGE_NAME):$(EXT_VERSION)-ts$(TIMESCALEDB_VERSION_FULL)-pg$(PG_BUILD_VERSION) \
+		-t $(IMAGE_NAME):$(EXT_VERSION)-ts$(TIMESCALEDB_VERSION_MAJOR)-pg$(PG_BUILD_VERSION) \
+		-t $(IMAGE_NAME):latest-ts$(TIMESCALEDB_VERSION_MAJOR)-pg$(PG_BUILD_VERSION) \
         -f alpine.Dockerfile \
 		.
 
@@ -163,13 +166,13 @@ docker-image: docker-image-14 docker-image-13 docker-image-12 ## Build Timescale
 docker-quick-build-12 docker-quick-build-13 docker-quick-build-14: ## A quick way to rebuild the extension image with only SQL changes
 	cargo pgx schema pg$(PG_BUILD_VERSION)
 	docker build -f quick.Dockerfile \
-		--build-arg TIMESCALEDB_VERSION=$(TIMESCALEDB_VER) \
+		--build-arg TIMESCALEDB_VERSION_MAJOR=$(TIMESCALEDB_VERSION_MAJOR) \
 		--build-arg PG_VERSION=$(PG_BUILD_VERSION) \
 		--build-arg EXTENSION_VERSION=$(EXT_VERSION) \
-		-t local/dev_promscale_extension:head-ts2-pg$(PG_BUILD_VERSION) \
-		-t $(IMAGE_NAME):$(EXT_VERSION)-$(TIMESCALEDB_VER)-pg$(PG_BUILD_VERSION) \
-		-t $(IMAGE_NAME):$(EXT_VERSION)-ts$(TIMESCALEDB_MAJOR)-pg$(PG_BUILD_VERSION) \
-		-t $(IMAGE_NAME):latest-ts$(TIMESCALEDB_MAJOR)-pg$(PG_BUILD_VERSION) \
+		-t local/dev_promscale_extension:head-ts$(TIMESCALEDB_VERSION_MAJOR)-pg$(PG_BUILD_VERSION) \
+		-t $(IMAGE_NAME):$(EXT_VERSION)-ts$(TIMESCALEDB_VERSION_FULL)-pg$(PG_BUILD_VERSION) \
+		-t $(IMAGE_NAME):$(EXT_VERSION)-ts$(TIMESCALEDB_VERSION_MAJOR)-pg$(PG_BUILD_VERSION) \
+		-t $(IMAGE_NAME):latest-ts$(TIMESCALEDB_VERSION_MAJOR)-pg$(PG_BUILD_VERSION) \
 		.
 
 .PHONY: docker-quick-14
