@@ -1,5 +1,7 @@
 DROP TABLE public.prom_schema_migrations;
 
+REVOKE EXECUTE ON FUNCTION ps_trace.delete_all_traces() FROM prom_writer;
+
 DO $block$
 DECLARE
     _rec record;
