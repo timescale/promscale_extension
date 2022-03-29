@@ -45,3 +45,7 @@ FROM
 ) z
 WHERE u.key = z.key
 ;
+
+PERFORM setval('_prom_catalog.remote_commands_seq_seq'::regclass, max(seq) + 1, false)
+FROM _prom_catalog.remote_commands
+;
