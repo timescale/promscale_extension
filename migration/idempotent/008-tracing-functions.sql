@@ -339,10 +339,14 @@ RETURNS BIGINT
 AS $func$
 DECLARE
     _tag _ps_trace.tag;
+    _value_digest bytea;
 BEGIN
+    SELECT _prom_ext.jsonb_digest(_value) INTO _value_digest;
+
     SELECT * INTO _tag
     FROM _ps_trace.tag
     WHERE key = _key
+    AND _prom_ext.jsonb_digest(value) = _value_digest
     AND value = _value
     FOR UPDATE;
 
@@ -355,19 +359,24 @@ BEGIN
             _value
         FROM _ps_trace.tag_key k
         WHERE k.key = _key
-        ON CONFLICT (key, value) DO
+        ON CONFLICT (key, _prom_ext.jsonb_digest(value)) DO
         UPDATE SET tag_type = t.tag_type | EXCLUDED.tag_type
         WHERE t.tag_type & EXCLUDED.tag_type = 0;
 
         SELECT * INTO STRICT _tag
         FROM _ps_trace.tag
         WHERE key = _key
+        AND _prom_ext.jsonb_digest(value) = _value_digest
         AND value = _value;
     ELSIF _tag.tag_type & _tag_type = 0 THEN
         UPDATE _ps_trace.tag as t
         SET tag_type = t.tag_type | _tag_type
         WHERE t.key = _key -- partition elimination
         AND t.id = _tag.id;
+    END IF;
+
+    IF _tag.value != _value THEN
+        RAISE EXCEPTION 'put_tag failed. Distinct values % and % for key % have identical sha512 digest.', _tag.value, _value, _key;
     END IF;
 
     RETURN _tag.id;
@@ -386,6 +395,7 @@ AS $func$
         SELECT a.key_id, a.id
         FROM _ps_trace.tag a
         WHERE x.key = a.key
+        AND _prom_ext.jsonb_digest(x.value) = _prom_ext.jsonb_digest(a.value)
         AND x.value = a.value
         LIMIT 1
     ) a on (true)
@@ -399,12 +409,18 @@ AS $func$
 DECLARE
     _service_name_id bigint;
     _operation_id bigint;
+    _service_name_json jsonb;
+    _service_name_digest bytea;
 BEGIN
+    SELECT to_jsonb(_service_name::text) INTO _service_name_json;
+    SELECT _prom_ext.jsonb_digest(_service_name_json) INTO _service_name_digest;
+
     SELECT id INTO _service_name_id
     FROM _ps_trace.tag
     WHERE key = 'service.name'
     AND key_id = 1
-    AND value = to_jsonb(_service_name::text)
+    AND _prom_ext.jsonb_digest(value) = _service_name_digest
+    AND value = _service_name_json
     ;
 
     IF NOT FOUND THEN
@@ -414,7 +430,7 @@ BEGIN
             ps_trace.resource_tag_type(),
             'service.name',
             1,
-            to_jsonb(_service_name::text)
+            _service_name_json
         )
         ON CONFLICT DO NOTHING
         RETURNING id INTO _service_name_id;
@@ -424,7 +440,8 @@ BEGIN
             FROM _ps_trace.tag
             WHERE key = 'service.name'
             AND key_id = 1
-            AND value = to_jsonb(_service_name::text);
+            AND _prom_ext.jsonb_digest(value) = _service_name_digest
+            AND value = _service_name_json;
         END IF;
     END IF;
 
