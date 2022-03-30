@@ -369,8 +369,28 @@ BEGIN
         RETURN NEW;
     END IF;
 
-    EXECUTE format('CREATE TABLE %I.%I(time TIMESTAMPTZ NOT NULL, value DOUBLE PRECISION NOT NULL, series_id BIGINT NOT NULL) WITH (autovacuum_vacuum_threshold = 50000, autovacuum_analyze_threshold = 50000)',
-                    NEW.table_schema, NEW.table_name);
+    --autovacuum notes: we need to vacuum here for the visibility map optimization
+    --but, we don't want to freeze anything since these tables will be truncated upon
+    --compression anyway (so keep freeze settings to the default).
+    --Make the vacuum less aggressive here by upping the threshold and scale factors.
+    IF current_setting('server_version_num')::integer >= 130000 THEN
+        EXECUTE format('CREATE TABLE %I.%I(time TIMESTAMPTZ NOT NULL, value DOUBLE PRECISION NOT NULL, series_id BIGINT NOT NULL) WITH
+                        (
+                            autovacuum_vacuum_insert_threshold=50000,
+                            autovacuum_vacuum_insert_scale_factor=2.0,
+                            autovacuum_analyze_threshold = 50000,
+                            autovacuum_analyze_scale_factor = 0.5
+                        )',
+        NEW.table_schema, NEW.table_name);
+    ELSE
+        --pg12 doesn't have autovacuum_vacuum_insert_threshold
+        EXECUTE format('CREATE TABLE %I.%I(time TIMESTAMPTZ NOT NULL, value DOUBLE PRECISION NOT NULL, series_id BIGINT NOT NULL) WITH
+                        (
+                            autovacuum_analyze_threshold = 50000,
+                            autovacuum_analyze_scale_factor=0.5
+                        )',
+        NEW.table_schema, NEW.table_name);
+    END IF;
     EXECUTE format('GRANT SELECT ON TABLE %I.%I TO prom_reader', NEW.table_schema, NEW.table_name);
     EXECUTE format('GRANT SELECT, INSERT ON TABLE %I.%I TO prom_writer', NEW.table_schema, NEW.table_name);
     EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I.%I TO prom_modifier', NEW.table_schema, NEW.table_name);
@@ -1735,6 +1755,8 @@ CREATE OR REPLACE FUNCTION prom_api.set_compression_on_metric_table(metric_table
     SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
+   _compressed_schema text;
+   _compressed_hypertable TEXT;
 BEGIN
     IF _prom_catalog.is_timescaledb_oss() THEN
         RAISE NOTICE 'Compression not available in TimescaleDB-OSS. Cannot set compression on "%" metric table name', metric_table_name;
@@ -1747,6 +1769,37 @@ BEGIN
                 timescaledb.compress_segmentby = 'series_id',
                 timescaledb.compress_orderby = 'time, value'
             ); $$, metric_table_name);
+
+        SELECT c.schema_name, c.table_name
+        INTO STRICT _compressed_schema, _compressed_hypertable
+        FROM _timescaledb_catalog.hypertable h
+        INNER JOIN _timescaledb_catalog.hypertable c ON (h.compressed_hypertable_id= c.id)
+        WHERE h.schema_name = 'prom_data' AND h.table_name = metric_table_name;
+
+        --Make the compressed tables freeze on every vacuum run. They won't be changed
+        --later anyway and there is no point requiring another vacuum before wraparound.
+        --Also, make sure autovacuum runs quickly after initial creation, by setting the
+        --threshold low.
+        IF current_setting('server_version_num')::integer >= 130000 THEN
+            EXECUTE FORMAT($$
+                ALTER TABLE %I.%I SET
+                (
+                    autovacuum_freeze_min_age=0,
+                    autovacuum_freeze_table_age=0,
+                    autovacuum_vacuum_insert_threshold=1,
+                    autovacuum_vacuum_insert_scale_factor=0.0
+                )
+            $$, _compressed_schema, _compressed_hypertable);
+        ELSE
+            --pg12 doesn't have autovacuum_vacuum_insert_threshold. You should still freeze if you get the chance.
+            EXECUTE FORMAT($$
+                ALTER TABLE %I.%I SET
+                (
+                    autovacuum_freeze_min_age=0,
+                    autovacuum_freeze_table_age=0
+                )
+            $$, _compressed_schema, _compressed_hypertable);
+        END IF;
 
         --rc4 of multinode doesn't properly hand down compression when turned on
         --inside of a function; this gets around that.
