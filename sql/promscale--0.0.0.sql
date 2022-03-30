@@ -359,6 +359,7 @@ END
 $block$
 ;
 
+-- tracing hypertables
 DO $block$
 DECLARE
     _rec record;
@@ -380,6 +381,7 @@ END;
 $block$
 ;
 
+-- metric tables / views
 DO $block$
 DECLARE
     _rec record;
@@ -394,43 +396,36 @@ BEGIN
     LOOP
         EXECUTE format($sql$ALTER TABLE %I.%I OWNER TO %I$sql$, _rec.table_schema, _rec.table_name, current_user);
         EXECUTE format($sql$GRANT TRIGGER ON TABLE %I.%I TO prom_modifier$sql$, _rec.table_schema, _rec.table_name);
+
         EXECUTE format($sql$ALTER TABLE prom_data_series.%I OWNER TO %I$sql$, _rec.series_table, current_user);
+
         EXECUTE format($sql$ALTER VIEW prom_series.%I OWNER TO %I$sql$, _rec.series_table, current_user);
+
         EXECUTE format($sql$ALTER VIEW prom_metric.%I OWNER TO %I$sql$, _rec.table_name, current_user);
     END LOOP;
 END;
 $block$
 ;
 
-
--- metric related tables and views that are dynamically generated
--- need to be discovered and ownership transferred
+-- exemplar tables
 DO $block$
 DECLARE
     _rec record;
 BEGIN
     FOR _rec IN
     (
-        SELECT
-            CASE k.relkind
-                WHEN 'r' THEN 'TABLE'
-                WHEN 'v' THEN 'VIEW'
-            END AS typ,
-            n.nspname,
-            k.relname
-        FROM pg_class k
-        INNER JOIN pg_namespace n ON (k.relnamespace = n.oid)
-        WHERE k.relkind in ('r', 'v')
-        AND n.nspname in ('prom_metric', 'prom_series', 'prom_data_series', 'prom_data')
+        SELECT e.table_name
+        FROM _prom_catalog.exemplar e
+        ORDER BY e.table_name
     )
     LOOP
-        EXECUTE format($sql$ALTER %s %I.%I OWNER TO %I$sql$, _rec.typ, _rec.nspname, _rec.relname, current_user);
-
-   END LOOP;
-END
+        EXECUTE format($sql$ALTER TABLE prom_data_exemplar.%I OWNER TO %I$sql$, _rec.table_name, current_user);
+    END LOOP;
+END;
 $block$
 ;
 
+-- migration table
 DO $block$
 BEGIN
     CREATE TABLE _ps_catalog.migration(

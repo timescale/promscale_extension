@@ -270,21 +270,20 @@ CREATE OR REPLACE FUNCTION _prom_catalog.make_metric_table()
     RETURNS trigger
     AS $func$
 DECLARE
-  label_id INT;
-  compressed_hypertable_name text;
+    label_id INT;
 BEGIN
 
-   -- Note: if the inserted metric is a view, nothing to do.
-   IF NEW.is_view THEN
+    -- Note: if the inserted metric is a view, nothing to do.
+    IF NEW.is_view THEN
         RETURN NEW;
-   END IF;
+    END IF;
 
-   EXECUTE format('CREATE TABLE %I.%I(time TIMESTAMPTZ NOT NULL, value DOUBLE PRECISION NOT NULL, series_id BIGINT NOT NULL) WITH (autovacuum_vacuum_threshold = 50000, autovacuum_analyze_threshold = 50000)',
+    EXECUTE format('CREATE TABLE %I.%I(time TIMESTAMPTZ NOT NULL, value DOUBLE PRECISION NOT NULL, series_id BIGINT NOT NULL) WITH (autovacuum_vacuum_threshold = 50000, autovacuum_analyze_threshold = 50000)',
                     NEW.table_schema, NEW.table_name);
-   EXECUTE format('GRANT SELECT ON TABLE %I.%I TO prom_reader', NEW.table_schema, NEW.table_name);
-   EXECUTE format('GRANT SELECT, INSERT ON TABLE %I.%I TO prom_writer', NEW.table_schema, NEW.table_name);
-   EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE, TRIGGER ON TABLE %I.%I TO prom_modifier', NEW.table_schema, NEW.table_name);
-   EXECUTE format('CREATE UNIQUE INDEX data_series_id_time_%s ON %I.%I (series_id, time) INCLUDE (value)',
+    EXECUTE format('GRANT SELECT ON TABLE %I.%I TO prom_reader', NEW.table_schema, NEW.table_name);
+    EXECUTE format('GRANT SELECT, INSERT ON TABLE %I.%I TO prom_writer', NEW.table_schema, NEW.table_name);
+    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE, TRIGGER ON TABLE %I.%I TO prom_modifier', NEW.table_schema, NEW.table_name);
+    EXECUTE format('CREATE UNIQUE INDEX data_series_id_time_%s ON %I.%I (series_id, time) INCLUDE (value)',
                     NEW.id, NEW.table_schema, NEW.table_name);
 
     IF _prom_catalog.is_timescaledb_installed() THEN
@@ -301,17 +300,16 @@ BEGIN
         ELSE
             PERFORM public.create_hypertable(format('%I.%I', NEW.table_schema, NEW.table_name), 'time',
             chunk_time_interval=>_prom_catalog.get_staggered_chunk_interval(_prom_catalog.get_default_chunk_interval()),
-                             create_default_indexes=>false);
+                            create_default_indexes=>false);
         END IF;
     END IF;
 
     --Do not move this into the finalize step, because it's cheap to do while the table is empty
     --but takes a heavyweight blocking lock otherwise.
     IF  _prom_catalog.is_timescaledb_installed()
-            AND _prom_catalog.get_default_compression_setting() THEN
-            PERFORM prom_api.set_compression_on_metric_table(NEW.table_name, TRUE);
+        AND _prom_catalog.get_default_compression_setting() THEN
+        PERFORM prom_api.set_compression_on_metric_table(NEW.table_name, TRUE);
     END IF;
-
 
     SELECT _prom_catalog.get_or_create_label_id('__name__', NEW.metric_name)
     INTO STRICT label_id;
@@ -328,10 +326,10 @@ BEGIN
             CONSTRAINT series_pkey_%3$s PRIMARY KEY(id)
         ) WITH (autovacuum_vacuum_threshold = 100, autovacuum_analyze_threshold = 100)
     $$, NEW.table_name, label_id, NEW.id);
-   EXECUTE format('GRANT SELECT ON TABLE prom_data_series.%I TO prom_reader', NEW.table_name);
-   EXECUTE format('GRANT SELECT, INSERT ON TABLE prom_data_series.%I TO prom_writer', NEW.table_name);
-   EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE prom_data_series.%I TO prom_modifier', NEW.table_name);
-   RETURN NEW;
+    EXECUTE format('GRANT SELECT ON TABLE prom_data_series.%I TO prom_reader', NEW.table_name);
+    EXECUTE format('GRANT SELECT, INSERT ON TABLE prom_data_series.%I TO prom_writer', NEW.table_name);
+    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE prom_data_series.%I TO prom_modifier', NEW.table_name);
+    RETURN NEW;
 END
 $func$
 LANGUAGE PLPGSQL VOLATILE
@@ -824,25 +822,29 @@ GRANT EXECUTE ON FUNCTION prom_api.label_key_position(text, text) to prom_reader
 CREATE OR REPLACE FUNCTION prom_api.drop_metric(metric_name_to_be_dropped text) RETURNS VOID
 AS
 $$
-    DECLARE
-        hypertable_name TEXT;
-        deletable_metric_id INTEGER;
-    BEGIN
-        IF (SELECT NOT pg_try_advisory_xact_lock(5585198506344173278)) THEN
-            RAISE NOTICE 'drop_metric can run only when no Promscale connectors are running. Please shutdown the Promscale connectors';
-            PERFORM pg_advisory_xact_lock(5585198506344173278);
-        END IF;
-        SELECT table_name, id INTO hypertable_name, deletable_metric_id FROM _prom_catalog.metric WHERE metric_name=metric_name_to_be_dropped;
-        RAISE NOTICE 'deleting "%" metric with metric_id as "%" and table_name as "%"', metric_name_to_be_dropped, deletable_metric_id, hypertable_name;
-        EXECUTE FORMAT('DROP VIEW prom_series.%1$I;', hypertable_name);
-        EXECUTE FORMAT('DROP VIEW prom_metric.%1$I;', hypertable_name);
-        EXECUTE FORMAT('DROP TABLE prom_data_series.%1$I;', hypertable_name);
-        EXECUTE FORMAT('DROP TABLE prom_data.%1$I;', hypertable_name);
-        DELETE FROM _prom_catalog.metric WHERE id=deletable_metric_id;
-        -- clean up unreferenced labels, label_keys and its position.
-        DELETE FROM _prom_catalog.label_key_position WHERE metric_name=metric_name_to_be_dropped;
-        DELETE FROM _prom_catalog.label_key WHERE key NOT IN (select key from _prom_catalog.label_key_position);
-    END;
+DECLARE
+    hypertable_name TEXT;
+    deletable_metric_id INTEGER;
+BEGIN
+    IF (SELECT NOT pg_try_advisory_xact_lock(5585198506344173278)) THEN
+        RAISE NOTICE 'drop_metric can run only when no Promscale connectors are running. Please shutdown the Promscale connectors';
+        PERFORM pg_advisory_xact_lock(5585198506344173278);
+    END IF;
+    SELECT table_name, id INTO hypertable_name, deletable_metric_id FROM _prom_catalog.metric WHERE metric_name=metric_name_to_be_dropped;
+    IF NOT FOUND THEN
+        RAISE WARNING '% is not a metric. unable to drop it.', metric_name_to_be_dropped;
+        RETURN;
+    END IF;
+    RAISE NOTICE 'deleting "%" metric with metric_id as "%" and table_name as "%"', metric_name_to_be_dropped, deletable_metric_id, hypertable_name;
+    EXECUTE FORMAT('DROP VIEW prom_series.%1$I;', hypertable_name);
+    EXECUTE FORMAT('DROP VIEW prom_metric.%1$I;', hypertable_name);
+    EXECUTE FORMAT('DROP TABLE prom_data_series.%1$I;', hypertable_name);
+    EXECUTE FORMAT('DROP TABLE prom_data.%1$I;', hypertable_name);
+    DELETE FROM _prom_catalog.metric WHERE id=deletable_metric_id;
+    -- clean up unreferenced labels, label_keys and its position.
+    DELETE FROM _prom_catalog.label_key_position WHERE metric_name=metric_name_to_be_dropped;
+    DELETE FROM _prom_catalog.label_key WHERE key NOT IN (select key from _prom_catalog.label_key_position);
+END;
 $$
 LANGUAGE plpgsql VOLATILE
 SECURITY DEFINER
@@ -3110,50 +3112,99 @@ $$
 LANGUAGE PLPGSQL;
 GRANT EXECUTE ON FUNCTION _prom_catalog.insert_metric_row(NAME, TIMESTAMPTZ[], DOUBLE PRECISION[], BIGINT[]) TO prom_writer;
 
+CREATE OR REPLACE FUNCTION _prom_catalog.has_permission_on_table(_table regclass)
+RETURNS boolean
+AS $func$
+DECLARE
+    _rec record;
+    _rec2 record;
+    _found boolean;
+BEGIN
+    -- ensure it's a table and not some other kind of object
+    SELECT
+        k.oid,
+        k.relname,
+        k.relnamespace,
+        n.nspname
+    INTO _rec
+    FROM pg_catalog.pg_class k
+    INNER JOIN pg_catalog.pg_namespace n on (k.relnamespace = n.oid)
+    WHERE k.oid = _table::oid
+    AND k.relkind in ('r', 'p')
+    ;
+    IF NOT FOUND THEN
+        RAISE WARNING '% is not a table', _table;
+        RETURN false;
+    END IF;
+
+    -- is the table a chunk? if so, check the chunk's hypertable instead
+    IF _prom_catalog.is_timescaledb_installed() THEN
+        SELECT
+            k.oid,
+            k.relname,
+            k.relnamespace,
+            n.nspname
+        INTO _rec2
+        FROM _timescaledb_catalog.chunk c
+        INNER JOIN _timescaledb_catalog.hypertable h
+        ON (c.hypertable_id = h.id
+            AND c.schema_name = _rec.nspname
+            AND c.table_name = _rec.relname)
+        INNER JOIN pg_catalog.pg_class k on (k.relname = h.table_name)
+        INNER JOIN pg_catalog.pg_namespace n on (k.relnamespace = n.oid AND h.schema_name = n.nspname)
+        ;
+        IF FOUND THEN
+            _rec = _rec2;
+        END IF;
+    END IF;
+
+    -- is exemplar table?
+    IF 'prom_data_exemplar' = _rec.nspname THEN
+        SELECT count(*) > 0 INTO STRICT _found
+        FROM _prom_catalog.exemplar e
+        WHERE e.table_name = _rec.relname
+        ;
+        IF _found THEN
+            RETURN true;
+        END IF;
+    END IF;
+
+    -- is metric or series table?
+    SELECT count(*) > 0 INTO STRICT _found
+    FROM _prom_catalog.metric m
+    WHERE m.table_name = _rec.relname
+    AND _rec.nspname IN (m.table_schema, 'prom_data_series')
+    ;
+    IF _found THEN
+        RETURN true;
+    END IF;
+
+    -- is a table belonging to the extension
+    SELECT count(*) > 0 INTO STRICT _found
+    FROM pg_catalog.pg_depend d
+    INNER JOIN pg_catalog.pg_extension e ON (d.refobjid = e.oid AND d.objid = _rec.oid)
+    WHERE d.refclassid = 'pg_catalog.pg_extension'::pg_catalog.regclass
+    AND d.deptype = 'e'
+    AND e.extname = 'promscale'
+    ;
+
+    RETURN _found;
+END;
+$func$
+LANGUAGE plpgsql STABLE;
+GRANT EXECUTE ON FUNCTION _prom_catalog.has_permission_on_table(regclass) TO prom_reader;
+
 DO $block$
 BEGIN
 IF _prom_catalog.is_timescaledb_installed() THEN
 
-    CREATE OR REPLACE VIEW _prom_catalog.promscale_hypertables AS
-    SELECT
-        hypertable_schema,
-        hypertable_name
-    FROM timescaledb_information.hypertables
-    INTERSECT
-    (
-        -- metric tables
-        SELECT
-            table_schema,
-            table_name
-        FROM _prom_catalog.metric
-        UNION
-        -- non-metric tables belonging to the extension
-        SELECT
-            n.nspname as hypertable_schema,
-            k.relname as hypertable_name
-        FROM pg_catalog.pg_depend d
-        INNER JOIN pg_catalog.pg_extension e ON (d.refobjid = e.oid)
-        INNER JOIN pg_catalog.pg_class k ON (d.objid = k.oid)
-        INNER JOIN pg_namespace n ON (k.relnamespace = n.oid)
-        WHERE d.refclassid = 'pg_catalog.pg_extension'::pg_catalog.regclass
-        AND d.deptype = 'e'
-        AND e.extname = 'promscale'
-        AND k.relkind IN ('r', 'p')
-    );
-    GRANT SELECT ON _prom_catalog.promscale_hypertables TO prom_reader;
-
     CREATE OR REPLACE FUNCTION prom_api.compress_chunk(uncompressed_chunk regclass, if_not_compressed boolean DEFAULT false)
     RETURNS regclass
     AS $$
+        --verify that the chunk in question belongs to the extension.
+        --we don't want to compress chunks that aren't ours
         SELECT public.compress_chunk(uncompressed_chunk, if_not_compressed)
-        WHERE uncompressed_chunk IN
-        (
-            SELECT format('%I.%I', k.chunk_schema, k.chunk_name)::regclass
-            FROM _prom_catalog.promscale_hypertables x
-            INNER JOIN timescaledb_information.chunks k
-            ON (x.hypertable_schema = k.hypertable_schema
-            AND x.hypertable_name = k.hypertable_name)
-        )
+        WHERE _prom_catalog.has_permission_on_table(uncompressed_chunk) = true
     $$
     LANGUAGE sql VOLATILE
     SECURITY DEFINER
@@ -3164,18 +3215,16 @@ IF _prom_catalog.is_timescaledb_installed() THEN
     CREATE OR REPLACE FUNCTION prom_api.set_chunk_time_interval(hypertable regclass, chunk_time_interval anyelement, dimension_name name DEFAULT NULL::name)
     RETURNS void
     AS $$
+        --verify that the hypertable in question belongs to the extension.
+        --we don't want to modify hypertables that aren't ours
         SELECT public.set_chunk_time_interval(hypertable, chunk_time_interval, dimension_name)
-        WHERE hypertable IN
-        (
-            SELECT format('%I.%I', hypertable_schema, hypertable_name)::regclass
-            FROM _prom_catalog.promscale_hypertables
-        )
+        WHERE _prom_catalog.has_permission_on_table(hypertable) = true
     $$
     LANGUAGE sql VOLATILE
     SECURITY DEFINER
     SET search_path = pg_temp;
     REVOKE ALL ON FUNCTION prom_api.set_chunk_time_interval(regclass, anyelement, name) FROM PUBLIC;
-    GRANT EXECUTE ON FUNCTION prom_api.set_chunk_time_interval(regclass, anyelement, name) TO prom_writer;
+    GRANT EXECUTE ON FUNCTION prom_api.set_chunk_time_interval(regclass, anyelement, name) TO prom_admin;
 
 END IF;
 END;
