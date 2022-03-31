@@ -1,67 +1,339 @@
+-- Due to incompatible change of trace_id type we need to drop tables and delete data
+DROP TABLE _ps_trace.link CASCADE;
+DROP TABLE _ps_trace.event CASCADE;
+DROP TABLE _ps_trace.span CASCADE;
 
--- Fix compression on trace tables
+TRUNCATE TABLE _ps_trace.tag;
+DELETE FROM _ps_trace.tag_key WHERE id >= 1000;
+ANALYZE _ps_trace.tag_key;
+REINDEX TABLE _ps_trace.tag_key;
+PERFORM setval('_ps_trace.tag_key_id_seq', 1000);
+TRUNCATE TABLE _ps_trace.operation;
+ANALYZE _ps_trace.operation;
+TRUNCATE TABLE _ps_trace.instrumentation_lib CASCADE;
+ANALYZE _ps_trace.instrumentation_lib;
+TRUNCATE TABLE _ps_trace.schema_url CASCADE;
+ANALYZE _ps_trace.schema_url;
+
+-- We are replacing domain with custom type
+DROP DOMAIN ps_trace.trace_id CASCADE;
+
+CREATE TYPE ps_trace.trace_id;
+
+CREATE OR REPLACE FUNCTION _ps_trace.trace_id_in(cstring)
+RETURNS ps_trace.trace_id
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$uuid_in$function$;
+GRANT EXECUTE ON FUNCTION _ps_trace.trace_id_in(cstring) TO prom_reader;
+
+CREATE OR REPLACE FUNCTION _ps_trace.trace_id_out(ps_trace.trace_id)
+RETURNS cstring
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$uuid_out$function$;
+GRANT EXECUTE ON FUNCTION _ps_trace.trace_id_out(ps_trace.trace_id) TO prom_reader;
+
+CREATE OR REPLACE FUNCTION _ps_trace.trace_id_send(ps_trace.trace_id)
+RETURNS bytea
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$uuid_send$function$;
+GRANT EXECUTE ON FUNCTION _ps_trace.trace_id_send(ps_trace.trace_id) TO prom_reader;
+
+CREATE OR REPLACE FUNCTION _ps_trace.trace_id_recv(internal)
+RETURNS ps_trace.trace_id
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$uuid_recv$function$;
+GRANT EXECUTE ON FUNCTION _ps_trace.trace_id_recv(internal) TO prom_reader;
+
+CREATE OR REPLACE FUNCTION _ps_trace.trace_id_ne(ps_trace.trace_id, ps_trace.trace_id)
+RETURNS bool
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$uuid_ne$function$;
+GRANT EXECUTE ON FUNCTION _ps_trace.trace_id_ne(ps_trace.trace_id, ps_trace.trace_id) TO prom_reader;
+
+CREATE OR REPLACE FUNCTION _ps_trace.trace_id_eq(ps_trace.trace_id, ps_trace.trace_id)
+RETURNS bool
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$uuid_eq$function$;
+GRANT EXECUTE ON FUNCTION _ps_trace.trace_id_eq(ps_trace.trace_id, ps_trace.trace_id) TO prom_reader;
+
+CREATE OR REPLACE FUNCTION _ps_trace.trace_id_ge(ps_trace.trace_id, ps_trace.trace_id)
+RETURNS bool
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$uuid_ge$function$;
+GRANT EXECUTE ON FUNCTION _ps_trace.trace_id_ge(ps_trace.trace_id, ps_trace.trace_id) TO prom_reader;
+
+CREATE OR REPLACE FUNCTION _ps_trace.trace_id_le(ps_trace.trace_id, ps_trace.trace_id)
+RETURNS bool
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$uuid_le$function$;
+GRANT EXECUTE ON FUNCTION _ps_trace.trace_id_le(ps_trace.trace_id, ps_trace.trace_id) TO prom_reader;
+
+CREATE OR REPLACE FUNCTION _ps_trace.trace_id_gt(ps_trace.trace_id, ps_trace.trace_id)
+RETURNS bool
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$uuid_gt$function$;
+GRANT EXECUTE ON FUNCTION _ps_trace.trace_id_gt(ps_trace.trace_id, ps_trace.trace_id) TO prom_reader;
+
+CREATE OR REPLACE FUNCTION _ps_trace.trace_id_lt(ps_trace.trace_id, ps_trace.trace_id)
+RETURNS bool
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$uuid_lt$function$;
+GRANT EXECUTE ON FUNCTION _ps_trace.trace_id_lt(ps_trace.trace_id, ps_trace.trace_id) TO prom_reader;
+
+CREATE OR REPLACE FUNCTION _ps_trace.trace_id_cmp(ps_trace.trace_id, ps_trace.trace_id)
+RETURNS int
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$uuid_cmp$function$;
+GRANT EXECUTE ON FUNCTION _ps_trace.trace_id_cmp(ps_trace.trace_id, ps_trace.trace_id) TO prom_reader;
+
+CREATE OR REPLACE FUNCTION _ps_trace.trace_id_hash(ps_trace.trace_id)
+RETURNS int
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$uuid_hash$function$;
+GRANT EXECUTE ON FUNCTION _ps_trace.trace_id_hash(ps_trace.trace_id) TO prom_reader;
+
+CREATE TYPE ps_trace.trace_id(
+    internallength = 16,
+    INPUT = _ps_trace.trace_id_in,
+    OUTPUT = _ps_trace.trace_id_out,
+    SEND = _ps_trace.trace_id_send,
+    RECEIVE = _ps_trace.trace_id_recv,
+    alignment = char
+);
+
+CREATE OPERATOR ps_trace.= ( 
+    FUNCTION=_ps_trace.trace_id_eq,
+    LEFTARG=ps_trace.trace_id,
+    RIGHTARG=ps_trace.trace_id,
+    COMMUTATOR= OPERATOR(ps_trace.=),
+    NEGATOR= OPERATOR(ps_trace.!=),
+    RESTRICT=eqsel,
+    JOIN=eqjoinsel,
+    HASHES, MERGES);
+
+CREATE OPERATOR ps_trace.<> ( 
+    FUNCTION=_ps_trace.trace_id_ne,
+    LEFTARG=ps_trace.trace_id,
+    RIGHTARG=ps_trace.trace_id,
+    COMMUTATOR= OPERATOR(ps_trace.<>),
+    NEGATOR= OPERATOR(ps_trace.=),
+    RESTRICT=neqsel,
+    JOIN=neqjoinsel);
+
+CREATE OPERATOR ps_trace.> ( 
+    FUNCTION=_ps_trace.trace_id_gt,
+    LEFTARG=ps_trace.trace_id,
+    RIGHTARG=ps_trace.trace_id,
+    COMMUTATOR= OPERATOR(ps_trace.<),
+    NEGATOR= OPERATOR(ps_trace.<=),
+    RESTRICT=scalargtsel,
+    JOIN=scalargtjoinsel);
+
+CREATE OPERATOR ps_trace.>= ( 
+    FUNCTION=_ps_trace.trace_id_ge,
+    LEFTARG=ps_trace.trace_id,
+    RIGHTARG=ps_trace.trace_id,
+    COMMUTATOR= OPERATOR(ps_trace.<=),
+    NEGATOR= OPERATOR(ps_trace.<),
+    RESTRICT=scalargesel,
+    JOIN=scalargejoinsel);
+
+CREATE OPERATOR ps_trace.< ( 
+    FUNCTION=_ps_trace.trace_id_lt,
+    LEFTARG=ps_trace.trace_id,
+    RIGHTARG=ps_trace.trace_id,
+    COMMUTATOR= OPERATOR(ps_trace.>),
+    NEGATOR= OPERATOR(ps_trace.>=),
+    RESTRICT=scalarltsel,
+    JOIN=scalarltjoinsel);
+
+CREATE OPERATOR ps_trace.<= ( 
+    FUNCTION=_ps_trace.trace_id_le,
+    LEFTARG=ps_trace.trace_id,
+    RIGHTARG=ps_trace.trace_id,
+    COMMUTATOR= OPERATOR(ps_trace.>=),
+    NEGATOR= OPERATOR(ps_trace.>),
+    RESTRICT=scalarlesel,
+    JOIN=scalarlejoinsel);
+
+CREATE OPERATOR CLASS ps_trace.btree_trace_id_ops
+DEFAULT FOR TYPE ps_trace.trace_id USING btree AS
+    OPERATOR        1       ps_trace.< ,
+    OPERATOR        2       ps_trace.<= ,
+    OPERATOR        3       ps_trace.= ,
+    OPERATOR        4       ps_trace.>= ,
+    OPERATOR        5       ps_trace.> ,
+    FUNCTION 1 _ps_trace.trace_id_cmp(ps_trace.trace_id,ps_trace.trace_id);
+
+CREATE OPERATOR CLASS ps_trace.hash_trace_id_ops
+DEFAULT FOR TYPE ps_trace.trace_id USING hash AS 
+    OPERATOR 1 ps_trace.=,
+    FUNCTION 1 _ps_trace.trace_id_hash(ps_trace.trace_id);
+
+GRANT USAGE ON TYPE ps_trace.trace_id TO prom_reader;
+
+
+CREATE TABLE _ps_trace.span
+(
+    trace_id ps_trace.trace_id NOT NULL,
+    span_id bigint NOT NULL CHECK (span_id != 0),
+    parent_span_id bigint NULL CHECK (parent_span_id != 0),
+    operation_id bigint NOT NULL,
+    start_time timestamptz NOT NULL,
+    end_time timestamptz NOT NULL,
+    duration_ms double precision NOT NULL GENERATED ALWAYS AS ( extract(epoch from (end_time - start_time)) * 1000.0 ) STORED,
+    trace_state text CHECK (trace_state != ''),
+    span_tags ps_trace.tag_map NOT NULL,
+    dropped_tags_count int NOT NULL default 0,
+    event_time tstzrange default NULL,
+    dropped_events_count int NOT NULL default 0,
+    dropped_link_count int NOT NULL default 0,
+    status_code ps_trace.status_code NOT NULL,
+    status_message text,
+    instrumentation_lib_id bigint,
+    resource_tags ps_trace.tag_map NOT NULL,
+    resource_dropped_tags_count int NOT NULL default 0,
+    resource_schema_url_id BIGINT,
+    PRIMARY KEY (span_id, trace_id, start_time),
+    CHECK (start_time <= end_time)
+);
+CREATE INDEX ON _ps_trace.span USING BTREE (trace_id, parent_span_id) INCLUDE (span_id); -- used for recursive CTEs for trace tree queries
+CREATE INDEX ON _ps_trace.span USING GIN (span_tags jsonb_path_ops); -- supports tag filters. faster ingest than json_ops
+CREATE INDEX ON _ps_trace.span USING BTREE (operation_id); -- supports filters/joins to operation table
+--CREATE INDEX ON _ps_trace.span USING GIN (jsonb_object_keys(span_tags) array_ops); -- possible way to index key exists
+CREATE INDEX ON _ps_trace.span USING GIN (resource_tags jsonb_path_ops); -- supports tag filters. faster ingest than json_ops
+GRANT SELECT ON TABLE _ps_trace.span TO prom_reader;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.span TO prom_writer;
+
+CREATE TABLE _ps_trace.event
+(
+    time timestamptz NOT NULL,
+    trace_id ps_trace.trace_id NOT NULL,
+    span_id bigint NOT NULL CHECK (span_id != 0),
+    event_nbr int NOT NULL DEFAULT 0,
+    name text NOT NULL,
+    tags ps_trace.tag_map NOT NULL,
+    dropped_tags_count int NOT NULL DEFAULT 0
+);
+CREATE INDEX ON _ps_trace.event USING GIN (tags jsonb_path_ops);
+CREATE INDEX ON _ps_trace.event USING BTREE (trace_id, span_id);
+GRANT SELECT ON TABLE _ps_trace.event TO prom_reader;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.event TO prom_writer;
+
+CREATE TABLE _ps_trace.link
+(
+    trace_id ps_trace.trace_id NOT NULL,
+    span_id bigint NOT NULL CHECK (span_id != 0),
+    span_start_time timestamptz NOT NULL,
+    linked_trace_id ps_trace.trace_id NOT NULL,
+    linked_span_id bigint NOT NULL CHECK (linked_span_id != 0),
+    link_nbr int NOT NULL DEFAULT 0,
+    trace_state text CHECK (trace_state != ''),
+    tags ps_trace.tag_map NOT NULL,
+    dropped_tags_count int NOT NULL DEFAULT 0
+);
+CREATE INDEX ON _ps_trace.link USING BTREE (trace_id, span_id);
+CREATE INDEX ON _ps_trace.link USING GIN (tags jsonb_path_ops);
+GRANT SELECT ON TABLE _ps_trace.link TO prom_reader;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.link TO prom_writer;
+
+/*
+    If "vanilla" postgres is installed, do nothing.
+    If timescaledb is installed, turn on compression for tracing tables.
+    If timescaledb is installed and multinode is set up,
+    turn span, event, and link into distributed hypertables.
+    If timescaledb is installed but multinode is NOT set up,
+    turn span, event, and link into regular hypertables.
+*/
 DO $block$
 DECLARE
     _is_timescaledb_installed boolean = false;
     _is_compression_available boolean = false;
+    _is_multinode boolean = false;
     _saved_search_path text;
 BEGIN
     _is_timescaledb_installed = _prom_catalog.is_timescaledb_installed();
+  
 
     IF _is_timescaledb_installed THEN
         _is_compression_available = NOT (current_setting('timescaledb.license') = 'apache');
+        _is_multinode = _prom_catalog.is_multinode();
     END IF;
 
     IF _is_timescaledb_installed THEN
-        --need to clear the search path while creating distributed
-        --hypertables because otherwise the datanodes don't find
-        --the right column types since type names are not schema
-        --qualified if in search path.
-        _saved_search_path := current_setting('search_path');
-        SET search_path = pg_temp;
-
-        PERFORM public.set_chunk_time_interval(
-            '_ps_trace.span'::regclass,
-            '1 hour'::interval
-        );
-        PERFORM public.set_chunk_time_interval(
-            '_ps_trace.event'::regclass,
-            '1 hour'::interval
-        );
-        PERFORM public.set_chunk_time_interval(
-            '_ps_trace.link'::regclass,
-            '1 hour'::interval
-        );
-
-        execute format('SET search_path = %s', _saved_search_path);
+        IF _is_multinode THEN
+            --need to clear the search path while creating distributed
+            --hypertables because otherwise the datanodes don't find
+            --the right column types since type names are not schema
+            --qualified if in search path.
+            _saved_search_path := current_setting('search_path');
+            SET search_path = pg_temp;
+            PERFORM public.create_distributed_hypertable(
+                '_ps_trace.span'::regclass,
+                'start_time'::name,
+                partitioning_column=>'trace_id'::name,
+                number_partitions=>1::int,
+                chunk_time_interval=>'1 hours'::interval,
+                create_default_indexes=>false
+            );
+            PERFORM public.create_distributed_hypertable(
+                '_ps_trace.event'::regclass,
+                'time'::name,
+                partitioning_column=>'trace_id'::name,
+                number_partitions=>1::int,
+                chunk_time_interval=>'1 hours'::interval,
+                create_default_indexes=>false
+            );
+            PERFORM public.create_distributed_hypertable(
+                '_ps_trace.link'::regclass,
+                'span_start_time'::name,
+                partitioning_column=>'trace_id'::name,
+                number_partitions=>1::int,
+                chunk_time_interval=>'1 hours'::interval,
+                create_default_indexes=>false
+            );
+            execute format('SET search_path = %s', _saved_search_path);
+        ELSE -- not multinode
+            PERFORM public.create_hypertable(
+                '_ps_trace.span'::regclass,
+                'start_time'::name,
+                partitioning_column=>'trace_id'::name,
+                number_partitions=>1::int,
+                chunk_time_interval=>'1 hours'::interval,
+                create_default_indexes=>false
+            );
+            PERFORM public.create_hypertable(
+                '_ps_trace.event'::regclass,
+                'time'::name,
+                partitioning_column=>'trace_id'::name,
+                number_partitions=>1::int,
+                chunk_time_interval=>'1 hours'::interval,
+                create_default_indexes=>false
+            );
+            PERFORM public.create_hypertable(
+                '_ps_trace.link'::regclass,
+                'span_start_time'::name,
+                partitioning_column=>'trace_id'::name,
+                number_partitions=>1::int,
+                chunk_time_interval=>'1 hours'::interval,
+                create_default_indexes=>false
+            );
+        END IF;
 
         IF _is_compression_available THEN
-            -- drop any compressed chunks for the three tables we are modifying
-            PERFORM public.drop_chunks(
-                format('%I.%I', hypertable_schema, hypertable_schema)::regclass,
-                (max(range_end) + interval '1 minute'),
-                verbose=>true
-            )
-            FROM timescaledb_information.chunks
-            WHERE is_compressed = true
-            AND (hypertable_schema, hypertable_name) IN
-            (
-                ('_ps_trace', 'span'),
-                ('_ps_trace', 'link'),
-                ('_ps_trace', 'event')
-            )
-            GROUP BY hypertable_schema, hypertable_name
-            ORDER BY hypertable_name DESC -- span table last
-            ;
-
-            PERFORM public.remove_compression_policy('_ps_trace.span', if_exists=>true);
-            PERFORM public.remove_compression_policy('_ps_trace.event', if_exists=>true);
-            PERFORM public.remove_compression_policy('_ps_trace.link', if_exists=>true);
-
-            ALTER TABLE _ps_trace.span SET (timescaledb.compress=false);
-            ALTER TABLE _ps_trace.event SET (timescaledb.compress=false);
-            ALTER TABLE _ps_trace.link SET (timescaledb.compress=false);
-
+            -- turn on compression
             ALTER TABLE _ps_trace.span SET (timescaledb.compress, timescaledb.compress_orderby='trace_id,span_id,start_time');
             ALTER TABLE _ps_trace.event SET (timescaledb.compress, timescaledb.compress_orderby='trace_id,span_id,time');
             ALTER TABLE _ps_trace.link SET (timescaledb.compress, timescaledb.compress_orderby='trace_id,span_id,span_start_time');
