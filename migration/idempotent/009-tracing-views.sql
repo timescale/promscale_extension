@@ -58,7 +58,7 @@ SELECT
     s.status_code,
     s.status_message
 FROM _ps_trace.event e
-LEFT OUTER JOIN _ps_trace.span s on (e.span_id = s.span_id AND e.trace_id = s.trace_id)
+LEFT OUTER JOIN _ps_trace.span s on (e.span_id = s.span_id AND e.trace_id OPERATOR(ps_trace.=) s.trace_id)
 LEFT OUTER JOIN _ps_trace.operation o ON (s.operation_id = o.id)
 LEFT OUTER JOIN _ps_trace.tag t ON (o.service_name_id = t.id AND t.key = 'service.name') -- partition elimination
 ;
@@ -119,7 +119,7 @@ SELECT
     k.tags as link_tags,
     k.dropped_tags_count as dropped_link_tags_count
 FROM _ps_trace.link k
-LEFT OUTER JOIN ps_trace.span s1 on (k.span_id = s1.span_id and k.trace_id = s1.trace_id)
-LEFT OUTER JOIN ps_trace.span s2 on (k.linked_span_id = s2.span_id and k.linked_trace_id = s2.trace_id)
+LEFT OUTER JOIN ps_trace.span s1 on (k.span_id = s1.span_id and k.trace_id OPERATOR(ps_trace.=) s1.trace_id)
+LEFT OUTER JOIN ps_trace.span s2 on (k.linked_span_id = s2.span_id and k.linked_trace_id OPERATOR(ps_trace.=) s2.trace_id)
 ;
 GRANT SELECT ON ps_trace.link to prom_reader;
