@@ -20,18 +20,12 @@ jobs:
         pgversion:
         - 14
         - 13
+        - 12
         tsversion:
         - 2.6.0
         base:
         - ha
         - alpine
-        include:
-        - pgversion: 12
-          tsversion: 2.5.0
-          base: ha
-        - pgversion: 12
-          tsversion: 2.5.0
-          base: alpine
     steps:
       - uses: actions/checkout@v2
 
@@ -78,8 +72,6 @@ jobs:
 
       - name: Run end-to-end tests
         uses: actions-rs/cargo@v1
-        # Note: we skip pg12 because the docker images don't work currently. See https://github.com/timescale/promscale_extension/issues/109.
-        if: ${{ matrix.pgversion != 12 }}
         with:
           command: test
           args: -p e2e

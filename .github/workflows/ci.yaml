@@ -16,6 +16,8 @@ jobs:
       matrix:
         postgres:
         - version: "14"
+        - version: "13"
+        - version: "12"
     steps:
       - uses: actions/checkout@v2
       - name: Install latest nightly
@@ -37,7 +39,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ~/.pgx
-          key: dot-pgx
+          key: dot-pgx-${{ matrix.postgres.version }}-cargo-${{ hashFiles('**/Cargo.*') }}
 
       - name: Initialize pgx
         if: ${{ steps.cache-pgx.outputs.cache-hit != 'true' }}

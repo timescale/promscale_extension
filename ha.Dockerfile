@@ -44,7 +44,7 @@ RUN chown -R postgres:postgres /build
 USER postgres
 
 COPY --chown=postgres:postgres Cargo.* /build/promscale/
-COPY --chown=postgres:postgres promscale.control Makefile build.rs create-upgrade-symlinks.sh /build/promscale/
+COPY --chown=postgres:postgres Makefile build.rs create-upgrade-symlinks.sh /build/promscale/
 COPY --chown=postgres:postgres .cargo/ /build/promscale/.cargo/
 COPY --chown=postgres:postgres e2e/ /build/promscale/e2e/
 COPY --chown=postgres:postgres src/ /build/promscale/src/
@@ -54,10 +54,13 @@ COPY --chown=postgres:postgres templates/ /build/promscale/templates/
 
 RUN make package
 
-FROM timescale/timescaledb-ha:pg${PG_VERSION}-ts${TIMESCALEDB_VERSION_MAJMIN}-latest
+# Yes, fixed pg14 image is intentional. The image ships with PG 12, 13 and 14 binaries
+# PATH environment variable below is used to specify runtime version.
+FROM timescale/timescaledb-ha:pg14-ts${TIMESCALEDB_VERSION_MAJMIN}-latest
 ARG PG_VERSION
 COPY --from=builder --chown=root:postgres /build/promscale/target/release/promscale-pg${PG_VERSION}/usr/lib/postgresql /usr/lib/postgresql
 COPY --from=builder --chown=root:postgres /build/promscale/target/release/promscale-pg${PG_VERSION}/usr/share/postgresql /usr/share/postgresql
+ENV PATH="/usr/lib/postgresql/${PG_VERSION}/bin:${PATH}"
 USER root
 # The timescale/timescaledb-ha docker image sets the sticky bit on the lib and extension directories, which we overwrote
 # with the copy above. We need to set it back and set permissions correctly to allow us to later (in a test) remove the

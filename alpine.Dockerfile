@@ -54,14 +54,14 @@ RUN --mount=type=cache,uid=70,gid=70,target=/build/promscale/.cargo/registry \
     make dependencies
 
 # Build extension
-COPY Cargo.* /build/promscale/
-COPY promscale.control Makefile build.rs create-upgrade-symlinks.sh /build/promscale/
-COPY .cargo/ /build/promscale/.cargo/
-COPY e2e/ /build/promscale/e2e/
-COPY src/ /build/promscale/src/
-COPY sql/*.sql /build/promscale/sql/
-COPY migration/ /build/promscale/migration
-COPY templates/ /build/promscale/templates/
+COPY --chown=postgres:postgres Cargo.* /build/promscale/
+COPY --chown=postgres:postgres Makefile build.rs create-upgrade-symlinks.sh /build/promscale/
+COPY --chown=postgres:postgres .cargo/ /build/promscale/.cargo/
+COPY --chown=postgres:postgres e2e/ /build/promscale/e2e/
+COPY --chown=postgres:postgres src/ /build/promscale/src/
+COPY --chown=postgres:postgres sql/*.sql /build/promscale/sql/
+COPY --chown=postgres:postgres migration/ /build/promscale/migration
+COPY --chown=postgres:postgres templates/ /build/promscale/templates/
 
 RUN --mount=type=cache,uid=70,gid=70,target=/build/promscale/.cargo/registry \
     make package

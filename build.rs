@@ -21,11 +21,15 @@ struct IdempotentWrapper<'a> {
     body: &'a str,
 }
 
+#[derive(Template)]
+#[template(path = "promscale.control", escape = "none")]
+struct ControlFile {
+    is_pg_12: bool,
+}
+
+const CONTROL_FILE_NAME: &str = "promscale.control";
 const MIGRATION_FILE_NAME: &str = "hand-written-migration.sql";
 
-/// This build script reads the SQL files placed in the `migration/{idempotent,migration}`
-/// directories, wraps each file in its respective template (in the `templates` directory), and
-/// outputs the whole contents as one long SQL file (`MIGRATION_FILE_NAME`) in the root directory.
 fn main() {
     println!("cargo:rerun-if-changed=Cargo.lock");
     // Note: directories are not traversed, instead Cargo looks at the mtime of the directory.
@@ -33,17 +37,54 @@ fn main() {
     println!("cargo:rerun-if-changed=migration/migration");
     println!("cargo:rerun-if-changed=migration/idempotent");
     println!("cargo:rerun-if-changed=templates");
+    // According to the cargo documentation we are horribly misusing
+    // the build script mechanism, hence this workaround:
+    // "Build scripts may save any output files or intermediate artifacts
+    // in the directory specified in the OUT_DIR environment variable.
+    // Scripts should not modify any files outside of that directory."
+    //
+    // Forces build.rs to run every time and generate control file anew.
+    // Otherwise it runs only once per feature combination, making it
+    // difficult to switch back and forth between PG versions.
+    // We should remove this as soon as we drop PG 12 support.
+    println!("cargo:rerun-if-changed={}", CONTROL_FILE_NAME);
 
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    generate_migration_sql(manifest_dir.as_str());
+    generate_control_file(manifest_dir.as_str());
+}
+
+/// This procedure generates promscale.control file based on postgresql version.
+/// Specifically, PostgreSQL 12 doesn't support 'trusted' extension functionality.
+fn generate_control_file(manifest_dir: &str) {
+    let features: std::collections::HashSet<String> = env::vars()
+        .filter(|(k, _)| k.starts_with("CARGO_FEATURE_"))
+        .map(|(k, _)| k.replace("CARGO_FEATURE_", "").to_ascii_lowercase())
+        .collect();
+    let is_pg_12 = features.contains(&"pg12".to_string());
+    let control_file_contents = ControlFile { is_pg_12 }.render().unwrap();
+
+    let mut control_file_path = PathBuf::from(manifest_dir);
+    control_file_path.push(CONTROL_FILE_NAME);
+    let mut control_file = File::create(control_file_path).unwrap();
+    control_file
+        .write_all(control_file_contents.as_bytes())
+        .expect("unable to write control file contents");
+}
+
+/// This procedure reads the SQL files placed in the `migration/{idempotent,migration}`
+/// directories, wraps each file in its respective template (in the `templates` directory), and
+/// outputs the whole contents as one long SQL file (`MIGRATION_FILE_NAME`) in the root directory.
+fn generate_migration_sql(manifest_dir: &str) {
     let mut sql = include_str!("migration/migration-table.sql").to_string();
     let rendered_sql = render_sql().expect("unable to render migrations");
     sql.push_str(rendered_sql.as_str());
 
-    let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let mut out_path = PathBuf::from(manifest_dir);
     out_path.push(MIGRATION_FILE_NAME);
     let mut file = File::create(out_path).unwrap();
     file.write_all(sql.as_bytes())
-        .expect("unable to write file contents");
+        .expect("unable to write migration file contents");
 }
 
 fn render_sql() -> Result<String, Error> {

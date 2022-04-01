@@ -63,21 +63,37 @@ build: ## Build the extension
 clean: ## Clean up latest build
 	cargo clean
 
+.PHONY: run-12
+run-12: PG_BUILD_VERSION=12
+run-12: run
+
+.PHONY: run-13
+run-13: PG_BUILD_VERSION=13
+run-13: run
+
+.PHONY: run-14
+run-14: PG_BUILD_VERSION=14
+run-14: run
+
+.PHONY: run
+run: promscale.control ## Custom wrapper around cargo pgx run
+	cargo pgx run pg${PG_BUILD_VERSION}
+
 .PHONY: dependencies
-dependencies: ## Used in docker build to improve build caching
+dependencies: promscale.control ## Used in docker build to improve build caching
 	# both of these steps are also run in the `package` target, so we run them here to provide better caching
 	cargo pgx schema pg${PG_BUILD_VERSION} --out sql/promscale--${EXT_VERSION}.sql --release
 	cargo pgx package --pg-config ${PG_CONFIG}
 	rm sql/promscale--${EXT_VERSION}.sql
 
 .PHONY: package
-package: ## Generate extension artifacts for packaging
+package: promscale.control ## Generate extension artifacts for packaging
 	cargo pgx schema pg${PG_BUILD_VERSION} --out sql/promscale--${EXT_VERSION}.sql --release
 	bash create-upgrade-symlinks.sh
 	cargo pgx package --pg-config ${PG_CONFIG}
 
 .PHONY: install
-install: ## Install the extension in the Postgres found via pg_config
+install: promscale.control ## Install the extension in the Postgres found via pg_config
 	bash create-upgrade-symlinks.sh
 	cargo pgx install --pg-config ${PG_CONFIG}
 
@@ -163,7 +179,7 @@ docker-image-14: docker-image-build-14
 docker-image: docker-image-14 docker-image-13 docker-image-12 ## Build Timescale images with the extension
 
 .PHONY: docker-quick-build-12 docker-quick-build-13 docker-quick-build-14
-docker-quick-build-12 docker-quick-build-13 docker-quick-build-14: ## A quick way to rebuild the extension image with only SQL changes
+docker-quick-build-12 docker-quick-build-13 docker-quick-build-14: promscale.control ## A quick way to rebuild the extension image with only SQL changes
 	cargo pgx schema pg$(PG_BUILD_VERSION)
 	docker build -f quick.Dockerfile \
 		--build-arg TIMESCALEDB_VERSION_MAJOR=$(TIMESCALEDB_VERSION_MAJOR) \
@@ -198,3 +214,6 @@ setup-buildx: ## Setup a Buildx builder
 			--use && \
 		docker buildx inspect --bootstrap --builder buildx-builder; \
 	fi
+
+promscale.control: ## A hack to boostrap the build, some pgx commands require this file. It gets re-generated later.
+	cp templates/promscale.control ./promscale.control

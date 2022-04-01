@@ -117,7 +117,6 @@ pub unsafe fn arg_can_be_put_into_subquery(arg: *mut pg_sys::Node) -> bool {
 mod tests {
 
     use pgx::*;
-    use serde_json::Value;
 
     fn setup() {
         Spi::run(
@@ -161,23 +160,12 @@ mod tests {
         )
         .expect("SQL query failed");
 
-        assert_eq!(
-            result.0,
-            serde_json::from_str::<Value>(
-                // Note: This output can be obtained directly from postgres
-                r#"
-                    [{
-                        "Plan": {
-                            "Alias": "gfs_test_table",
-                            "Async Capable": false,
-                            "Node Type": "Seq Scan",
-                            "Parallel Aware": false,
-                            "Relation Name": "gfs_test_table"
-                        }
-                    }]
-                "#
-            )
-            .unwrap()
+        let top_level_plan = result.0[0]["Plan"].clone();
+        let sub_plans = top_level_plan.get("Plans");
+        assert_eq!(top_level_plan["Node Type"], "Seq Scan");
+        assert!(
+            sub_plans.is_none(),
+            "did not expect to find a plan with multiple sub-plans"
         );
     }
 
@@ -203,41 +191,26 @@ mod tests {
         )
             .expect("SQL query failed");
 
-        assert_eq!(
-            result.0,
-            serde_json::from_str::<Value>(
-                // Note: This output can be obtained directly from postgres
-                r#"
-                    [
-                      {
-                        "Plan": {
-                          "Node Type": "Result",
-                          "Parallel Aware": false,
-                          "Async Capable": false,
-                          "One-Time Filter": "($0 = 'constvalue'::text)",
-                          "Plans": [
-                            {
-                              "Node Type": "Result",
-                              "Parent Relationship": "InitPlan",
-                              "Subplan Name": "InitPlan 1 (returns $0)",
-                              "Parallel Aware": false,
-                              "Async Capable": false
-                            },
-                            {
-                              "Node Type": "Seq Scan",
-                              "Parent Relationship": "Outer",
-                              "Parallel Aware": false,
-                              "Async Capable": false,
-                              "Relation Name": "gfs_test_table",
-                              "Alias": "gfs_test_table"
-                            }
-                          ]
-                        }
-                      }
-                    ]
-                "#
-            )
-            .unwrap()
+        let top_level_plan = result.0[0]["Plan"].clone();
+        let sub_plans = top_level_plan.get("Plans");
+        assert_eq!(top_level_plan["Node Type"], "Result");
+        assert!(
+            sub_plans.is_some(),
+            "expected a plan with multiple sub-plans"
+        );
+        assert!(
+            sub_plans
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .as_slice()
+                .into_iter()
+                .any(|plan| {
+                    plan["Node Type"] == "Result"
+                        && plan["Parent Relationship"] == "InitPlan"
+                        && plan["Subplan Name"] == "InitPlan 1 (returns $0)"
+                }),
+            "didn't find an InitPlan subplan among subplans."
         );
     }
 }

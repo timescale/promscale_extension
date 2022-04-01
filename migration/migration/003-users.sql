@@ -65,14 +65,21 @@ CALL _prom_catalog.execute_everywhere('grant_prom_reader_prom_writer',$ee$
     $$;
 $ee$);
 
-CALL _prom_catalog.execute_everywhere('grant_all_roles_to_extowner',$ee$
+CALL _prom_catalog.execute_everywhere('grant_all_roles_to_extowner',
+format(
+$ee$
     DO $$
     BEGIN
-        GRANT prom_reader TO @extowner@ WITH ADMIN OPTION;
-        GRANT prom_writer TO @extowner@ WITH ADMIN OPTION;
-        GRANT prom_maintenance TO @extowner@ WITH ADMIN OPTION;
-        GRANT prom_modifier TO @extowner@ WITH ADMIN OPTION;
-        GRANT prom_admin TO @extowner@ WITH ADMIN OPTION;
+        GRANT prom_reader TO %1$s WITH ADMIN OPTION;
+        GRANT prom_writer TO %1$s WITH ADMIN OPTION;
+        GRANT prom_maintenance TO %1$s WITH ADMIN OPTION;
+        GRANT prom_modifier TO %1$s WITH ADMIN OPTION;
+        GRANT prom_admin TO %1$s WITH ADMIN OPTION;
     END
     $$;
-$ee$);
+$ee$, CASE
+        WHEN current_setting('server_version_num')::INT < 130000 THEN quote_ident(current_user)
+        ELSE '@extowner@' -- proper quotation is handled by the pg itself
+      END
+)
+);
