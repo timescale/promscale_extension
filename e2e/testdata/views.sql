@@ -26,6 +26,6 @@ SELECT count(public.compress_chunk(i)) from public.show_chunks('prom_data.cpu_us
 \set ON_ERROR_STOP 0
 
 SET role prom_reader;
-SELECT * FROM cpu_usage ORDER BY time, series_id LIMIT 5;
-SELECT time, value, jsonb(labels), val(namespace_id) FROM cpu_usage ORDER BY time, series_id LIMIT 5;
+SELECT * FROM prom_metric.cpu_usage ORDER BY time, series_id LIMIT 5;
+SELECT time, value, prom_api.jsonb(labels), prom_api.val(namespace_id) FROM prom_metric.cpu_usage ORDER BY time, series_id LIMIT 5;
 SELECT * FROM prom_series.cpu_usage ORDER BY series_id;

@@ -39,16 +39,3 @@ CALL _prom_catalog.execute_everywhere('create_schemas', $ee$ DO $$ BEGIN
     CREATE SCHEMA IF NOT EXISTS _ps_catalog;
     GRANT USAGE ON SCHEMA _ps_catalog TO prom_reader;
 END $$ $ee$);
-
--- the promscale extension contains optimized version of some
--- of our functions and operators. To ensure the correct version of the are
--- used, _prom_ext must be before all of our other schemas in the search path
-DO $$
-DECLARE
-   new_path text;
-BEGIN
-   new_path := current_setting('search_path') || format(',%L,%L,%L,%L,%L,%L', 'ps_tag', '_prom_ext', 'prom_api', 'prom_metric', '_prom_catalog', 'ps_trace');
-   execute format('ALTER DATABASE %I SET search_path = %s', current_database(), new_path);
-   execute format('SET search_path = %s', new_path);
-END
-$$;

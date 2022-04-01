@@ -140,7 +140,7 @@ SUPPORT _prom_ext.rewrite_fn_call_to_subquery;
 CREATE OR REPLACE FUNCTION _prom_catalog.match_equals(labels prom_api.label_array, _op ps_tag.tag_op_equals)
 RETURNS boolean
 AS $func$
-    SELECT labels && label_find_key_equal(_op.tag_key, (_op.value#>>'{}'))::int[]
+    SELECT labels && _prom_catalog.label_find_key_equal(_op.tag_key, (_op.value#>>'{}'))::int[]
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE; -- do not make strict. it disables function inlining
 
@@ -153,7 +153,7 @@ CREATE OPERATOR _prom_catalog.? (
 CREATE OR REPLACE FUNCTION _prom_catalog.match_not_equals(labels prom_api.label_array, _op ps_tag.tag_op_not_equals)
 RETURNS boolean
 AS $func$
-    SELECT NOT (labels && label_find_key_not_equal(_op.tag_key, (_op.value#>>'{}'))::int[])
+    SELECT NOT (labels && _prom_catalog.label_find_key_not_equal(_op.tag_key, (_op.value#>>'{}'))::int[])
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE; -- do not make strict. it disables function inlining
 
@@ -166,7 +166,7 @@ CREATE OPERATOR _prom_catalog.? (
 CREATE OR REPLACE FUNCTION _prom_catalog.match_regexp_matches(labels prom_api.label_array, _op ps_tag.tag_op_regexp_matches)
 RETURNS boolean
 AS $func$
-    SELECT labels && label_find_key_regex(_op.tag_key, _op.value)::int[]
+    SELECT labels && _prom_catalog.label_find_key_regex(_op.tag_key, _op.value)::int[]
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE; -- do not make strict. it disables function inlining
 
@@ -179,7 +179,7 @@ CREATE OPERATOR _prom_catalog.? (
 CREATE OR REPLACE FUNCTION _prom_catalog.match_regexp_not_matches(labels prom_api.label_array, _op ps_tag.tag_op_regexp_not_matches)
 RETURNS boolean
 AS $func$
-    SELECT NOT (labels && label_find_key_not_regex(_op.tag_key, _op.value)::int[])
+    SELECT NOT (labels && _prom_catalog.label_find_key_not_regex(_op.tag_key, _op.value)::int[])
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE; -- do not make strict. it disables function inlining
 
