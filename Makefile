@@ -110,6 +110,10 @@ dist/$(RELEASE_FILE_NAME): release-builder
 .PHONY: release
 release: dist/$(RELEASE_FILE_NAME) ## Produces release artifacts based on OS_NAME, OS_VERSION, and PG_RELEASE_VERSION
 
+.PHONY: gendoc
+gendoc:
+	cargo run -p gendoc > docs/sql-api.md
+
 .PHONY: release-builder
 release-builder: dist/$(DOCKERFILE) ## Build image with the release artifact for OS_NAME, OS_VERSION, and PG_RELEASE_VERSION
 ifndef DOCKERFILE

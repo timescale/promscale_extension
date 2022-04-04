@@ -816,6 +816,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "gendoc"
+version = "0.1.0"
+dependencies = [
+ "markdown-gen",
+ "postgres",
+ "testcontainers",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1074,6 +1083,12 @@ checksum = "abb12e687cfb44aa40f41fc3978ef76448f9b6038cad6aef4259d3c095a2382e"
 dependencies = [
  "cfg-if",
 ]
+
+[[package]]
+name = "markdown-gen"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8034621d7f1258317ca1dfb9205e3925d27ee4aa2a46620a09c567daf0310562"
 
 [[package]]
 name = "matchers"

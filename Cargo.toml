@@ -1,5 +1,5 @@
 [workspace]
-members = ["e2e"]
+members = ["e2e", "gendoc"]
 
 [package]
 name = "promscale"

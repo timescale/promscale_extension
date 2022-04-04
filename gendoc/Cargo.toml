@@ -1,0 +1,9 @@
+[package]
+name = "gendoc"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+markdown-gen = "1.2.1"
+postgres = "0.19.2"
+testcontainers = "0.12.0"
