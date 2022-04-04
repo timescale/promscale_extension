@@ -81,6 +81,14 @@ jobs:
         env:
           TS_DOCKER_IMAGE: ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
 
+      - name: Check SQL Documentation
+        if: ${{ matrix.pgversion == 14 && matrix.base == 'ha' }}
+        env:
+          TS_DOCKER_IMAGE: ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
+        run: |
+          make gendoc
+          git diff --exit-code
+
   # This allows us to set a single job which must pass in GitHub's branch protection rules,
   # otherwise we have to keep updating them as we add or remove postgres versions etc.
   docker-result:

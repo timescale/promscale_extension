@@ -67,6 +67,7 @@ USER postgres
 RUN cd ../ && cargo pgx new promscale && cd promscale
 COPY Cargo.* Makefile /build/promscale/
 COPY e2e /build/promscale/e2e
+COPY gendoc/ /build/promscale/gendoc/
 RUN --mount=type=secret,uid=70,gid=70,id=AWS_ACCESS_KEY_ID --mount=type=secret,uid=70,gid=70,id=AWS_SECRET_ACCESS_KEY \
     --mount=type=cache,uid=70,gid=70,target=/build/promscale/.cargo/registry \
     [ -f "/run/secrets/AWS_ACCESS_KEY_ID" ] && export AWS_ACCESS_KEY_ID="$(cat /run/secrets/AWS_ACCESS_KEY_ID)" ; \
