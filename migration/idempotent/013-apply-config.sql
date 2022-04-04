@@ -2,23 +2,27 @@
 DO $block$
 DECLARE
     _old_search_path text;
-    _sql text;
+    _rec record;
 BEGIN
+    -- set the search_path such that pg_get_function_identity_arguments
+    -- should return fully schema qualified arguments
     EXECUTE 'SHOW search_path' INTO STRICT _old_search_path;
     SET search_path TO pg_temp;
-    FOR _sql IN
+    FOR _rec IN
     (
         -- find functions and procedures which belong to the extension
-        -- so we can revoke execute from public on them
-        SELECT format($$REVOKE ALL ON %s %I.%I(%s) FROM public$$, 
+        -- we are going to be extra paranoid on this
+        -- use both pg_depend and schema name to find said functions
+        -- and procedures. they *ought* to produce the same list, but
+        -- since this is a security measure, paranoia is worth it
+        SELECT
             CASE prokind
                 WHEN 'f' THEN 'FUNCTION'
                 WHEN 'p' THEN 'PROCEDURE'
-            END,
-            n.nspname, 
+            END as prokind,
+            n.nspname,
             k.proname,
-            pg_get_function_identity_arguments(k.oid)
-        )
+            pg_get_function_identity_arguments(k.oid) as args
         FROM pg_catalog.pg_depend d
         INNER JOIN pg_catalog.pg_extension e ON (d.refobjid = e.oid)
         INNER JOIN pg_catalog.pg_proc k ON (d.objid = k.oid)
@@ -27,10 +31,40 @@ BEGIN
         AND d.deptype = 'e'
         AND e.extname = 'promscale'
         AND k.prokind IN ('f', 'p')
-        ORDER BY n.nspname, k.proname
+        UNION
+        SELECT
+            CASE prokind
+                WHEN 'f' THEN 'FUNCTION'
+                WHEN 'p' THEN 'PROCEDURE'
+            END as prokind,
+            n.nspname,
+            k.proname,
+            pg_get_function_identity_arguments(k.oid) as args
+        FROM pg_catalog.pg_proc k
+        INNER JOIN pg_namespace n ON (k.pronamespace = n.oid)
+        WHERE k.prokind IN ('f', 'p')
+        AND n.nspname IN
+        ( '_prom_catalog'
+        , '_prom_ext'
+        , '_ps_catalog'
+        , '_ps_trace'
+        , 'prom_api'
+        , 'prom_data'
+        , 'prom_data_exemplar'
+        , 'prom_data_series'
+        , 'prom_info'
+        , 'prom_metric'
+        , 'prom_series'
+        , 'ps_tag'
+        , 'ps_trace'
+        )
+        ORDER BY nspname, proname
     )
     LOOP
-        EXECUTE _sql;
+        EXECUTE format($$REVOKE ALL ON %s %I.%I(%s) FROM public$$, _rec.prokind, _rec.nspname, _rec.proname, _rec.args);
+        -- explicitly make the func/proc owned by the current_user (superuser). if (somehow) a malicious user predefined
+        -- a func/proc that we replace, we don't want them to be able to subsequently replace the body with malicious code
+        EXECUTE format($$ALTER %s %I.%I(%s) OWNER TO %I$$, _rec.prokind, _rec.nspname, _rec.proname, _rec.args, current_user);
     END LOOP;
     EXECUTE format('SET search_path TO %s', _old_search_path);
 END;
