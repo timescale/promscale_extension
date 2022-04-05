@@ -271,7 +271,6 @@ CREATE OR REPLACE FUNCTION _prom_catalog.make_metric_table()
     AS $func$
 DECLARE
   label_id INT;
-  compressed_hypertable_name text;
 BEGIN
 
    -- Note: if the inserted metric is a view, nothing to do.
@@ -286,6 +285,13 @@ BEGIN
    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE, TRIGGER ON TABLE %I.%I TO prom_modifier', NEW.table_schema, NEW.table_name);
    EXECUTE format('CREATE UNIQUE INDEX data_series_id_time_%s ON %I.%I (series_id, time) INCLUDE (value)',
                     NEW.id, NEW.table_schema, NEW.table_name);
+  
+   --dynamically created tables are owned by our highest-privileged role, prom_admin
+   --these cannot be made part of the extension since we cannot make them config
+   --tables outside of extension upgrade/install scripts. They cannot be superuser
+   --owned without being part extension since that would prevent dump/restore from
+   --working on any environment without SU privileges (such as cloud).
+   EXECUTE format('ALTER TABLE %I.%I OWNER TO prom_admin', NEW.table_schema, NEW.table_name);
 
     IF _prom_catalog.is_timescaledb_installed() THEN
         IF _prom_catalog.is_multinode() THEN
@@ -331,8 +337,8 @@ BEGIN
    EXECUTE format('GRANT SELECT ON TABLE prom_data_series.%I TO prom_reader', NEW.table_name);
    EXECUTE format('GRANT SELECT, INSERT ON TABLE prom_data_series.%I TO prom_writer', NEW.table_name);
    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE prom_data_series.%I TO prom_modifier', NEW.table_name);
-   EXECUTE format('ALTER TABLE %I.%I OWNER TO prom_modifier', NEW.table_schema, NEW.table_name);
-   EXECUTE format('ALTER TABLE prom_data_series.%1$I OWNER TO prom_modifier', NEW.table_name);
+
+   EXECUTE format('ALTER TABLE prom_data_series.%1$I OWNER TO prom_admin', NEW.table_name);
    RETURN NEW;
 END
 $func$
@@ -835,6 +841,9 @@ $$
             PERFORM pg_advisory_xact_lock(5585198506344173278);
         END IF;
         SELECT table_name, id INTO hypertable_name, deletable_metric_id FROM _prom_catalog.metric WHERE metric_name=metric_name_to_be_dropped;
+        IF NOT FOUND THEN
+          RAISE '% is not a metric. unable to drop it.', metric_name_to_be_dropped;
+        END IF;
         RAISE NOTICE 'deleting "%" metric with metric_id as "%" and table_name as "%"', metric_name_to_be_dropped, deletable_metric_id, hypertable_name;
         EXECUTE FORMAT('DROP VIEW prom_series.%1$I;', hypertable_name);
         EXECUTE FORMAT('DROP VIEW prom_metric.%1$I;', hypertable_name);
@@ -2086,7 +2095,7 @@ BEGIN
 
     IF NOT view_exists THEN
         EXECUTE FORMAT('GRANT SELECT ON prom_series.%1$I TO prom_reader', view_name);
-        EXECUTE FORMAT('ALTER VIEW prom_series.%1$I OWNER TO prom_modifier', view_name);
+        EXECUTE FORMAT('ALTER VIEW prom_series.%1$I OWNER TO prom_admin', view_name);
     END IF;
     RETURN true;
 END
@@ -2144,7 +2153,7 @@ BEGIN
 
     IF NOT view_exists THEN
         EXECUTE FORMAT('GRANT SELECT ON prom_metric.%1$I TO prom_reader', table_name);
-        EXECUTE FORMAT('ALTER VIEW prom_metric.%1$I OWNER TO prom_modifier', table_name);
+        EXECUTE FORMAT('ALTER VIEW prom_metric.%1$I OWNER TO prom_admin', table_name);
     END IF;
 
     RETURN true;

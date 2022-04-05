@@ -380,24 +380,20 @@ DECLARE
 BEGIN
     FOR _rec IN
     (
-        SELECT
-            CASE k.relkind
-                WHEN 'r' THEN 'TABLE'
-                WHEN 'v' THEN 'VIEW'
-            END AS typ,
-            n.nspname,
-            k.relname
-        FROM pg_class k
-        INNER JOIN pg_namespace n ON (k.relnamespace = n.oid)
-        WHERE k.relkind in ('r', 'v')
-        AND n.nspname in ('prom_metric', 'prom_series', 'prom_data_series', 'prom_data')
+        SELECT m.*
+        FROM _prom_catalog.metric m
+        WHERE table_schema = 'prom_data'
+        ORDER BY m.table_schema, m.table_name
     )
     LOOP
-        EXECUTE format($sql$ALTER %s %I.%I OWNER TO %I$sql$, _rec.typ, _rec.nspname, _rec.relname, current_user);
+        EXECUTE format($sql$ALTER TABLE %I.%I OWNER TO prom_admin $sql$, _rec.table_schema, _rec.table_name);
+        EXECUTE format($sql$ALTER TABLE prom_data_series.%I OWNER TO prom_admin $sql$, _rec.series_table);
+        EXECUTE format($sql$ALTER VIEW prom_series.%I OWNER TO prom_admin $sql$, _rec.series_table);
+        EXECUTE format($sql$ALTER VIEW prom_metric.%I OWNER TO prom_admin $sql$, _rec.table_name);
    END LOOP;
 END
-$block$
-;
+$block$;
+
 
 DO $block$
 BEGIN
