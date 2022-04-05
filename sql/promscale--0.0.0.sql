@@ -431,8 +431,10 @@ BEGIN
     CREATE TABLE _ps_catalog.migration(
       name TEXT NOT NULL PRIMARY KEY
     , applied_at_version TEXT
+    , body TEXT
     , applied_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT clock_timestamp()
     );
+    CREATE UNIQUE INDEX ON _ps_catalog.migration(name);
     PERFORM pg_catalog.pg_extension_config_dump('_ps_catalog.migration', '');
 
     -- Bring migrations table up to speed
