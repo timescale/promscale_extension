@@ -282,7 +282,7 @@ BEGIN
                     NEW.table_schema, NEW.table_name);
    EXECUTE format('GRANT SELECT ON TABLE %I.%I TO prom_reader', NEW.table_schema, NEW.table_name);
    EXECUTE format('GRANT SELECT, INSERT ON TABLE %I.%I TO prom_writer', NEW.table_schema, NEW.table_name);
-   EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE, TRIGGER ON TABLE %I.%I TO prom_modifier', NEW.table_schema, NEW.table_name);
+   EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I.%I TO prom_modifier', NEW.table_schema, NEW.table_name);
    EXECUTE format('CREATE UNIQUE INDEX data_series_id_time_%s ON %I.%I (series_id, time) INCLUDE (value)',
                     NEW.id, NEW.table_schema, NEW.table_name);
   
@@ -3085,7 +3085,7 @@ BEGIN
     END IF;
 END
 $func$ LANGUAGE PLPGSQL;
-GRANT EXECUTE ON PROCEDURE prom_api.add_prom_node(TEXT, BOOLEAN) TO prom_writer;
+-- add_prom_node is a superuser only function
 
 CREATE OR REPLACE FUNCTION _prom_catalog.insert_metric_row(
     metric_table name,
