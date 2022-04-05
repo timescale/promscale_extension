@@ -1,5 +1,13 @@
 DROP TABLE public.prom_schema_migrations;
 
+REVOKE EXECUTE ON FUNCTION ps_trace.delete_all_traces() FROM prom_writer;
+REVOKE EXECUTE ON PROCEDURE prom_api.add_prom_node(TEXT, BOOLEAN) FROM prom_writer;
+
+DROP OPERATOR IF EXISTS prom_api.!== (prom_api.label_key, prom_api.pattern);
+DROP OPERATOR IF EXISTS prom_api.!=~ (prom_api.label_key, prom_api.pattern);
+DROP OPERATOR IF EXISTS prom_api.== (prom_api.label_key, prom_api.pattern);
+DROP OPERATOR IF EXISTS prom_api.==~ (prom_api.label_key, prom_api.pattern);
+
 DO $block$
 DECLARE
     _rec record;
@@ -351,6 +359,7 @@ END
 $block$
 ;
 
+--tracing hypertables
 DO $block$
 DECLARE
     _rec record;
@@ -372,8 +381,7 @@ END;
 $block$
 ;
 
--- metric related tables and views that are dynamically generated
--- need to be discovered and ownership transferred
+-- metric tables / views
 DO $block$
 DECLARE
     _rec record;
@@ -394,7 +402,25 @@ BEGIN
 END
 $block$;
 
+-- exemplar tables
+ DO $block$
+ DECLARE
+     _rec record;
+ BEGIN
+     FOR _rec IN
+     (
+         SELECT e.table_name
+         FROM _prom_catalog.exemplar e
+         ORDER BY e.table_name
+     )
+     LOOP
+         EXECUTE format($sql$ALTER TABLE prom_data_exemplar.%I OWNER TO %I$sql$, _rec.table_name, current_user);
+     END LOOP;
+ END;
+ $block$
+ ;
 
+ -- migration table
 DO $block$
 BEGIN
     CREATE TABLE _ps_catalog.migration(
