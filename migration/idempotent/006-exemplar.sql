@@ -51,10 +51,22 @@ BEGIN
                    table_name_fetched, table_name_fetched);
     INSERT INTO _prom_catalog.exemplar (metric_name, table_name)
         VALUES (metric_name_fetched, table_name_fetched);
+
+    --dynamically created tables are owned by our highest-privileged role, prom_admin
+    --these cannot be made part of the extension since we cannot make them config
+    --tables outside of extension upgrade/install scripts. They cannot be superuser
+    --owned without being part extension since that would prevent dump/restore from
+    --working on any environment without SU privileges (such as cloud).
+    EXECUTE format('ALTER TABLE prom_data_exemplar.%I OWNER TO prom_admin', table_name_fetched);
+
     RETURN TRUE;
 END;
 $$
-LANGUAGE PLPGSQL;
+LANGUAGE PLPGSQL VOLATILE
+--need sec definer to assign ownership to prom_admin
+SECURITY DEFINER
+SET search_path = pg_temp;
+REVOKE ALL ON FUNCTION _prom_catalog.create_exemplar_table_if_not_exists(TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION _prom_catalog.create_exemplar_table_if_not_exists(TEXT) TO prom_writer;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.insert_exemplar_row(
