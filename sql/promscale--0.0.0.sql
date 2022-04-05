@@ -414,7 +414,7 @@ $block$;
          ORDER BY e.table_name
      )
      LOOP
-         EXECUTE format($sql$ALTER TABLE prom_data_exemplar.%I OWNER TO %I$sql$, _rec.table_name, current_user);
+         EXECUTE format($sql$ALTER TABLE prom_data_exemplar.%I OWNER TO prom_admin $sql$, _rec.table_name);
      END LOOP;
  END;
  $block$
