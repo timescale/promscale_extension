@@ -66,13 +66,13 @@ clean: ## Clean up latest build
 .PHONY: dependencies
 dependencies: ## Used in docker build to improve build caching
 	# both of these steps are also run in the `package` target, so we run them here to provide better caching
-	cargo pgx schema pg${PG_BUILD_VERSION} --out sql/promscale--${EXT_VERSION}.sql
+	cargo pgx schema pg${PG_BUILD_VERSION} --out sql/promscale--${EXT_VERSION}.sql --release
 	cargo pgx package --pg-config ${PG_CONFIG}
 	rm sql/promscale--${EXT_VERSION}.sql
 
 .PHONY: package
 package: ## Generate extension artifacts for packaging
-	cargo pgx schema pg${PG_BUILD_VERSION} --out sql/promscale--${EXT_VERSION}.sql
+	cargo pgx schema pg${PG_BUILD_VERSION} --out sql/promscale--${EXT_VERSION}.sql --release
 	bash create-upgrade-symlinks.sh
 	cargo pgx package --pg-config ${PG_CONFIG}
 
