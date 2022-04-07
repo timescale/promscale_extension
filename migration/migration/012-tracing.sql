@@ -115,9 +115,9 @@ GRANT USAGE ON SEQUENCE _ps_trace.schema_url_id_seq TO prom_writer;
 CREATE TABLE IF NOT EXISTS _ps_trace.instrumentation_lib
 (
     id bigint NOT NULL GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    schema_url_id BIGINT REFERENCES _ps_trace.schema_url(id),
     name text NOT NULL,
     version text NOT NULL,
-    schema_url_id BIGINT REFERENCES _ps_trace.schema_url(id),
     UNIQUE(name, version, schema_url_id)
 );
 GRANT SELECT ON TABLE _ps_trace.instrumentation_lib TO prom_reader;
@@ -133,18 +133,18 @@ CREATE TABLE IF NOT EXISTS _ps_trace.span
     start_time timestamptz NOT NULL,
     end_time timestamptz NOT NULL,
     duration_ms double precision NOT NULL GENERATED ALWAYS AS ( extract(epoch from (end_time - start_time)) * 1000.0 ) STORED,
-    trace_state text CHECK (trace_state != ''),
-    span_tags ps_trace.tag_map NOT NULL,
-    dropped_tags_count int NOT NULL default 0,
-    event_time tstzrange default NULL,
+    resource_schema_url_id BIGINT,
+    instrumentation_lib_id bigint,
     dropped_events_count int NOT NULL default 0,
     dropped_link_count int NOT NULL default 0,
-    status_code ps_trace.status_code NOT NULL,
-    status_message text,
-    instrumentation_lib_id bigint,
-    resource_tags ps_trace.tag_map NOT NULL,
+    dropped_tags_count int NOT NULL default 0,
     resource_dropped_tags_count int NOT NULL default 0,
-    resource_schema_url_id BIGINT,
+    status_code ps_trace.status_code NOT NULL,
+    trace_state text CHECK (trace_state != ''),
+    event_time tstzrange default NULL,
+    status_message text,
+    resource_tags ps_trace.tag_map NOT NULL,
+    span_tags ps_trace.tag_map NOT NULL,
     PRIMARY KEY (span_id, trace_id, start_time),
     CHECK (start_time <= end_time)
 );
@@ -158,13 +158,13 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.span TO prom_writer;
 
 CREATE TABLE IF NOT EXISTS _ps_trace.event
 (
-    time timestamptz NOT NULL,
     trace_id ps_trace.trace_id NOT NULL,
+    time timestamptz NOT NULL,
     span_id bigint NOT NULL CHECK (span_id != 0),
     event_nbr int NOT NULL DEFAULT 0,
+    dropped_tags_count int NOT NULL DEFAULT 0
     name text NOT NULL,
     tags ps_trace.tag_map NOT NULL,
-    dropped_tags_count int NOT NULL DEFAULT 0
 );
 CREATE INDEX ON _ps_trace.event USING GIN (tags jsonb_path_ops);
 CREATE INDEX ON _ps_trace.event USING BTREE (trace_id, span_id);
@@ -174,14 +174,14 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.event TO prom_writer;
 CREATE TABLE IF NOT EXISTS _ps_trace.link
 (
     trace_id ps_trace.trace_id NOT NULL,
-    span_id bigint NOT NULL CHECK (span_id != 0),
-    span_start_time timestamptz NOT NULL,
     linked_trace_id ps_trace.trace_id NOT NULL,
+    span_start_time timestamptz NOT NULL,
     linked_span_id bigint NOT NULL CHECK (linked_span_id != 0),
+    span_id bigint NOT NULL CHECK (span_id != 0),
     link_nbr int NOT NULL DEFAULT 0,
+    dropped_tags_count int NOT NULL DEFAULT 0
     trace_state text CHECK (trace_state != ''),
     tags ps_trace.tag_map NOT NULL,
-    dropped_tags_count int NOT NULL DEFAULT 0
 );
 CREATE INDEX ON _ps_trace.link USING BTREE (trace_id, span_id);
 CREATE INDEX ON _ps_trace.link USING GIN (tags jsonb_path_ops);
