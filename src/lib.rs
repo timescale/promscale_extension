@@ -148,6 +148,6 @@ pub mod pg_test {
 
     pub fn postgresql_conf_options() -> Vec<&'static str> {
         // return any postgresql.conf settings that are required for your tests
-        vec!["search_path = 'public, _prom_ext'"]
+        vec!["search_path = 'public, _prom_ext, ps_trace'"]
     }
 }

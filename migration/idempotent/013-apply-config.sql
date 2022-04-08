@@ -1,13 +1,8 @@
 
 DO $block$
 DECLARE
-    _old_search_path text;
     _rec record;
 BEGIN
-    -- set the search_path such that pg_get_function_identity_arguments
-    -- should return fully schema qualified arguments
-    EXECUTE 'SHOW search_path' INTO STRICT _old_search_path;
-    SET search_path TO pg_temp;
     FOR _rec IN
     (
         -- find functions and procedures which belong to the extension
@@ -66,7 +61,6 @@ BEGIN
         -- a func/proc that we replace, we don't want them to be able to subsequently replace the body with malicious code
         EXECUTE format($$ALTER %s %I.%I(%s) OWNER TO %I$$, _rec.prokind, _rec.nspname, _rec.proname, _rec.args, current_user);
     END LOOP;
-    EXECUTE format('SET search_path TO %s', _old_search_path);
 END;
 $block$;
 
@@ -103,7 +97,6 @@ GRANT EXECUTE ON FUNCTION _prom_ext.prom_delta(TIMESTAMPTZ, TIMESTAMPTZ, BIGINT,
 GRANT EXECUTE ON FUNCTION _prom_ext.prom_increase(TIMESTAMPTZ, TIMESTAMPTZ, BIGINT, BIGINT, TIMESTAMPTZ, DOUBLE PRECISION) TO prom_reader;
 GRANT EXECUTE ON FUNCTION _prom_ext.prom_rate(TIMESTAMPTZ, TIMESTAMPTZ, BIGINT, BIGINT, TIMESTAMPTZ, DOUBLE PRECISION) TO prom_reader;
 GRANT EXECUTE ON FUNCTION _prom_ext.vector_selector(TIMESTAMPTZ, TIMESTAMPTZ, BIGINT, BIGINT, TIMESTAMPTZ, DOUBLE PRECISION) TO prom_reader;
-GRANT EXECUTE ON FUNCTION _prom_ext.update_tsprom_metadata(TEXT, TEXT, BOOLEAN) TO prom_writer;
 GRANT EXECUTE ON FUNCTION _prom_ext.rewrite_fn_call_to_subquery(internal) TO prom_reader;
 GRANT EXECUTE ON PROCEDURE _prom_catalog.execute_everywhere(text, text, boolean) TO prom_admin;
 GRANT EXECUTE ON PROCEDURE _prom_catalog.update_execute_everywhere_entry(text, text, boolean) TO prom_admin;

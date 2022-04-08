@@ -205,7 +205,6 @@ DECLARE
     _timescaledb_minor_version int;
     _is_compression_available boolean = false;
     _is_multinode boolean = false;
-    _saved_search_path text;
 BEGIN
     /*
         These functions do not exist until the
@@ -253,12 +252,6 @@ BEGIN
 
     IF _is_timescaledb_installed THEN
         IF _is_multinode THEN
-            --need to clear the search path while creating distributed
-            --hypertables because otherwise the datanodes don't find
-            --the right column types since type names are not schema
-            --qualified if in search path.
-            _saved_search_path := current_setting('search_path');
-            SET search_path = pg_temp;
             PERFORM public.create_distributed_hypertable(
                 '_ps_trace.span'::regclass,
                 'start_time'::name,
@@ -283,7 +276,6 @@ BEGIN
                 chunk_time_interval=>'07:59:48.644258'::interval,
                 create_default_indexes=>false
             );
-            execute format('SET search_path = %s', _saved_search_path);
         ELSE -- not multinode
             PERFORM public.create_hypertable(
                 '_ps_trace.span'::regclass,

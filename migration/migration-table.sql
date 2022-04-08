@@ -5,7 +5,11 @@ $migration_table$
         _current_user_id oid = NULL;
         _ps_catalog_schema_owner_id oid = NULL;
         _migration_table_owner_id oid = NULL;
+        _old_search_path text;
     BEGIN
+        EXECUTE 'SHOW search_path' INTO STRICT _old_search_path;
+        SET search_path TO pg_catalog;
+
         SELECT pg_user.usesysid
         INTO STRICT _current_user_id
         FROM pg_catalog.pg_user
@@ -52,5 +56,7 @@ $migration_table$
             );
             CREATE UNIQUE INDEX ON _ps_catalog.migration(name);
         END IF;
+
+        EXECUTE format('SET search_path TO %s', _old_search_path);
     END;
 $migration_table$;

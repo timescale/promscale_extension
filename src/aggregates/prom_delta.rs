@@ -101,7 +101,7 @@ unsafe extern "C" fn prom_delta_final_wrapper(fcinfo: pg_sys::FunctionCallInfo) 
 // for proper behavior the input must be ORDER BY sample_time
 extension_sql!(
     r#"
-CREATE OR REPLACE AGGREGATE @extschema@.prom_delta(
+CREATE OR REPLACE AGGREGATE _prom_ext.prom_delta(
     lowest_time TIMESTAMPTZ,
     greatest_time TIMESTAMPTZ,
     step_size BIGINT,
@@ -109,9 +109,9 @@ CREATE OR REPLACE AGGREGATE @extschema@.prom_delta(
     sample_time TIMESTAMPTZ,
     sample_value DOUBLE PRECISION)
 (
-    sfunc=@extschema@.prom_delta_transition,
+    sfunc=_prom_ext.prom_delta_transition,
     stype=internal,
-    finalfunc=@extschema@.prom_extrapolate_final
+    finalfunc=_prom_ext.prom_extrapolate_final
 );
 "#,
     name = "create_prom_delta_aggregate",
