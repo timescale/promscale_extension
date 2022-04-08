@@ -688,7 +688,7 @@ BEGIN
                 FROM _timescaledb_catalog.hypertable
                 WHERE format('%I.%I', schema_name, table_name)::regclass=table_name_input)
         THEN
-                RETURN (SELECT row_estimate FROM hypertable_approximate_row_count(table_name_input));
+                RETURN (SELECT public.approximate_row_count(table_name_input));
         END IF;
         RETURN (SELECT reltuples::BIGINT FROM pg_class WHERE oid=table_name_input);
     END IF;
