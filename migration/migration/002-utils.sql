@@ -1,5 +1,5 @@
 --perms for schema will be addressed later;
-CREATE SCHEMA IF NOT EXISTS _prom_catalog;
+CREATE SCHEMA _prom_catalog;
 
 --table to save commands so they can be run when adding new nodes
 CREATE TABLE _prom_catalog.remote_commands(
@@ -34,6 +34,7 @@ $func$ LANGUAGE PLPGSQL;
 REVOKE ALL ON PROCEDURE _prom_catalog.execute_everywhere(text, text, boolean) FROM PUBLIC;
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.update_execute_everywhere_entry(command_key text, command TEXT, transactional BOOLEAN = true)
+SET search_path = pg_catalog
 AS $func$
 BEGIN
     UPDATE _prom_catalog.remote_commands

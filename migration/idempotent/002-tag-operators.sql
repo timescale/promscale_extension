@@ -2,7 +2,9 @@
 -- jsonb_path_exists
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION ps_tag.tag_op_jsonb_path_exists(_tag_key text, _value jsonpath)
-RETURNS ps_tag.tag_op_jsonb_path_exists AS $func$
+    RETURNS ps_tag.tag_op_jsonb_path_exists
+    -- Note: no explicit `SET SCHEMA` because we want this function to be inlined
+AS $func$
     SELECT ROW(_tag_key, _value)::ps_tag.tag_op_jsonb_path_exists
 $func$ LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_tag.tag_op_jsonb_path_exists(text, jsonpath) TO prom_reader;
@@ -25,7 +27,9 @@ $do$;
 -- regexp_matches
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION ps_tag.tag_op_regexp_matches(_tag_key text, _value text)
-RETURNS ps_tag.tag_op_regexp_matches AS $func$
+    RETURNS ps_tag.tag_op_regexp_matches
+    -- Note: no explicit `SET SCHEMA` because we want this function to be inlined
+AS $func$
     SELECT ROW(_tag_key, _value)::ps_tag.tag_op_regexp_matches
 $func$ LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_tag.tag_op_regexp_matches(text, text) TO prom_reader;
@@ -48,7 +52,9 @@ $do$;
 -- regexp_not_matches
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION ps_tag.tag_op_regexp_not_matches(_tag_key text, _value text)
-RETURNS ps_tag.tag_op_regexp_not_matches AS $func$
+    RETURNS ps_tag.tag_op_regexp_not_matches
+    -- Note: no explicit `SET SCHEMA` because we want this function to be inlined
+AS $func$
     SELECT ROW(_tag_key, _value)::ps_tag.tag_op_regexp_not_matches
 $func$ LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_tag.tag_op_regexp_not_matches(text, text) TO prom_reader;
@@ -71,8 +77,10 @@ $do$;
 -- equals
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION ps_tag.tag_op_equals_text(_tag_key text, _value text)
-RETURNS ps_tag.tag_op_equals AS $func$
-    SELECT ROW(_tag_key, to_jsonb(_value))::ps_tag.tag_op_equals
+    RETURNS ps_tag.tag_op_equals
+    -- Note: no explicit `SET SCHEMA` because we want this function to be inlined
+AS $func$
+    SELECT ROW(_tag_key, pg_catalog.to_jsonb(_value))::ps_tag.tag_op_equals
 $func$ LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_tag.tag_op_equals_text(text, text) TO prom_reader;
 COMMENT ON FUNCTION ps_tag.tag_op_equals_text(text, text) IS $$This function supports the == operator.$$;
@@ -91,8 +99,10 @@ END;
 $do$;
 
 CREATE OR REPLACE FUNCTION ps_tag.tag_op_equals(_tag_key text, _value anyelement)
-RETURNS ps_tag.tag_op_equals AS $func$
-    SELECT ROW(_tag_key, to_jsonb(_value))::ps_tag.tag_op_equals
+    RETURNS ps_tag.tag_op_equals
+    -- Note: no explicit `SET SCHEMA` because we want this function to be inlined
+AS $func$
+    SELECT ROW(_tag_key, pg_catalog.to_jsonb(_value))::ps_tag.tag_op_equals
 $func$ LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_tag.tag_op_equals(text, anyelement) TO prom_reader;
 COMMENT ON FUNCTION ps_tag.tag_op_equals(text, anyelement) IS $$This function supports the == operator.$$;
@@ -114,8 +124,10 @@ $do$;
 -- not_equals
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION ps_tag.tag_op_not_equals_text(_tag_key text, _value text)
-RETURNS ps_tag.tag_op_not_equals AS $func$
-    SELECT ROW(_tag_key, to_jsonb(_value))::ps_tag.tag_op_not_equals
+    RETURNS ps_tag.tag_op_not_equals
+    -- Note: no explicit `SET SCHEMA` because we want this function to be inlined
+AS $func$
+    SELECT ROW(_tag_key, pg_catalog.to_jsonb(_value))::ps_tag.tag_op_not_equals
 $func$ LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_tag.tag_op_not_equals_text(text, text) TO prom_reader;
 COMMENT ON FUNCTION ps_tag.tag_op_not_equals_text(text, text) IS $$This function supports the !== operator.$$;
@@ -134,8 +146,10 @@ END;
 $do$;
 
 CREATE OR REPLACE FUNCTION ps_tag.tag_op_not_equals(_tag_key text, _value anyelement)
-RETURNS ps_tag.tag_op_not_equals AS $func$
-    SELECT ROW(_tag_key, to_jsonb(_value))::ps_tag.tag_op_not_equals
+    RETURNS ps_tag.tag_op_not_equals
+    -- Note: no explicit `SET SCHEMA` because we want this function to be inlined
+AS $func$
+    SELECT ROW(_tag_key, pg_catalog.to_jsonb(_value))::ps_tag.tag_op_not_equals
 $func$ LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_tag.tag_op_not_equals(text, anyelement) TO prom_reader;
 COMMENT ON FUNCTION ps_tag.tag_op_not_equals(text, anyelement) IS $$This function supports the !== operator.$$;
@@ -157,8 +171,10 @@ $do$;
 -- less_than
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION ps_tag.tag_op_less_than_text(_tag_key text, _value text)
-RETURNS ps_tag.tag_op_less_than AS $func$
-    SELECT ROW(_tag_key, to_jsonb(_value))::ps_tag.tag_op_less_than
+    RETURNS ps_tag.tag_op_less_than
+    -- Note: no explicit `SET SCHEMA` because we want this function to be inlined
+AS $func$
+    SELECT ROW(_tag_key, pg_catalog.to_jsonb(_value))::ps_tag.tag_op_less_than
 $func$ LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_tag.tag_op_less_than_text(text, text) TO prom_reader;
 COMMENT ON FUNCTION ps_tag.tag_op_less_than_text(text, text) IS $$This function supports the #< operator.$$;
@@ -177,8 +193,10 @@ END;
 $do$;
 
 CREATE OR REPLACE FUNCTION ps_tag.tag_op_less_than(_tag_key text, _value anyelement)
-RETURNS ps_tag.tag_op_less_than AS $func$
-    SELECT ROW(_tag_key, to_jsonb(_value))::ps_tag.tag_op_less_than
+    RETURNS ps_tag.tag_op_less_than
+    -- Note: no explicit `SET SCHEMA` because we want this function to be inlined
+AS $func$
+    SELECT ROW(_tag_key, pg_catalog.to_jsonb(_value))::ps_tag.tag_op_less_than
 $func$ LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_tag.tag_op_less_than(text, anyelement) TO prom_reader;
 COMMENT ON FUNCTION ps_tag.tag_op_less_than(text, anyelement) IS $$This function supports the #< operator.$$;
@@ -200,8 +218,10 @@ $do$;
 -- less_than_or_equal
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION ps_tag.tag_op_less_than_or_equal_text(_tag_key text, _value text)
-RETURNS ps_tag.tag_op_less_than_or_equal AS $func$
-    SELECT ROW(_tag_key, to_jsonb(_value))::ps_tag.tag_op_less_than_or_equal
+    RETURNS ps_tag.tag_op_less_than_or_equal
+    -- Note: no explicit `SET SCHEMA` because we want this function to be inlined
+AS $func$
+    SELECT ROW(_tag_key, pg_catalog.to_jsonb(_value))::ps_tag.tag_op_less_than_or_equal
 $func$ LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_tag.tag_op_less_than_or_equal_text(text, text) TO prom_reader;
 COMMENT ON FUNCTION ps_tag.tag_op_less_than_or_equal_text(text, text) IS $$This function supports the #<= operator.$$;
@@ -220,8 +240,10 @@ END;
 $do$;
 
 CREATE OR REPLACE FUNCTION ps_tag.tag_op_less_than_or_equal(_tag_key text, _value anyelement)
-RETURNS ps_tag.tag_op_less_than_or_equal AS $func$
-    SELECT ROW(_tag_key, to_jsonb(_value))::ps_tag.tag_op_less_than_or_equal
+    RETURNS ps_tag.tag_op_less_than_or_equal
+    -- Note: no explicit `SET SCHEMA` because we want this function to be inlined
+AS $func$
+    SELECT ROW(_tag_key, pg_catalog.to_jsonb(_value))::ps_tag.tag_op_less_than_or_equal
 $func$ LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_tag.tag_op_less_than_or_equal(text, anyelement) TO prom_reader;
 COMMENT ON FUNCTION ps_tag.tag_op_less_than_or_equal IS $$This function supports the #<= operator.$$;
@@ -243,8 +265,10 @@ $do$;
 -- greater_than
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION ps_tag.tag_op_greater_than_text(_tag_key text, _value text)
-RETURNS ps_tag.tag_op_greater_than AS $func$
-    SELECT ROW(_tag_key, to_jsonb(_value))::ps_tag.tag_op_greater_than
+    RETURNS ps_tag.tag_op_greater_than
+    -- Note: no explicit `SET SCHEMA` because we want this function to be inlined
+AS $func$
+    SELECT ROW(_tag_key, pg_catalog.to_jsonb(_value))::ps_tag.tag_op_greater_than
 $func$ LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_tag.tag_op_greater_than_text(text, text) TO prom_reader;
 COMMENT ON FUNCTION ps_tag.tag_op_greater_than_text(text, text) IS $$This function supports the #> operator.$$;
@@ -263,8 +287,10 @@ END;
 $do$;
 
 CREATE OR REPLACE FUNCTION ps_tag.tag_op_greater_than(_tag_key text, _value anyelement)
-RETURNS ps_tag.tag_op_greater_than AS $func$
-    SELECT ROW(_tag_key, to_jsonb(_value))::ps_tag.tag_op_greater_than
+    RETURNS ps_tag.tag_op_greater_than
+    -- Note: no explicit `SET SCHEMA` because we want this function to be inlined
+AS $func$
+    SELECT ROW(_tag_key, pg_catalog.to_jsonb(_value))::ps_tag.tag_op_greater_than
 $func$ LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_tag.tag_op_greater_than(text, anyelement) TO prom_reader;
 COMMENT ON FUNCTION ps_tag.tag_op_greater_than(text, anyelement) IS $$This function supports the #> operator.$$;
@@ -286,8 +312,10 @@ $do$;
 -- greater_than_or_equal
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION ps_tag.tag_op_greater_than_or_equal_text(_tag_key text, _value text)
-RETURNS ps_tag.tag_op_greater_than_or_equal AS $func$
-    SELECT ROW(_tag_key, to_jsonb(_value))::ps_tag.tag_op_greater_than_or_equal
+    RETURNS ps_tag.tag_op_greater_than_or_equal
+    -- Note: no explicit `SET SCHEMA` because we want this function to be inlined
+AS $func$
+    SELECT ROW(_tag_key, pg_catalog.to_jsonb(_value))::ps_tag.tag_op_greater_than_or_equal
 $func$ LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_tag.tag_op_greater_than_or_equal_text(text, text) TO prom_reader;
 COMMENT ON FUNCTION ps_tag.tag_op_greater_than_or_equal_text(text, text) IS $$This function supports the #>= operator.$$;
@@ -306,8 +334,10 @@ END;
 $do$;
 
 CREATE OR REPLACE FUNCTION ps_tag.tag_op_greater_than_or_equal(_tag_key text, _value anyelement)
-RETURNS ps_tag.tag_op_greater_than_or_equal AS $func$
-    SELECT ROW(_tag_key, to_jsonb(_value))::ps_tag.tag_op_greater_than_or_equal
+    RETURNS ps_tag.tag_op_greater_than_or_equal
+    -- Note: no explicit `SET SCHEMA` because we want this function to be inlined
+AS $func$
+    SELECT ROW(_tag_key, pg_catalog.to_jsonb(_value))::ps_tag.tag_op_greater_than_or_equal
 $func$ LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_tag.tag_op_greater_than_or_equal(text, anyelement) TO prom_reader;
 COMMENT ON FUNCTION ps_tag.tag_op_greater_than_or_equal IS $$This function supports the #>= operator.$$;

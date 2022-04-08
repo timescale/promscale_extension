@@ -1,5 +1,7 @@
 CREATE OR REPLACE FUNCTION _prom_catalog.get_exemplar_label_key_positions(metric_name TEXT)
-RETURNS JSON AS
+RETURNS JSON
+SET search_path = pg_catalog
+AS
 $$
     SELECT json_object_agg(row.key, row.position)
     FROM (
@@ -18,7 +20,11 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_exemplar_label_key_positions(TEXT) T
 -- must be called after the metric is created in _prom_catalog.metric as it utilizes the table_name
 -- from the metric table. It returns true if the table was created.
 CREATE OR REPLACE FUNCTION _prom_catalog.create_exemplar_table_if_not_exists(metric_name TEXT)
-RETURNS BOOLEAN
+    RETURNS BOOLEAN
+    --need sec definer to assign ownership to prom_admin
+    SECURITY DEFINER
+    VOLATILE
+    SET search_path = pg_catalog
 AS
 $$
 DECLARE
@@ -62,10 +68,7 @@ BEGIN
     RETURN TRUE;
 END;
 $$
-LANGUAGE PLPGSQL VOLATILE
---need sec definer to assign ownership to prom_admin
-SECURITY DEFINER
-SET search_path = pg_temp;
+LANGUAGE PLPGSQL;
 REVOKE ALL ON FUNCTION _prom_catalog.create_exemplar_table_if_not_exists(TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION _prom_catalog.create_exemplar_table_if_not_exists(TEXT) TO prom_writer;
 
@@ -75,7 +78,10 @@ CREATE OR REPLACE FUNCTION _prom_catalog.insert_exemplar_row(
     series_id_array BIGINT[],
     exemplar_label_values_array prom_api.label_value_array[],
     value_array DOUBLE PRECISION[]
-) RETURNS BIGINT AS
+)
+RETURNS BIGINT
+SET search_path = pg_catalog
+AS
 $$
 DECLARE
     num_rows BIGINT;

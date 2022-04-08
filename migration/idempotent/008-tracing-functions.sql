@@ -4,64 +4,72 @@
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION ps_trace.span_tag_type()
 RETURNS ps_trace.tag_type
+-- Note: no explicit `SET SCHEMA` because we want this function to be inlined
 AS $sql$
-    SELECT (1<<0)::smallint::ps_trace.tag_type
+    SELECT (1 OPERATOR(pg_catalog.<<) 0)::smallint::ps_trace.tag_type
 $sql$
 LANGUAGE SQL IMMUTABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.span_tag_type() TO prom_reader;
 
 CREATE OR REPLACE FUNCTION ps_trace.resource_tag_type()
 RETURNS ps_trace.tag_type
+-- Note: no explicit `SET SCHEMA` because we want this function to be inlined
 AS $sql$
-    SELECT (1<<1)::smallint::ps_trace.tag_type
+    SELECT (1 OPERATOR(pg_catalog.<<) 1)::smallint::ps_trace.tag_type
 $sql$
 LANGUAGE SQL IMMUTABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.resource_tag_type() TO prom_reader;
 
 CREATE OR REPLACE FUNCTION ps_trace.event_tag_type()
 RETURNS ps_trace.tag_type
+-- Note: no explicit `SET SCHEMA` because we want this function to be inlined
 AS $sql$
-    SELECT (1<<2)::smallint::ps_trace.tag_type
+    SELECT (1 OPERATOR(pg_catalog.<<) 2)::smallint::ps_trace.tag_type
 $sql$
 LANGUAGE SQL IMMUTABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.event_tag_type() TO prom_reader;
 
 CREATE OR REPLACE FUNCTION ps_trace.link_tag_type()
 RETURNS ps_trace.tag_type
+-- Note: no explicit `SET SCHEMA` because we want this function to be inlined
 AS $sql$
-    SELECT (1<<3)::smallint::ps_trace.tag_type
+    SELECT (1 OPERATOR(pg_catalog.<<) 3)::smallint::ps_trace.tag_type
 $sql$
 LANGUAGE SQL IMMUTABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.link_tag_type() TO prom_reader;
 
 CREATE OR REPLACE FUNCTION ps_trace.is_span_tag_type(_tag_type ps_trace.tag_type)
 RETURNS BOOLEAN
+-- Note: no explicit `SET SCHEMA` because we want this function to be inlined
 AS $sql$
-    SELECT _tag_type & ps_trace.span_tag_type() = ps_trace.span_tag_type()
+    SELECT _tag_type OPERATOR(pg_catalog.&) ps_trace.span_tag_type() OPERATOR(pg_catalog.=) ps_trace.span_tag_type()
 $sql$
 LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.is_span_tag_type(ps_trace.tag_type) TO prom_reader;
 
 CREATE OR REPLACE FUNCTION ps_trace.is_resource_tag_type(_tag_type ps_trace.tag_type)
 RETURNS BOOLEAN
+-- Note: no explicit `SET SCHEMA` because we want this function to be inlined
 AS $sql$
-    SELECT _tag_type & ps_trace.resource_tag_type() = ps_trace.resource_tag_type()
+    SELECT _tag_type OPERATOR(pg_catalog.&) ps_trace.resource_tag_type() OPERATOR(pg_catalog.=) ps_trace.resource_tag_type()
 $sql$
 LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.is_resource_tag_type(ps_trace.tag_type) TO prom_reader;
 
 CREATE OR REPLACE FUNCTION ps_trace.is_event_tag_type(_tag_type ps_trace.tag_type)
 RETURNS BOOLEAN
+-- Note: no explicit `SET SCHEMA` because we want this function to be inlined
 AS $sql$
-    SELECT _tag_type & ps_trace.event_tag_type() = ps_trace.event_tag_type()
+    SELECT _tag_type OPERATOR(pg_catalog.&) ps_trace.event_tag_type() OPERATOR(pg_catalog.=) ps_trace.event_tag_type()
 $sql$
 LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.is_event_tag_type(ps_trace.tag_type) TO prom_reader;
 
 CREATE OR REPLACE FUNCTION ps_trace.is_link_tag_type(_tag_type ps_trace.tag_type)
 RETURNS BOOLEAN
+-- Note: no explicit `SET SCHEMA` because we want this function to be inlined
 AS $sql$
-    SELECT _tag_type & ps_trace.link_tag_type() = ps_trace.link_tag_type()
+    SELECT _tag_type OPERATOR(pg_catalog.&) ps_trace.link_tag_type() OPERATOR(pg_catalog.=) ps_trace.link_tag_type()
 $sql$
 LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.is_link_tag_type(ps_trace.tag_type) TO prom_reader;
@@ -78,8 +86,9 @@ RETURNS TABLE
     lvl int,
     path bigint[]
 )
+SET search_path = pg_catalog
 AS $func$
-    WITH RECURSIVE x as
+        WITH RECURSIVE x as
     (
         SELECT
             s1.parent_span_id,
@@ -125,6 +134,7 @@ RETURNS TABLE
     dist int,
     path bigint[]
 )
+SET search_path = pg_catalog
 AS $func$
     WITH RECURSIVE x as
     (
@@ -173,6 +183,7 @@ RETURNS TABLE
     dist int,
     path bigint[]
 )
+SET search_path = pg_catalog
 AS $func$
     WITH RECURSIVE x as
     (
@@ -217,6 +228,7 @@ RETURNS TABLE
     parent_span_id bigint,
     span_id bigint
 )
+SET search_path = pg_catalog
 AS $func$
     SELECT
         _trace_id,
@@ -241,6 +253,7 @@ RETURNS TABLE
     child_operation_id bigint,
     cnt bigint
 )
+SET search_path = pg_catalog
 AS $func$
     SELECT
         parent.operation_id as parent_operation_id,
@@ -274,6 +287,7 @@ RETURNS TABLE
     is_downstream bool,
     path bigint[]
 )
+SET search_path = pg_catalog
 AS $func$
     SELECT
         trace_id,
@@ -302,7 +316,9 @@ GRANT EXECUTE ON FUNCTION ps_trace.span_tree(ps_trace.trace_id, bigint, int) TO 
 -- get / put functions
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION ps_trace.put_tag_key(_key ps_trace.tag_k, _tag_type ps_trace.tag_type)
-RETURNS bigint
+    RETURNS bigint
+    VOLATILE STRICT
+    SET search_path = pg_catalog
 AS $func$
 DECLARE
     _tag_key _ps_trace.tag_key;
@@ -331,11 +347,13 @@ BEGIN
     RETURN _tag_key.id;
 END;
 $func$
-LANGUAGE plpgsql VOLATILE STRICT;
+LANGUAGE plpgsql;
 GRANT EXECUTE ON FUNCTION ps_trace.put_tag_key(ps_trace.tag_k, ps_trace.tag_type) TO prom_writer;
 
 CREATE OR REPLACE FUNCTION ps_trace.put_tag(_key ps_trace.tag_k, _value ps_trace.tag_v, _tag_type ps_trace.tag_type)
-RETURNS BIGINT
+    RETURNS BIGINT
+    VOLATILE STRICT
+    SET search_path = pg_catalog
 AS $func$
 DECLARE
     _tag _ps_trace.tag;
@@ -382,11 +400,12 @@ BEGIN
     RETURN _tag.id;
 END;
 $func$
-LANGUAGE plpgsql VOLATILE STRICT;
+LANGUAGE plpgsql;
 GRANT EXECUTE ON FUNCTION ps_trace.put_tag(ps_trace.tag_k, ps_trace.tag_v, ps_trace.tag_type) TO prom_writer;
 
 CREATE OR REPLACE FUNCTION ps_trace.get_tag_map(_tags jsonb)
 RETURNS ps_trace.tag_map
+SET search_path = pg_catalog
 AS $func$
     SELECT coalesce(jsonb_object_agg(a.key_id, a.id), '{}')::ps_trace.tag_map
     FROM jsonb_each(_tags) x
@@ -404,7 +423,9 @@ LANGUAGE SQL STABLE PARALLEL SAFE STRICT;
 GRANT EXECUTE ON FUNCTION ps_trace.get_tag_map(jsonb) TO prom_reader;
 
 CREATE OR REPLACE FUNCTION ps_trace.put_operation(_service_name text, _span_name text, _span_kind ps_trace.span_kind)
-RETURNS bigint
+    RETURNS bigint
+    VOLATILE STRICT
+    SET search_path = pg_catalog
 AS $func$
 DECLARE
     _service_name_id bigint;
@@ -474,11 +495,13 @@ BEGIN
     RETURN _operation_id;
 END;
 $func$
-LANGUAGE plpgsql VOLATILE STRICT;
+LANGUAGE plpgsql;
 GRANT EXECUTE ON FUNCTION ps_trace.put_operation(text, text, ps_trace.span_kind) TO prom_writer;
 
 CREATE OR REPLACE FUNCTION ps_trace.put_schema_url(_schema_url text)
-RETURNS bigint
+    RETURNS bigint
+    VOLATILE STRICT
+    SET search_path = pg_catalog
 AS $func$
 DECLARE
     _schema_url_id bigint;
@@ -506,11 +529,13 @@ BEGIN
     RETURN _schema_url_id;
 END;
 $func$
-LANGUAGE plpgsql VOLATILE STRICT;
+LANGUAGE plpgsql;
 GRANT EXECUTE ON FUNCTION ps_trace.put_schema_url(text) TO prom_writer;
 
 CREATE OR REPLACE FUNCTION ps_trace.put_instrumentation_lib(_name text, _version text, _schema_url_id bigint)
-RETURNS bigint
+    RETURNS bigint
+    VOLATILE
+    SET search_path = pg_catalog
 AS $func$
 DECLARE
     _inst_lib_id bigint;
@@ -544,11 +569,14 @@ BEGIN
     RETURN _inst_lib_id;
 END;
 $func$
-LANGUAGE plpgsql VOLATILE;
+LANGUAGE plpgsql;
 GRANT EXECUTE ON FUNCTION ps_trace.put_instrumentation_lib(text, text, bigint) TO prom_writer;
 
 CREATE OR REPLACE FUNCTION ps_trace.delete_all_traces()
-RETURNS void
+    RETURNS void
+    SECURITY DEFINER
+    VOLATILE
+    SET search_path = pg_catalog
 AS $func$
     TRUNCATE _ps_trace.link;
     TRUNCATE _ps_trace.event;
@@ -560,10 +588,7 @@ AS $func$
     DELETE FROM _ps_trace.tag_key WHERE id >= 1000; -- keep the "standard" tag keys
     SELECT setval('_ps_trace.tag_key_id_seq', 1000);
 $func$
-LANGUAGE sql VOLATILE
--- TODO (james): security definer isn't actually required here. This is a permissions issue because no TRUNCATE on
--- link, event, span, ... for prom_modifier.
-SECURITY DEFINER;
+LANGUAGE sql;
 GRANT EXECUTE ON FUNCTION ps_trace.delete_all_traces() TO prom_admin;
 COMMENT ON FUNCTION ps_trace.delete_all_traces IS
 $$WARNING: this function deletes all spans and related tracing data in the system and restores it to a "just installed" state.$$;

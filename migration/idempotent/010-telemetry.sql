@@ -7,7 +7,9 @@
 -- 
 -- It returns TRUE if last run was beyond telemetry_sync_duration, otherwise FALSE.
 CREATE OR REPLACE FUNCTION _ps_catalog.promscale_telemetry_housekeeping(telemetry_sync_duration INTERVAL DEFAULT INTERVAL '1 HOUR')
-RETURNS BOOLEAN AS
+RETURNS BOOLEAN
+SET search_path = pg_catalog
+AS
 $$
     DECLARE
         should_update_telemetry BOOLEAN;
@@ -64,7 +66,9 @@ $$
 LANGUAGE PLPGSQL;
 GRANT EXECUTE ON FUNCTION _ps_catalog.promscale_telemetry_housekeeping(INTERVAL) TO prom_writer;
 
-CREATE OR REPLACE FUNCTION _ps_catalog.promscale_sql_telemetry() RETURNS VOID AS
+CREATE OR REPLACE FUNCTION _ps_catalog.promscale_sql_telemetry() RETURNS VOID
+SET search_path = pg_catalog
+AS
 $$
     DECLARE result TEXT;
     BEGIN
@@ -132,17 +136,23 @@ GRANT EXECUTE ON FUNCTION _ps_catalog.promscale_sql_telemetry() TO prom_writer;
 
 --security definer function that allows setting metadata with the promscale_prefix
 CREATE OR REPLACE FUNCTION _prom_ext.update_tsprom_metadata(meta_key text, meta_value text, send_telemetry BOOLEAN)
-RETURNS VOID
-SECURITY DEFINER
-SET search_path = pg_catalog
+    RETURNS VOID
+    SECURITY DEFINER
+    VOLATILE
+    SET search_path = pg_catalog
 AS $func$
     INSERT INTO _timescaledb_catalog.metadata(key, value, include_in_telemetry)
     VALUES ('promscale_' || meta_key,meta_value, send_telemetry)
     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, include_in_telemetry = EXCLUDED.include_in_telemetry
 $func$
-LANGUAGE SQL VOLATILE;
+LANGUAGE SQL;
+REVOKE ALL ON FUNCTION _prom_ext.update_tsprom_metadata(TEXT, TEXT, BOOLEAN) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION _prom_ext.update_tsprom_metadata(TEXT, TEXT, BOOLEAN) TO prom_writer;
 
-CREATE OR REPLACE FUNCTION _ps_catalog.apply_telemetry(telemetry_name TEXT, telemetry_value TEXT) RETURNS VOID AS
+CREATE OR REPLACE FUNCTION _ps_catalog.apply_telemetry(telemetry_name TEXT, telemetry_value TEXT)
+RETURNS VOID
+SET search_path = pg_catalog
+AS
 $$
     BEGIN
         IF telemetry_value IS NULL THEN

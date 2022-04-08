@@ -22,4 +22,4 @@ FROM generate_series(1,10) g;
 --this should use a subquery with the Promscale extension but not without
 --this is thanks to the support function make_call_subquery_support
 ANALYZE;
-EXPLAIN (costs off) SELECT time, value, jsonb(labels), val(namespace_id) FROM cpu_usage WHERE labels ? ('namespace' !== 'dev' ) ORDER BY time, series_id LIMIT 5;
+EXPLAIN (costs off) SELECT time, value, prom_api.jsonb(labels), prom_api.val(namespace_id) FROM prom_metric.cpu_usage WHERE labels OPERATOR(_prom_catalog.?) ('namespace' OPERATOR(ps_tag.!==) 'dev' ) ORDER BY time, series_id LIMIT 5;

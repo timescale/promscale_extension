@@ -1,6 +1,8 @@
 -- function that trigger to automatically keep the log calls
 CREATE OR REPLACE FUNCTION _prom_catalog.ha_leases_audit_fn()
     RETURNS TRIGGER
+    VOLATILE
+    SET search_path = pg_catalog
 AS
 $func$
 BEGIN
@@ -11,7 +13,7 @@ BEGIN
 
     -- leader changed, set lease until to existing log line
     IF OLD IS NOT NULL AND OLD.leader_name <> NEW.leader_name THEN
-        UPDATE ha_leases_logs
+        UPDATE _prom_catalog.ha_leases_logs
         SET lease_until = OLD.lease_until
         WHERE cluster_name = OLD.cluster_name
           AND leader_name = OLD.leader_name
@@ -20,17 +22,20 @@ BEGIN
     END IF;
 
     -- insert happened or leader changed and new leader needs to be logged
-    INSERT INTO ha_leases_logs (cluster_name, leader_name, lease_start, lease_until)
+    INSERT INTO _prom_catalog.ha_leases_logs (cluster_name, leader_name, lease_start, lease_until)
     VALUES (NEW.cluster_name, NEW.leader_name, NEW.lease_start, null);
 
     RETURN NEW;
 END;
-$func$ LANGUAGE plpgsql VOLATILE;
+$func$ LANGUAGE plpgsql;
 GRANT EXECUTE ON FUNCTION _prom_catalog.ha_leases_audit_fn() TO prom_writer;
 
 -- ha api functions
 CREATE OR REPLACE FUNCTION _prom_catalog.update_lease(cluster TEXT, writer TEXT, min_time TIMESTAMPTZ,
-                                                       max_time TIMESTAMPTZ) RETURNS _prom_catalog.ha_leases
+                                                       max_time TIMESTAMPTZ)
+    RETURNS _prom_catalog.ha_leases
+    VOLATILE
+    SET search_path = pg_catalog
 AS
 $func$
 DECLARE
@@ -99,11 +104,14 @@ BEGIN
     SELECT * INTO STRICT lease_state FROM _prom_catalog.ha_leases WHERE cluster_name = cluster;
     RETURN lease_state;
 END;
-$func$ LANGUAGE plpgsql VOLATILE;
+$func$ LANGUAGE plpgsql;
 GRANT EXECUTE ON FUNCTION _prom_catalog.update_lease(TEXT, TEXT, TIMESTAMPTZ, TIMESTAMPTZ) TO prom_writer;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.try_change_leader(cluster TEXT, new_leader TEXT,
-                                                            max_time TIMESTAMPTZ) RETURNS _prom_catalog.ha_leases
+                                                            max_time TIMESTAMPTZ)
+    RETURNS _prom_catalog.ha_leases
+    VOLATILE
+    SET search_path = pg_catalog
 AS
 $func$
 DECLARE
@@ -130,5 +138,5 @@ BEGIN
     RETURN lease_state;
 
 END;
-$func$ LANGUAGE plpgsql VOLATILE;
+$func$ LANGUAGE plpgsql;
 GRANT EXECUTE ON FUNCTION _prom_catalog.try_change_leader(TEXT, TEXT, TIMESTAMPTZ) TO prom_writer;

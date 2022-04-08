@@ -2,6 +2,7 @@
 -- orderings in different statements
 CREATE OR REPLACE FUNCTION _prom_catalog.get_metrics_that_need_drop_chunk()
 RETURNS SETOF _prom_catalog.metric
+SET search_path = pg_catalog
 AS $$
 BEGIN
         IF NOT _prom_catalog.is_timescaledb_installed() THEN
@@ -33,7 +34,13 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_metrics_that_need_drop_chunk() TO pr
 --drop chunks from metrics tables and delete the appropriate series.
 CREATE OR REPLACE FUNCTION _prom_catalog.drop_metric_chunk_data(
     schema_name TEXT, metric_name TEXT, older_than TIMESTAMPTZ
-) RETURNS VOID AS $func$
+)
+    RETURNS VOID
+    --security definer to add jobs as the logged-in user
+    SECURITY DEFINER
+    VOLATILE
+    SET search_path = pg_catalog
+AS $func$
 DECLARE
     metric_schema NAME;
     metric_table NAME;
@@ -73,11 +80,7 @@ BEGIN
     END IF;
 END
 $func$
-LANGUAGE PLPGSQL VOLATILE
---security definer to add jobs as the logged-in user
-SECURITY DEFINER
---search path must be set for security definer
-SET search_path = pg_temp;
+LANGUAGE PLPGSQL;
 --redundant given schema settings but extra caution for security definers
 REVOKE ALL ON FUNCTION _prom_catalog.drop_metric_chunk_data(text, text, timestamptz) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION _prom_catalog.drop_metric_chunk_data(text, text, timestamptz) TO prom_maintenance;
@@ -85,7 +88,9 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.drop_metric_chunk_data(text, text, times
 --drop chunks from metrics tables and delete the appropriate series.
 CREATE OR REPLACE PROCEDURE _prom_catalog.drop_metric_chunks(
     schema_name TEXT, metric_name TEXT, older_than TIMESTAMPTZ, ran_at TIMESTAMPTZ = now(), log_verbose BOOLEAN = FALSE
-) AS $func$
+)
+-- Note: Cannot SET search_path because we do transaction control
+AS $func$
 DECLARE
     metric_id int;
     metric_schema NAME;
@@ -103,12 +108,12 @@ BEGIN
     INTO STRICT metric_id, metric_schema, metric_table, metric_series_table, is_metric_view
     FROM _prom_catalog.get_metric_table_name_if_exists(schema_name, metric_name);
 
-    SELECT older_than + INTERVAL '1 hour'
+    SELECT older_than OPERATOR(pg_catalog.+) INTERVAL '1 hour'
     INTO check_time;
 
-    startT := clock_timestamp();
+    startT := pg_catalog.clock_timestamp();
 
-    PERFORM _prom_catalog.set_app_name(format('promscale maintenance: data retention: metric %s', metric_name));
+    PERFORM _prom_catalog.set_app_name(pg_catalog.format('promscale maintenance: data retention: metric %s', metric_name));
     IF log_verbose THEN
         RAISE LOG 'promscale maintenance: data retention: metric %: starting', metric_name;
     END IF;
@@ -119,7 +124,7 @@ BEGIN
             SELECT d.id
             INTO STRICT time_dimension_id
             FROM _timescaledb_catalog.dimension d
-            INNER JOIN _prom_catalog.get_storage_hypertable_info(metric_schema, metric_table, is_metric_view) hi ON (hi.id = d.hypertable_id)
+            INNER JOIN _prom_catalog.get_storage_hypertable_info(metric_schema, metric_table, is_metric_view) hi ON (hi.id OPERATOR(pg_catalog.=) d.hypertable_id)
             ORDER BY d.id ASC
             LIMIT 1;
 
@@ -128,10 +133,10 @@ BEGIN
             SELECT _timescaledb_internal.to_timestamp(range_end)
             INTO older_than
             FROM _timescaledb_catalog.chunk c
-            INNER JOIN _timescaledb_catalog.chunk_constraint cc ON (c.id = cc.chunk_id)
-            INNER JOIN _timescaledb_catalog.dimension_slice ds ON (ds.id = cc.dimension_slice_id)
+            INNER JOIN _timescaledb_catalog.chunk_constraint cc ON (c.id OPERATOR(pg_catalog.=) cc.chunk_id)
+            INNER JOIN _timescaledb_catalog.dimension_slice ds ON (ds.id OPERATOR(pg_catalog.=) cc.dimension_slice_id)
             --range_end is exclusive so this is everything < older_than (which is also exclusive)
-            WHERE ds.dimension_id = time_dimension_id AND ds.range_end <= _timescaledb_internal.to_unix_microseconds(older_than)
+            WHERE ds.dimension_id OPERATOR(pg_catalog.=) time_dimension_id AND ds.range_end OPERATOR(pg_catalog.<=) _timescaledb_internal.to_unix_microseconds(older_than)
             ORDER BY range_end DESC
             LIMIT 1;
         END IF;
@@ -144,31 +149,31 @@ BEGIN
     IF older_than IS NULL THEN
         -- even though there are no new Ids in need of deletion,
         -- we may still have old ones to delete
-        lastT := clock_timestamp();
-        PERFORM _prom_catalog.set_app_name(format('promscale maintenance: data retention: metric %s: delete expired series', metric_name));
+        lastT := pg_catalog.clock_timestamp();
+        PERFORM _prom_catalog.set_app_name(pg_catalog.format('promscale maintenance: data retention: metric %s: delete expired series', metric_name));
         PERFORM _prom_catalog.delete_expired_series(metric_schema, metric_table, metric_series_table, ran_at, present_epoch, last_updated);
         IF log_verbose THEN
-            RAISE LOG 'promscale maintenance: data retention: metric %: done deleting expired series as only action in %', metric_name, clock_timestamp()-lastT;
-            RAISE LOG 'promscale maintenance: data retention: metric %: finished in %', metric_name, clock_timestamp()-startT;
+            RAISE LOG 'promscale maintenance: data retention: metric %: done deleting expired series as only action in %', metric_name, pg_catalog.clock_timestamp() OPERATOR(pg_catalog.-) lastT;
+            RAISE LOG 'promscale maintenance: data retention: metric %: finished in %', metric_name, pg_catalog.clock_timestamp() OPERATOR(pg_catalog.-) startT;
         END IF;
         RETURN;
     END IF;
 
     -- transaction 2
-        lastT := clock_timestamp();
-        PERFORM _prom_catalog.set_app_name(format('promscale maintenance: data retention: metric %s: mark unused series', metric_name));
+        lastT := pg_catalog.clock_timestamp();
+        PERFORM _prom_catalog.set_app_name(pg_catalog.format('promscale maintenance: data retention: metric %s: mark unused series', metric_name));
         PERFORM _prom_catalog.mark_unused_series(metric_schema, metric_table, metric_series_table, older_than, check_time);
         IF log_verbose THEN
-            RAISE LOG 'promscale maintenance: data retention: metric %: done marking unused series in %', metric_name, clock_timestamp()-lastT;
+            RAISE LOG 'promscale maintenance: data retention: metric %: done marking unused series in %', metric_name, pg_catalog.clock_timestamp() OPERATOR(pg_catalog.-) lastT;
         END IF;
     COMMIT;
 
     -- transaction 3
-        lastT := clock_timestamp();
-        PERFORM _prom_catalog.set_app_name( format('promscale maintenance: data retention: metric %s: drop chunks', metric_name));
+        lastT := pg_catalog.clock_timestamp();
+        PERFORM _prom_catalog.set_app_name(pg_catalog.format('promscale maintenance: data retention: metric %s: drop chunks', metric_name));
         PERFORM _prom_catalog.drop_metric_chunk_data(metric_schema, metric_name, older_than);
         IF log_verbose THEN
-            RAISE LOG 'promscale maintenance: data retention: metric %: done dropping chunks in %', metric_name, clock_timestamp()-lastT;
+            RAISE LOG 'promscale maintenance: data retention: metric %: done dropping chunks in %', metric_name, pg_catalog.clock_timestamp() OPERATOR(pg_catalog.-) lastT;
         END IF;
         SELECT current_epoch, last_update_time INTO present_epoch, last_updated FROM
             _prom_catalog.ids_epoch LIMIT 1;
@@ -176,12 +181,12 @@ BEGIN
 
 
     -- transaction 4
-        lastT := clock_timestamp();
-        PERFORM _prom_catalog.set_app_name( format('promscale maintenance: data retention: metric %s: delete expired series', metric_name));
+        lastT := pg_catalog.clock_timestamp();
+        PERFORM _prom_catalog.set_app_name(pg_catalog.format('promscale maintenance: data retention: metric %s: delete expired series', metric_name));
         PERFORM _prom_catalog.delete_expired_series(metric_schema, metric_table, metric_series_table, ran_at, present_epoch, last_updated);
         IF log_verbose THEN
-            RAISE LOG 'promscale maintenance: data retention: metric %: done deleting expired series in %', metric_name, clock_timestamp()-lastT;
-            RAISE LOG 'promscale maintenance: data retention: metric %: finished in %', metric_name, clock_timestamp()-startT;
+            RAISE LOG 'promscale maintenance: data retention: metric %: done deleting expired series in %', metric_name, pg_catalog.clock_timestamp() OPERATOR(pg_catalog.-) lastT;
+            RAISE LOG 'promscale maintenance: data retention: metric %: finished in %', metric_name, pg_catalog.clock_timestamp() OPERATOR(pg_catalog.-) startT;
         END IF;
     RETURN;
 END
@@ -190,6 +195,9 @@ LANGUAGE PLPGSQL;
 GRANT EXECUTE ON PROCEDURE _prom_catalog.drop_metric_chunks(text, text, timestamptz, timestamptz, boolean) TO prom_maintenance;
 
 CREATE OR REPLACE PROCEDURE _ps_trace.drop_span_chunks(_older_than timestamptz)
+--security definer to add jobs as the logged-in user
+SECURITY DEFINER
+SET search_path = pg_catalog
 AS $func$
 BEGIN
     IF _prom_catalog.is_timescaledb_installed() THEN
@@ -211,16 +219,15 @@ BEGIN
     END IF;
 END
 $func$
-LANGUAGE PLPGSQL
---security definer to add jobs as the logged-in user
-SECURITY DEFINER
---search path must be set for security definer
-SET search_path = pg_temp;
+LANGUAGE PLPGSQL;
 --redundant given schema settings but extra caution for security definers
 REVOKE ALL ON PROCEDURE _ps_trace.drop_span_chunks(timestamptz) FROM PUBLIC;
 GRANT EXECUTE ON PROCEDURE _ps_trace.drop_span_chunks(timestamptz) TO prom_maintenance;
 
 CREATE OR REPLACE PROCEDURE _ps_trace.drop_link_chunks(_older_than timestamptz)
+--security definer to add jobs as the logged-in user
+SECURITY DEFINER
+SET search_path = pg_catalog
 AS $func$
 BEGIN
     IF _prom_catalog.is_timescaledb_installed() THEN
@@ -242,16 +249,15 @@ BEGIN
     END IF;
 END
 $func$
-LANGUAGE PLPGSQL
---security definer to add jobs as the logged-in user
-SECURITY DEFINER
---search path must be set for security definer
-SET search_path = pg_temp;
+LANGUAGE PLPGSQL;
 --redundant given schema settings but extra caution for security definers
 REVOKE ALL ON PROCEDURE _ps_trace.drop_link_chunks(timestamptz) FROM PUBLIC;
 GRANT EXECUTE ON PROCEDURE _ps_trace.drop_link_chunks(timestamptz) TO prom_maintenance;
 
 CREATE OR REPLACE PROCEDURE _ps_trace.drop_event_chunks(_older_than timestamptz)
+--security definer to add jobs as the logged-in user
+SECURITY DEFINER
+SET search_path = pg_catalog
 AS $func$
 BEGIN
     IF _prom_catalog.is_timescaledb_installed() THEN
@@ -273,29 +279,28 @@ BEGIN
     END IF;
 END
 $func$
-LANGUAGE PLPGSQL
---security definer to add jobs as the logged-in user
-SECURITY DEFINER
---search path must be set for security definer
-SET search_path = pg_temp;
+LANGUAGE PLPGSQL;
 --redundant given schema settings but extra caution for security definers
 REVOKE ALL ON PROCEDURE _ps_trace.drop_event_chunks(timestamptz) FROM PUBLIC;
 GRANT EXECUTE ON PROCEDURE _ps_trace.drop_event_chunks(timestamptz) TO prom_maintenance;
 
 CREATE OR REPLACE FUNCTION ps_trace.set_trace_retention_period(_trace_retention_period INTERVAL)
-RETURNS BOOLEAN
+    RETURNS BOOLEAN
+    VOLATILE
+    SET search_path = pg_catalog
 AS $$
     INSERT INTO _prom_catalog.default(key, value) VALUES ('trace_retention_period', _trace_retention_period::text)
     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
     SELECT true;
 $$
-LANGUAGE SQL VOLATILE;
+LANGUAGE SQL;
 COMMENT ON FUNCTION ps_trace.set_trace_retention_period(INTERVAL)
 IS 'set the retention period for trace data';
 GRANT EXECUTE ON FUNCTION ps_trace.set_trace_retention_period(INTERVAL) TO prom_admin;
 
 CREATE OR REPLACE FUNCTION ps_trace.get_trace_retention_period()
 RETURNS INTERVAL
+SET search_path = pg_catalog
 AS $$
     SELECT value::interval
     FROM _prom_catalog.default
@@ -307,6 +312,7 @@ IS 'get the retention period for trace data';
 GRANT EXECUTE ON FUNCTION ps_trace.get_trace_retention_period() TO prom_reader;
 
 CREATE OR REPLACE PROCEDURE _ps_trace.execute_data_retention_policy(log_verbose boolean)
+SET search_path = pg_catalog
 AS $$
 DECLARE
     _trace_retention_period interval;
@@ -403,6 +409,7 @@ IS 'drops old data according to the data retention policy. This procedure should
 GRANT EXECUTE ON PROCEDURE _ps_trace.execute_data_retention_policy(boolean) TO prom_maintenance;
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.execute_data_retention_policy(log_verbose boolean)
+SET search_path = pg_catalog
 AS $$
 DECLARE
     r _prom_catalog.metric;
@@ -454,6 +461,7 @@ GRANT EXECUTE ON PROCEDURE _prom_catalog.execute_data_retention_policy(boolean) 
 --should be the last thing run in a session so that all session locks
 --are guaranteed released on error.
 CREATE OR REPLACE PROCEDURE prom_api.execute_maintenance(log_verbose boolean = false)
+SET search_path = pg_catalog
 AS $$
 DECLARE
    startT TIMESTAMPTZ;
@@ -491,6 +499,7 @@ IS 'Execute maintenance tasks like dropping data according to retention policy. 
 GRANT EXECUTE ON PROCEDURE prom_api.execute_maintenance(boolean) TO prom_maintenance;
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.execute_maintenance_job(job_id int, config jsonb)
+SET search_path = pg_catalog
 AS $$
 DECLARE
    log_verbose boolean;
@@ -524,7 +533,11 @@ $$ LANGUAGE PLPGSQL;
 GRANT EXECUTE ON PROCEDURE _prom_catalog.execute_maintenance_job(int, jsonb) TO prom_maintenance;
 
 CREATE OR REPLACE FUNCTION prom_api.config_maintenance_jobs(number_jobs int, new_schedule_interval interval, new_config jsonb = NULL)
-RETURNS BOOLEAN
+    RETURNS BOOLEAN
+    --security definer to add jobs as the logged-in user
+    SECURITY DEFINER
+    VOLATILE
+    SET search_path = pg_catalog
 AS $func$
 DECLARE
   cnt int;
@@ -557,11 +570,7 @@ BEGIN
     RETURN TRUE;
 END
 $func$
-LANGUAGE PLPGSQL VOLATILE
---security definer to add jobs as the logged-in user
-SECURITY DEFINER
---search path must be set for security definer
-SET search_path = pg_temp;
+LANGUAGE PLPGSQL;
 --redundant given schema settings but extra caution for security definers
 REVOKE ALL ON FUNCTION prom_api.config_maintenance_jobs(int, interval, jsonb) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION prom_api.config_maintenance_jobs(int, interval, jsonb) TO prom_admin;

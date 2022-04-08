@@ -9,7 +9,6 @@ CREATE DOMAIN prom_api.matcher_negative AS int[] NOT NULL;
 CREATE DOMAIN prom_api.label_key AS TEXT NOT NULL;
 CREATE DOMAIN prom_api.pattern AS TEXT NOT NULL;
 
--- TODO (james): This function is also defined in idempotent/001-base.sql
 --wrapper around jsonb_each_text to give a better row_estimate
 --for labels (10 not 100)
 CREATE OR REPLACE FUNCTION _prom_catalog.label_jsonb_each_text(js jsonb, OUT key text, OUT value text)
@@ -20,20 +19,22 @@ AS $function$jsonb_each_text$function$;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.count_jsonb_keys(j jsonb)
 RETURNS INT
+-- Note: no explicit search_path because we want inlining
 AS $func$
-    SELECT count(*)::int from (SELECT jsonb_object_keys(j)) v;
+    SELECT pg_catalog.count(*)::int from (SELECT pg_catalog.jsonb_object_keys(j)) v;
 $func$
 LANGUAGE SQL IMMUTABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION _prom_catalog.count_jsonb_keys(jsonb) TO prom_reader;
 
 CREATE OR REPLACE FUNCTION prom_api.matcher(labels jsonb)
 RETURNS prom_api.matcher_positive
+-- Note: no explicit search_path because we want inlining
 AS $func$
     SELECT ARRAY(
            SELECT coalesce(l.id, -1) -- -1 indicates no such label
            FROM _prom_catalog.label_jsonb_each_text(labels-'__name__') e
            LEFT JOIN _prom_catalog.label l
-               ON (l.key = e.key AND l.value = e.value)
+               ON (l.key OPERATOR(pg_catalog.=) e.key AND l.value OPERATOR(pg_catalog.=) e.value)
         )::prom_api.matcher_positive
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE;
@@ -42,8 +43,9 @@ LANGUAGE SQL STABLE PARALLEL SAFE;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.label_contains(labels prom_api.label_array, json_labels jsonb)
 RETURNS BOOLEAN
+-- Note: no explicit search_path because we want inlining
 AS $func$
-    SELECT labels @> prom_api.matcher(json_labels)
+    SELECT labels OPERATOR(prom_api.@>) prom_api.matcher(json_labels)
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE;
 
@@ -55,8 +57,9 @@ CREATE OPERATOR prom_api.@> (
 
 CREATE OR REPLACE FUNCTION _prom_catalog.label_value_contains(labels prom_api.label_value_array, label_value TEXT)
 RETURNS BOOLEAN
+-- Note: no explicit search_path because we want inlining
 AS $func$
-    SELECT labels @> ARRAY[label_value]::TEXT[]
+    SELECT labels OPERATOR(prom_api.@>) ARRAY[label_value]::TEXT[]
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION _prom_catalog.label_value_contains(prom_api.label_value_array, TEXT) TO prom_reader;
@@ -71,8 +74,9 @@ CREATE OPERATOR prom_api.@> (
 
 CREATE OR REPLACE FUNCTION _prom_catalog.label_match(labels prom_api.label_array, matchers prom_api.matcher_positive)
 RETURNS BOOLEAN
+-- Note: no explicit search_path because we want inlining
 AS $func$
-    SELECT labels && matchers
+    SELECT labels OPERATOR(pg_catalog.&&) matchers
 $func$
 LANGUAGE SQL IMMUTABLE PARALLEL SAFE;
 
@@ -84,8 +88,9 @@ CREATE OPERATOR prom_api.? (
 
 CREATE OR REPLACE FUNCTION _prom_catalog.label_match(labels prom_api.label_array, matchers prom_api.matcher_negative)
 RETURNS BOOLEAN
+-- Note: no explicit search_path because we want inlining
 AS $func$
-    SELECT NOT (labels && matchers)
+    SELECT NOT (labels OPERATOR(pg_catalog.&&) matchers)
 $func$
 LANGUAGE SQL IMMUTABLE PARALLEL SAFE;
 
@@ -99,48 +104,53 @@ CREATE OPERATOR prom_api.? (
 
 CREATE OR REPLACE FUNCTION _prom_catalog.label_find_key_equal(key_to_match prom_api.label_key, pat prom_api.pattern)
 RETURNS prom_api.matcher_positive
+-- Note: no explicit search_path because we want inlining
 AS $func$
-    SELECT COALESCE(array_agg(l.id), array[]::int[])::prom_api.matcher_positive
+    SELECT COALESCE(pg_catalog.array_agg(l.id), array[]::int[])::prom_api.matcher_positive
     FROM _prom_catalog.label l
-    WHERE l.key = key_to_match and l.value = pat
+    WHERE l.key OPERATOR(pg_catalog.=) key_to_match and l.value OPERATOR(pg_catalog.=) pat
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE
 SUPPORT _prom_ext.rewrite_fn_call_to_subquery;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.label_find_key_not_equal(key_to_match prom_api.label_key, pat prom_api.pattern)
 RETURNS prom_api.matcher_negative
+-- Note: no explicit search_path because we want inlining
 AS $func$
-    SELECT COALESCE(array_agg(l.id), array[]::int[])::prom_api.matcher_negative
+    SELECT COALESCE(pg_catalog.array_agg(l.id), array[]::int[])::prom_api.matcher_negative
     FROM _prom_catalog.label l
-    WHERE l.key = key_to_match and l.value = pat
+    WHERE l.key OPERATOR(pg_catalog.=) key_to_match and l.value OPERATOR(pg_catalog.=) pat
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE
 SUPPORT _prom_ext.rewrite_fn_call_to_subquery;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.label_find_key_regex(key_to_match prom_api.label_key, pat prom_api.pattern)
 RETURNS prom_api.matcher_positive
+-- Note: no explicit search_path because we want inlining
 AS $func$
-    SELECT COALESCE(array_agg(l.id), array[]::int[])::prom_api.matcher_positive
+    SELECT COALESCE(pg_catalog.array_agg(l.id), array[]::int[])::prom_api.matcher_positive
     FROM _prom_catalog.label l
-    WHERE l.key = key_to_match and l.value ~ pat
+    WHERE l.key OPERATOR(pg_catalog.=) key_to_match and l.value OPERATOR(pg_catalog.~) pat
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE
 SUPPORT _prom_ext.rewrite_fn_call_to_subquery;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.label_find_key_not_regex(key_to_match prom_api.label_key, pat prom_api.pattern)
 RETURNS prom_api.matcher_negative
+-- Note: no explicit search_path because we want inlining
 AS $func$
-    SELECT COALESCE(array_agg(l.id), array[]::int[])::prom_api.matcher_negative
+    SELECT COALESCE(pg_catalog.array_agg(l.id), array[]::int[])::prom_api.matcher_negative
     FROM _prom_catalog.label l
-    WHERE l.key = key_to_match and l.value ~ pat
+    WHERE l.key OPERATOR(pg_catalog.=) key_to_match and l.value OPERATOR(pg_catalog.~) pat
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE
 SUPPORT _prom_ext.rewrite_fn_call_to_subquery;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.match_equals(labels prom_api.label_array, _op ps_tag.tag_op_equals)
 RETURNS boolean
+-- Note: no explicit search_path because we want inlining
 AS $func$
-    SELECT labels && label_find_key_equal(_op.tag_key, (_op.value#>>'{}'))::int[]
+    SELECT labels OPERATOR(pg_catalog.&&) _prom_catalog.label_find_key_equal(_op.tag_key, (_op.value OPERATOR(pg_catalog.#>>)'{}'))::int[]
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE; -- do not make strict. it disables function inlining
 
@@ -152,8 +162,9 @@ CREATE OPERATOR _prom_catalog.? (
 
 CREATE OR REPLACE FUNCTION _prom_catalog.match_not_equals(labels prom_api.label_array, _op ps_tag.tag_op_not_equals)
 RETURNS boolean
+-- Note: no explicit search_path because we want inlining
 AS $func$
-    SELECT NOT (labels && label_find_key_not_equal(_op.tag_key, (_op.value#>>'{}'))::int[])
+    SELECT NOT (labels OPERATOR(pg_catalog.&&) _prom_catalog.label_find_key_not_equal(_op.tag_key, (_op.value OPERATOR(pg_catalog.#>>) '{}'))::int[])
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE; -- do not make strict. it disables function inlining
 
@@ -165,8 +176,9 @@ CREATE OPERATOR _prom_catalog.? (
 
 CREATE OR REPLACE FUNCTION _prom_catalog.match_regexp_matches(labels prom_api.label_array, _op ps_tag.tag_op_regexp_matches)
 RETURNS boolean
+-- Note: no explicit search_path because we want inlining
 AS $func$
-    SELECT labels && label_find_key_regex(_op.tag_key, _op.value)::int[]
+    SELECT labels OPERATOR(pg_catalog.&&) _prom_catalog.label_find_key_regex(_op.tag_key, _op.value)::int[]
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE; -- do not make strict. it disables function inlining
 
@@ -178,8 +190,9 @@ CREATE OPERATOR _prom_catalog.? (
 
 CREATE OR REPLACE FUNCTION _prom_catalog.match_regexp_not_matches(labels prom_api.label_array, _op ps_tag.tag_op_regexp_not_matches)
 RETURNS boolean
+-- Note: no explicit search_path because we want inlining
 AS $func$
-    SELECT NOT (labels && label_find_key_not_regex(_op.tag_key, _op.value)::int[])
+    SELECT NOT (labels OPERATOR(pg_catalog.&&) _prom_catalog.label_find_key_not_regex(_op.tag_key, _op.value)::int[])
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE; -- do not make strict. it disables function inlining
 

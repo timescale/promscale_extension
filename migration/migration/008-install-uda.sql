@@ -1,5 +1,6 @@
 CREATE OR REPLACE FUNCTION _prom_catalog.get_timescale_major_version()
     RETURNS INT
+    SET search_path = pg_catalog
 AS $func$
     SELECT split_part(extversion, '.', 1)::INT FROM pg_catalog.pg_extension WHERE extname='timescaledb' LIMIT 1;
 $func$
@@ -7,6 +8,7 @@ LANGUAGE SQL STABLE PARALLEL SAFE;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.get_timescale_minor_version()
     RETURNS INT
+    SET search_path = pg_catalog
 AS $func$
     SELECT split_part(extversion, '.', 2)::INT FROM pg_catalog.pg_extension WHERE extname='timescaledb' LIMIT 1;
 $func$
@@ -22,7 +24,8 @@ END
 $$ LANGUAGE PLPGSQL;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.is_timescaledb_installed()
-RETURNS BOOLEAN
+    RETURNS BOOLEAN
+    SET search_path = pg_catalog
 AS $func$
     SELECT count(*) > 0 FROM pg_extension WHERE extname='timescaledb';
 $func$
@@ -30,7 +33,9 @@ LANGUAGE SQL STABLE;
 GRANT EXECUTE ON FUNCTION _prom_catalog.is_timescaledb_installed() TO prom_reader;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.is_timescaledb_oss()
-RETURNS BOOLEAN AS
+    RETURNS BOOLEAN
+    SET search_path = pg_catalog
+AS
 $$
 BEGIN
     IF _prom_catalog.is_timescaledb_installed() THEN
@@ -44,6 +49,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.is_timescaledb_oss() TO prom_reader;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.is_multinode()
     RETURNS BOOLEAN
+    SET search_path = pg_catalog
 AS $func$
     SELECT count(*) > 0 FROM timescaledb_information.data_nodes
 $func$
