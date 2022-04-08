@@ -130,6 +130,18 @@ $$
 LANGUAGE PLPGSQL;
 GRANT EXECUTE ON FUNCTION _ps_catalog.promscale_sql_telemetry() TO prom_writer;
 
+--security definer function that allows setting metadata with the promscale_prefix
+CREATE OR REPLACE FUNCTION _prom_ext.update_tsprom_metadata(meta_key text, meta_value text, send_telemetry BOOLEAN)
+RETURNS VOID
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $func$
+    INSERT INTO _timescaledb_catalog.metadata(key, value, include_in_telemetry)
+    VALUES ('promscale_' || meta_key,meta_value, send_telemetry)
+    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, include_in_telemetry = EXCLUDED.include_in_telemetry
+$func$
+LANGUAGE SQL VOLATILE;
+
 CREATE OR REPLACE FUNCTION _ps_catalog.apply_telemetry(telemetry_name TEXT, telemetry_value TEXT) RETURNS VOID AS
 $$
     BEGIN
