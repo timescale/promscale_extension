@@ -1422,7 +1422,7 @@ BEGIN
         RETURN true;
     END IF;
 
-    RAISE NOTICE 'Resetting data retention period for all metrics with underlying continuous aggregate %.%', _cagg_schema, cagg_name;
+    RAISE NOTICE 'Resetting data retention period for all metrics with underlying continuous aggregate %.%', _cagg_schema, _cagg_name;
 
     FOR r IN
         SELECT m.*
@@ -1430,7 +1430,7 @@ BEGIN
         INNER JOIN _prom_catalog.metric m
           ON (m.table_name = v.view_name AND m.table_schema = v.view_schema)
         WHERE v.table_name = _cagg_name
-          AND v.table_schema = _cagg_schem
+          AND v.table_schema = _cagg_schema
     LOOP
         RAISE NOTICE 'Resetting data retention for metrics %.%', r.table_schema, r.metric_name;
 
