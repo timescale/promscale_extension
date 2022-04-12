@@ -1,72 +1,76 @@
-use crate::iterable_jsonb::*;
 use pgx::*;
-use sha2::{Digest, Sha512};
 
-/// A custom SHA512 based JSONB digest.
-///
-/// Save for hash collisions, for any pair of `j1` and `j2` the statement
-/// `SELECT jsonb_digest(j1) = jsonb_digest(j2)`
-/// is true iff `j1 == j2` are _semantically_ equivalent.
-///
-/// There is a couple of alternatives, unfortunately neither
-/// should be used in a UNIQUE index.
-///
-/// `pg_catalog.sha512(json_value::text::bytea)` has two drawbacks:
-/// - There isn't enough control over `jsonb` -> `text` conversion.
-///   Although, the existing implementation relies on the same mechanism
-///   as [`jsonb_digest`] and should always keep object keys in the fixed
-///   order, there's no way to explicitly set specifics of its behaviour
-///   like indentation or white-space padding.
-/// - JSONB stores all numeric values in PostgreSQL `numeric` type.
-///   It's not just precise, it accurately preserves trailing fractional zeroes.
-///   In other words, values `1.01` and `1.010` will be represented differently,
-///   despite being equal.
-///  
-/// There's also `jsonb_hash_extended` that addresses the shortcomings,
-/// described above. Unfortunately, it is limited to 64 bit: good enough
-/// for hash tables, probably a bad idea for a UNIQUE index. This
-/// implementation is largely based on `jsonb_hash_extended`.
-#[pg_extern(immutable, strict, parallel_safe)]
-pub fn jsonb_digest(jsonb: Jsonb) -> Vec<u8> {
-    use Token::*;
+#[pg_schema]
+mod _prom_ext {
+    use crate::iterable_jsonb::*;
+    use pgx::*;
+    use sha2::{Digest, Sha512};
 
-    // Based on https://github.com/postgres/postgres/blob/27b77ecf9f4d5be211900eda54d8155ada50d696/src/include/utils/jsonb.h#L193
-    // I'm making an assumption here, that object key order
-    // should remain stable in the foreseeable future.
-    //
-    // Additionally, there's a test that checks that a hardcoded value didn't change.
-    let mut hasher = Sha512::new();
-    jsonb.tokens().enumerate().for_each(|(idx, token)| {
-        hasher.update(idx.to_le_bytes());
-        match token {
-            // Scalars
-            Null => hasher.update(0x01u8.to_le_bytes()),
-            Bool(true) => hasher.update(0x02u8.to_le_bytes()),
-            Bool(false) => hasher.update(0x03u8.to_le_bytes()),
-            String(str) => {
-                hasher.update(0x04u8.to_le_bytes());
-                hasher.update(str.as_bytes())
-            }
-            Token::Numeric(numeric) => {
-                hasher.update(0x05u8.to_le_bytes());
-                hasher.update(numeric.to_str().as_bytes())
-            }
-            // Objects
-            Key(str) => {
-                hasher.update(0x0Au8.to_le_bytes());
-                hasher.update(str.as_bytes())
-            }
-            BeginObject => hasher.update(0x0Bu8.to_le_bytes()),
-            EndObject => hasher.update(0x0Cu8.to_le_bytes()),
-            // Arrays
-            BeginArray => hasher.update(0x0Du8.to_le_bytes()),
-            EndArray => hasher.update(0x0Eu8.to_le_bytes()),
-        }
-    });
+    /// A custom SHA512 based JSONB digest.
+    ///
+    /// Save for hash collisions, for any pair of `j1` and `j2` the statement
+    /// `SELECT jsonb_digest(j1) = jsonb_digest(j2)`
+    /// is true iff `j1 == j2` are _semantically_ equivalent.
+    ///
+    /// There is a couple of alternatives, unfortunately neither
+    /// should be used in a UNIQUE index.
+    ///
+    /// `pg_catalog.sha512(json_value::text::bytea)` has two drawbacks:
+    /// - There isn't enough control over `jsonb` -> `text` conversion.
+    ///   Although, the existing implementation relies on the same mechanism
+    ///   as [`jsonb_digest`] and should always keep object keys in the fixed
+    ///   order, there's no way to explicitly set specifics of its behaviour
+    ///   like indentation or white-space padding.
+    /// - JSONB stores all numeric values in PostgreSQL `numeric` type.
+    ///   It's not just precise, it accurately preserves trailing fractional zeroes.
+    ///   In other words, values `1.01` and `1.010` will be represented differently,
+    ///   despite being equal.
+    ///
+    /// There's also `jsonb_hash_extended` that addresses the shortcomings,
+    /// described above. Unfortunately, it is limited to 64 bit: good enough
+    /// for hash tables, probably a bad idea for a UNIQUE index. This
+    /// implementation is largely based on `jsonb_hash_extended`.
+    #[pg_extern(immutable, strict, parallel_safe)]
+    pub fn jsonb_digest(jsonb: Jsonb) -> Vec<u8> {
+        use Token::*;
 
-    Vec::from(hasher.finalize().as_slice())
+        // Based on https://github.com/postgres/postgres/blob/27b77ecf9f4d5be211900eda54d8155ada50d696/src/include/utils/jsonb.h#L193
+        // I'm making an assumption here, that object key order
+        // should remain stable in the foreseeable future.
+        //
+        // Additionally, there's a test that checks that a hardcoded value didn't change.
+        let mut hasher = Sha512::new();
+        jsonb.tokens().enumerate().for_each(|(idx, token)| {
+            hasher.update(idx.to_le_bytes());
+            match token {
+                // Scalars
+                Null => hasher.update(0x01u8.to_le_bytes()),
+                Bool(true) => hasher.update(0x02u8.to_le_bytes()),
+                Bool(false) => hasher.update(0x03u8.to_le_bytes()),
+                String(str) => {
+                    hasher.update(0x04u8.to_le_bytes());
+                    hasher.update(str.as_bytes())
+                }
+                Token::Numeric(numeric) => {
+                    hasher.update(0x05u8.to_le_bytes());
+                    hasher.update(numeric.to_str().as_bytes())
+                }
+                // Objects
+                Key(str) => {
+                    hasher.update(0x0Au8.to_le_bytes());
+                    hasher.update(str.as_bytes())
+                }
+                BeginObject => hasher.update(0x0Bu8.to_le_bytes()),
+                EndObject => hasher.update(0x0Cu8.to_le_bytes()),
+                // Arrays
+                BeginArray => hasher.update(0x0Du8.to_le_bytes()),
+                EndArray => hasher.update(0x0Eu8.to_le_bytes()),
+            }
+        });
+
+        Vec::from(hasher.finalize().as_slice())
+    }
 }
-
 #[cfg(any(test, feature = "pg_test"))]
 #[pg_schema]
 mod tests {

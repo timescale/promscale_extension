@@ -7,11 +7,7 @@ DECLARE
     _body_differs BOOL = false;
     _migration _ps_catalog.migration = row ('{{filename}}', '{{version}}');
     _body TEXT = $migrationbody${{body}}$migrationbody$;
-    _old_search_path text;
 BEGIN
-    EXECUTE 'SHOW search_path' INTO STRICT _old_search_path;
-    SET search_path TO pg_catalog;
-
     SELECT migration.name, migration.body <> _body
     INTO _migration_name, _body_differs
     FROM _ps_catalog.migration
@@ -21,7 +17,6 @@ BEGIN
         IF _body_differs THEN
             RAISE WARNING 'Checksum of migration "{{filename}}" has changed';
         END IF;
-        EXECUTE format('SET search_path TO %s', _old_search_path);
         RETURN;
     END IF;
 
@@ -35,7 +30,5 @@ $inner_migration_block$;
 
     INSERT INTO _ps_catalog.migration (name, applied_at_version, body) VALUES (_migration.name, _migration.applied_at_version, _body);
     RAISE LOG 'Applied migration {{filename}}';
-
-    EXECUTE format('SET search_path TO %s', _old_search_path);
 END;
 $outer_migration_block$;

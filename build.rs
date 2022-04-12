@@ -29,6 +29,7 @@ struct ControlFile {
 
 const CONTROL_FILE_NAME: &str = "promscale.control";
 const MIGRATION_FILE_NAME: &str = "hand-written-migration.sql";
+const BOOTSTRAP_FILE_NAME: &str = "bootstrap.sql";
 
 fn main() {
     println!("cargo:rerun-if-changed=Cargo.lock");
@@ -37,6 +38,7 @@ fn main() {
     println!("cargo:rerun-if-changed=migration/migration");
     println!("cargo:rerun-if-changed=migration/idempotent");
     println!("cargo:rerun-if-changed=templates");
+    println!("cargo:rerun-if-changed=migration/bootstrap");
     // According to the cargo documentation we are horribly misusing
     // the build script mechanism, hence this workaround:
     // "Build scripts may save any output files or intermediate artifacts
@@ -76,15 +78,34 @@ fn generate_control_file(manifest_dir: &str) {
 /// directories, wraps each file in its respective template (in the `templates` directory), and
 /// outputs the whole contents as one long SQL file (`MIGRATION_FILE_NAME`) in the root directory.
 fn generate_migration_sql(manifest_dir: &str) {
-    let mut sql = include_str!("migration/migration-table.sql").to_string();
     let rendered_sql = render_sql().expect("unable to render migrations");
-    sql.push_str(rendered_sql.as_str());
 
     let mut out_path = PathBuf::from(manifest_dir);
     out_path.push(MIGRATION_FILE_NAME);
     let mut file = File::create(out_path).unwrap();
-    file.write_all(sql.as_bytes())
-        .expect("unable to write migration file contents");
+    file.write_all(rendered_sql.as_bytes())
+        .expect("unable to write file contents");
+
+    let mut bootstrap_out_path = PathBuf::from(manifest_dir);
+    bootstrap_out_path.push(BOOTSTRAP_FILE_NAME);
+    let mut bootstrap_out_file = File::create(bootstrap_out_path).unwrap();
+    bootstrap_out_file
+        .write_all(render_bootstrap(manifest_dir).as_bytes())
+        .expect("unable to write file contents")
+}
+
+fn render_bootstrap(manifest_dir: &str) -> String {
+    let migration_table_sql =
+        include_str!("migration/bootstrap/000-migration-table.sql").to_string();
+
+    let mut ext_schema_path = PathBuf::from(manifest_dir);
+    ext_schema_path.push("migration/bootstrap/001-create-ext-schema.sql");
+    let ext_schema_sql = wrap(ext_schema_path.as_path(), &Migration);
+
+    let mut result = String::from("");
+    result.push_str(&migration_table_sql);
+    result.push_str(&ext_schema_sql);
+    result
 }
 
 fn render_sql() -> Result<String, Error> {

@@ -1,122 +1,131 @@
 use pgx::*;
 
-use pgx::error;
+#[pg_schema]
+mod _prom_ext {
+    use pgx::*;
 
-use crate::aggregate_utils::in_aggregate_context;
-use crate::aggregates::{GapfillDeltaTransition, Milliseconds};
-use crate::palloc::{Inner, InternalAsValue, ToInternal};
+    use pgx::error;
 
-// prom divides time into sliding windows of fixed size, e.g.
-// |  5 seconds  |  5 seconds  |  5 seconds  |  5 seconds  |  5 seconds  |
-// we take the first and last values in that bucket and uses `last-first` as the
-// value for that bucket.
-//  | a b c d e | f g h i | j   k |   m    |
-//  |   e - a   |  i - f  | k - j | <null> |
-#[allow(clippy::too_many_arguments)]
-#[pg_extern(immutable, parallel_safe)]
-pub fn prom_delta_transition(
-    state: Internal,
-    lowest_time: pg_sys::TimestampTz,
-    greatest_time: pg_sys::TimestampTz,
-    step_size: Milliseconds, // `prev_now - step_size` is where the next window starts
-    range: Milliseconds,     // the size of a window to delta over
-    sample_time: pg_sys::TimestampTz,
-    sample_value: f64,
-    fc: pg_sys::FunctionCallInfo,
-) -> Internal {
-    prom_delta_transition_inner(
-        unsafe { state.to_inner() },
-        lowest_time,
-        greatest_time,
-        step_size,
-        range,
-        sample_time,
-        sample_value,
-        fc,
-    )
-    .internal()
-}
+    use crate::aggregate_utils::in_aggregate_context;
+    use crate::aggregates::{GapfillDeltaTransition, Milliseconds};
+    use crate::palloc::{Inner, InternalAsValue, ToInternal};
 
-#[allow(clippy::too_many_arguments)]
-fn prom_delta_transition_inner(
-    state: Option<Inner<GapfillDeltaTransition>>,
-    lowest_time: pg_sys::TimestampTz,
-    greatest_time: pg_sys::TimestampTz,
-    step_size: Milliseconds, // `prev_now - step` is where the next window starts
-    range: Milliseconds,     // the size of a window to delta over
-    sample_time: pg_sys::TimestampTz,
-    sample_value: f64,
-    fc: pg_sys::FunctionCallInfo,
-) -> Option<Inner<GapfillDeltaTransition>> {
-    unsafe {
-        in_aggregate_context(fc, || {
-            if sample_time < lowest_time || sample_time > greatest_time {
-                error!("input time less than lowest time")
-            }
-
-            let mut state = state.unwrap_or_else(|| {
-                let state: Inner<_> = GapfillDeltaTransition::new(
-                    lowest_time,
-                    greatest_time,
-                    range,
-                    step_size,
-                    false,
-                    false,
-                )
-                .into();
-                state
-            });
-
-            state.add_data_point(sample_time, sample_value);
-
-            Some(state)
-        })
+    // prom divides time into sliding windows of fixed size, e.g.
+    // |  5 seconds  |  5 seconds  |  5 seconds  |  5 seconds  |  5 seconds  |
+    // we take the first and last values in that bucket and uses `last-first` as the
+    // value for that bucket.
+    //  | a b c d e | f g h i | j   k |   m    |
+    //  |   e - a   |  i - f  | k - j | <null> |
+    #[allow(clippy::too_many_arguments)]
+    #[pg_extern(immutable, parallel_safe)]
+    pub fn prom_delta_transition(
+        state: Internal,
+        lowest_time: pg_sys::TimestampTz,
+        greatest_time: pg_sys::TimestampTz,
+        step_size: Milliseconds, // `prev_now - step_size` is where the next window starts
+        range: Milliseconds,     // the size of a window to delta over
+        sample_time: pg_sys::TimestampTz,
+        sample_value: f64,
+        fc: pg_sys::FunctionCallInfo,
+    ) -> Internal {
+        prom_delta_transition_inner(
+            unsafe { state.to_inner() },
+            lowest_time,
+            greatest_time,
+            step_size,
+            range,
+            sample_time,
+            sample_value,
+            fc,
+        )
+        .internal()
     }
-}
 
-/// Backwards compatibility
-#[no_mangle]
-pub extern "C" fn pg_finfo_gapfill_delta_transition() -> &'static pg_sys::Pg_finfo_record {
-    const V1_API: pg_sys::Pg_finfo_record = pg_sys::Pg_finfo_record { api_version: 1 };
-    &V1_API
-}
+    #[allow(clippy::too_many_arguments)]
+    fn prom_delta_transition_inner(
+        state: Option<Inner<GapfillDeltaTransition>>,
+        lowest_time: pg_sys::TimestampTz,
+        greatest_time: pg_sys::TimestampTz,
+        step_size: Milliseconds, // `prev_now - step` is where the next window starts
+        range: Milliseconds,     // the size of a window to delta over
+        sample_time: pg_sys::TimestampTz,
+        sample_value: f64,
+        fc: pg_sys::FunctionCallInfo,
+    ) -> Option<Inner<GapfillDeltaTransition>> {
+        unsafe {
+            in_aggregate_context(fc, || {
+                if sample_time < lowest_time || sample_time > greatest_time {
+                    error!("input time less than lowest time")
+                }
 
-#[no_mangle]
-unsafe extern "C" fn gapfill_delta_transition(fcinfo: pg_sys::FunctionCallInfo) -> pg_sys::Datum {
-    prom_delta_transition_wrapper(fcinfo)
-}
+                let mut state = state.unwrap_or_else(|| {
+                    let state: Inner<_> = GapfillDeltaTransition::new(
+                        lowest_time,
+                        greatest_time,
+                        range,
+                        step_size,
+                        false,
+                        false,
+                    )
+                    .into();
+                    state
+                });
 
-#[no_mangle]
-pub extern "C" fn pg_finfo_prom_delta_final_wrapper() -> &'static pg_sys::Pg_finfo_record {
-    const V1_API: pg_sys::Pg_finfo_record = pg_sys::Pg_finfo_record { api_version: 1 };
-    &V1_API
-}
+                state.add_data_point(sample_time, sample_value);
 
-#[no_mangle]
-unsafe extern "C" fn prom_delta_final_wrapper(fcinfo: pg_sys::FunctionCallInfo) -> pg_sys::Datum {
-    super::gapfill_delta::prom_extrapolate_final_wrapper(fcinfo)
-}
+                Some(state)
+            })
+        }
+    }
 
-// implementation of prometheus delta function
-// for proper behavior the input must be ORDER BY sample_time
-extension_sql!(
-    r#"
-CREATE OR REPLACE AGGREGATE _prom_ext.prom_delta(
-    lowest_time TIMESTAMPTZ,
-    greatest_time TIMESTAMPTZ,
-    step_size BIGINT,
-    range BIGINT,
-    sample_time TIMESTAMPTZ,
-    sample_value DOUBLE PRECISION)
-(
-    sfunc=_prom_ext.prom_delta_transition,
-    stype=internal,
-    finalfunc=_prom_ext.prom_extrapolate_final
-);
-"#,
-    name = "create_prom_delta_aggregate",
-    requires = [prom_delta_transition, prom_extrapolate_final]
-);
+    /// Backwards compatibility
+    #[no_mangle]
+    pub extern "C" fn pg_finfo_gapfill_delta_transition() -> &'static pg_sys::Pg_finfo_record {
+        const V1_API: pg_sys::Pg_finfo_record = pg_sys::Pg_finfo_record { api_version: 1 };
+        &V1_API
+    }
+
+    #[no_mangle]
+    unsafe extern "C" fn gapfill_delta_transition(
+        fcinfo: pg_sys::FunctionCallInfo,
+    ) -> pg_sys::Datum {
+        prom_delta_transition_wrapper(fcinfo)
+    }
+
+    #[no_mangle]
+    pub extern "C" fn pg_finfo_prom_delta_final_wrapper() -> &'static pg_sys::Pg_finfo_record {
+        const V1_API: pg_sys::Pg_finfo_record = pg_sys::Pg_finfo_record { api_version: 1 };
+        &V1_API
+    }
+
+    #[no_mangle]
+    unsafe extern "C" fn prom_delta_final_wrapper(
+        fcinfo: pg_sys::FunctionCallInfo,
+    ) -> pg_sys::Datum {
+        super::super::gapfill_delta::_prom_ext::prom_extrapolate_final_wrapper(fcinfo)
+    }
+
+    // implementation of prometheus delta function
+    // for proper behavior the input must be ORDER BY sample_time
+    extension_sql!(
+        r#"
+    CREATE OR REPLACE AGGREGATE _prom_ext.prom_delta(
+        lowest_time TIMESTAMPTZ,
+        greatest_time TIMESTAMPTZ,
+        step_size BIGINT,
+        range BIGINT,
+        sample_time TIMESTAMPTZ,
+        sample_value DOUBLE PRECISION)
+    (
+        sfunc=_prom_ext.prom_delta_transition,
+        stype=internal,
+        finalfunc=_prom_ext.prom_extrapolate_final
+    );
+    "#,
+        name = "create_prom_delta_aggregate",
+        requires = [prom_delta_transition, prom_extrapolate_final]
+    );
+}
 
 #[cfg(any(test, feature = "pg_test"))]
 #[pg_schema]

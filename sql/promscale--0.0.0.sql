@@ -330,10 +330,7 @@ BEGIN
         ) x(objtype, objname)
     )
     LOOP
-        -- extension is installed into _prom_ext schema. thus cannot add it to the extension
-        IF NOT (_rec.objtype = 'SCHEMA' AND _rec.objname = '_prom_ext') THEN
-            EXECUTE format('ALTER EXTENSION promscale ADD %s %s', _rec.objtype, _rec.objname);
-        END IF;
+        EXECUTE format('ALTER EXTENSION promscale ADD %s %s', _rec.objtype, _rec.objname);
         EXECUTE format('ALTER %s %s OWNER TO %I', _rec.objtype, _rec.objname, current_user);
 
         IF _rec.objtype = 'TABLE' THEN
@@ -435,6 +432,7 @@ BEGIN
     -- Bring migrations table up to speed
     INSERT INTO _ps_catalog.migration (name, applied_at_version)
     VALUES
+        ('001-create-ext-schema.sql'      , '0.0.0'),
         ('001-extension.sql'              , '0.0.0'),
         ('002-utils.sql'                  , '0.0.0'),
         ('003-users.sql'                  , '0.0.0'),

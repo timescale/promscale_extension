@@ -4,4 +4,5 @@ dist/*.deb
 dist/*.tar
 target
 hand-written-migration.sql
+bootstrap.sql
 /promscale.control
