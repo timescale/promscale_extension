@@ -1,4 +1,4 @@
-use crate::aggregates::gapfill_delta::GapfillDeltaTransition;
+use crate::aggregates::gapfill_delta::_prom_ext::GapfillDeltaTransition;
 
 mod gapfill_delta;
 mod prom_delta;

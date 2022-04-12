@@ -42,6 +42,7 @@ The Promscale extension's approach to securing its SQL consists of the following
 4. Explicitly schema-qualify all objects and operators in functions without `SET search_path = pg_catalog`
 5. Use `SET LOCAL search_path = pg_catalog;` on procedures which perform transaction control
 6. Explicitly `REVOKE ALL ... FROM PUBLIC` for `SECURITY DEFINER` functions and procedures
+7. Use `SET LOCAL search_path = pg_catalog;` at the beginning of the installation script
 
 Step 1. ensures that the bootstrap superuser (on Postgres 13 and 14) or the
 installing superuser (on postgres 12) is the owner of all schemas. If a schema
@@ -70,5 +71,8 @@ not use it for them.
 
 Step 6. is necessary, as by default functions are executable by `PUBLIC`, which
 is undesirable for `SECURITY DEFINER`.
+
+Step 7. ensures that top-level SQL which is executed during the extension
+install is also fully schema-qualified.
 
 [1]: https://www.postgresql.org/docs/current/extend-extensions.html#EXTEND-EXTENSIONS-SECURITY
