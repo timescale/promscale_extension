@@ -22,7 +22,7 @@ jobs:
         - 13
         - 12
         tsversion:
-        - 2.6.0
+        - 2.6.1
         base:
         - ha
         - alpine

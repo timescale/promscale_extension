@@ -1,5 +1,5 @@
 ARG PG_VERSION=14
-ARG TIMESCALEDB_VERSION_FULL=2.6.0
+ARG TIMESCALEDB_VERSION_FULL=2.6.1
 FROM timescale/timescaledb:${TIMESCALEDB_VERSION_FULL}-pg${PG_VERSION} as builder
 
 MAINTAINER Timescale https://www.timescale.com

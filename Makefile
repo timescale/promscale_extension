@@ -13,7 +13,7 @@ PG_RELEASE_VERSION ?= $(shell ${PG_CONFIG} --version | awk -F'[ \. ]' '{print $$
 PG_BUILD_VERSION = $(shell ${PG_CONFIG} --version | awk -F'[ \. ]' '{print $$2}')
 # If set to a non-empty value, docker builds will be pushed to the registry
 PUSH ?=
-TIMESCALEDB_VERSION_FULL=2.6.0
+TIMESCALEDB_VERSION_FULL=2.6.1
 TIMESCALEDB_VERSION_MAJMIN=$(shell echo $(TIMESCALEDB_VERSION_FULL) | cut -d. -f 1,2)
 TIMESCALEDB_VERSION_MAJOR=$(shell echo $(TIMESCALEDB_VERSION_FULL) | cut -d. -f 1)
 
