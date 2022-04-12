@@ -463,7 +463,6 @@ impl VectorSelector {
 #[pg_schema]
 mod tests {
     use pgx::*;
-    use serde_json::Value;
 
     fn setup() {
         Spi::run(
@@ -814,55 +813,21 @@ mod tests {
                 .expect("SQL query failed");
 
         // Assert that we're running in parallel mode.
-        // Note: this query plan is specific to PG14.
+        let top_level_plan = parallel_plan.0[0]["Plan"].clone();
+        assert_eq!(top_level_plan["Node Type"], "Aggregate");
         assert_eq!(
-            parallel_plan.0,
-            serde_json::from_str::<Value>(
-                r#"
-                 [
-                   {
-                     "Plan": {
-                       "Node Type": "Aggregate",
-                       "Strategy": "Plain",
-                       "Partial Mode": "Finalize",
-                       "Parallel Aware": false,
-                       "Async Capable": false,
-                       "Plans": [
-                         {
-                           "Node Type": "Gather",
-                           "Parent Relationship": "Outer",
-                           "Parallel Aware": false,
-                           "Async Capable": false,
-                           "Workers Planned": 3,
-                           "Single Copy": false,
-                           "Plans": [
-                             {
-                               "Node Type": "Aggregate",
-                               "Strategy": "Plain",
-                               "Partial Mode": "Partial",
-                               "Parent Relationship": "Outer",
-                               "Parallel Aware": false,
-                               "Async Capable": false,
-                               "Plans": [
-                                 {
-                                   "Node Type": "Seq Scan",
-                                   "Parent Relationship": "Outer",
-                                   "Parallel Aware": true,
-                                   "Async Capable": false,
-                                   "Relation Name": "gfv_test_table",
-                                   "Alias": "gfv_test_table"
-                                 }
-                               ]
-                             }
-                           ]
-                         }
-                       ]
-                     }
-                   }
-                 ]
-                "#
-            )
-            .unwrap()
+            top_level_plan
+                .pointer("/Plans/0/Node Type")
+                .and_then(|v| v.as_str()),
+            Some("Gather")
+        );
+        assert!(
+            top_level_plan
+                .pointer("/Plans/0/Workers Planned")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0)
+                > 1,
+            "expected more than one parallel worker in a parallel plan"
         );
 
         let result = Spi::get_one::<Vec<Option<f64>>>(query).expect("SQL query failed");
