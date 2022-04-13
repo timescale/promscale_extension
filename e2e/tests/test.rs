@@ -14,7 +14,9 @@ fn create_drop_promscale_extension() {
     let result = client.simple_query("CREATE EXTENSION promscale;").unwrap();
     assert_eq!(result.len(), 1);
 
-    let result = client.simple_query("DROP EXTENSION promscale;").unwrap();
+    let result = client
+        .simple_query("DROP EXTENSION promscale CASCADE;")
+        .unwrap();
 
     assert_eq!(result.len(), 1);
 }

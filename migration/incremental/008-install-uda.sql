@@ -56,10 +56,22 @@ $func$
 LANGUAGE sql STABLE;
 GRANT EXECUTE ON FUNCTION _prom_catalog.is_multinode() TO prom_reader;
 
+CREATE OR REPLACE FUNCTION _prom_catalog.is_restore_in_progress()
+RETURNS BOOLEAN
+SET search_path = pg_catalog
+AS $func$
+    SELECT coalesce((SELECT setting = 'on' from pg_catalog.pg_settings where name = 'timescaledb.restoring'), false)
+$func$
+LANGUAGE sql STABLE;
+GRANT EXECUTE ON FUNCTION _prom_catalog.is_restore_in_progress() TO prom_reader;
+
 --add 2 jobs executing every 30 min by default for timescaledb 2.0
 DO $$
 BEGIN
-    IF NOT _prom_catalog.is_timescaledb_oss() AND _prom_catalog.get_timescale_major_version() >= 2 THEN
+    IF  NOT _prom_catalog.is_timescaledb_oss()
+        AND _prom_catalog.get_timescale_major_version() >= 2
+        AND NOT _prom_catalog.is_restore_in_progress()
+        THEN
        PERFORM public.add_job('_prom_catalog.execute_maintenance_job', '30 min');
        PERFORM public.add_job('_prom_catalog.execute_maintenance_job', '30 min');
     END IF;

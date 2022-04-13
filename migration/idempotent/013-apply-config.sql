@@ -72,7 +72,14 @@ BEGIN
     (
         -- find tables which belong to the extension so we can mark them to have
         -- their data dumped by pg_dump
-        SELECT format($$SELECT pg_catalog.pg_extension_config_dump('%I.%I', '')$$, n.nspname, k.relname)
+        SELECT format($$SELECT pg_catalog.pg_extension_config_dump('%I.%I', %L)$$,
+            n.nspname,
+            k.relname,
+            case (n.nspname, k.relname)
+                when ('_prom_catalog'::name, 'remote_commands'::name) then 'where seq >= 1000'
+                when ('_ps_trace'::name, 'tag_key'::name) then 'where id >= 1000'
+                else ''
+            end)
         FROM pg_catalog.pg_depend d
         INNER JOIN pg_catalog.pg_extension e ON (d.refobjid = e.oid)
         INNER JOIN pg_catalog.pg_class k ON (d.objid = k.oid)
@@ -81,6 +88,12 @@ BEGIN
         AND d.deptype = 'e'
         AND e.extname = 'promscale'
         AND k.relkind IN ('r', 'p')
+        AND (n.nspname, k.relname) NOT IN
+        (
+            -- these should NOT be config tables
+            ('_ps_catalog'::name, 'migration'::name),
+            ('_ps_catalog'::name, 'promscale_instance_information'::name)
+        )
         ORDER BY n.nspname, k.relname
     )
     LOOP

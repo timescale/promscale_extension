@@ -31,8 +31,8 @@ FROM
     SELECT key, seq
     FROM x
     UNION
-    -- any other remote commands get listed afterwards
-    SELECT key, (SELECT max(seq) FROM x) + row_number() OVER (ORDER BY seq)
+    -- any other remote commands get listed afterwards starting with 1000
+    SELECT key, 999 + row_number() OVER (ORDER BY seq)
     FROM _prom_catalog.remote_commands k
     WHERE NOT EXISTS
     (
@@ -45,6 +45,12 @@ FROM
 WHERE u.key = z.key
 ;
 
-PERFORM setval('_prom_catalog.remote_commands_seq_seq'::regclass, max(seq) + 1, false)
+/*
+    There are known entries listed above that are managed by this script.
+    Other entries in the table are inserted "dynamically" (e.g. when metrics are created).
+    The dynamic entries need to be dumped by pg_dump. We will start the sequence at a
+    minimum of 1000 so that we can identify them as such.
+*/
+PERFORM setval('_prom_catalog.remote_commands_seq_seq'::regclass, greatest(1000, max(seq) + 1), false)
 FROM _prom_catalog.remote_commands
 ;

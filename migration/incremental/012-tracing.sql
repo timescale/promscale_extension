@@ -205,6 +205,7 @@ DECLARE
     _timescaledb_minor_version int;
     _is_compression_available boolean = false;
     _is_multinode boolean = false;
+    _is_restore_in_progress boolean = false;
 BEGIN
     /*
         These functions do not exist until the
@@ -248,9 +249,12 @@ BEGIN
             INTO STRICT _is_multinode
             FROM timescaledb_information.data_nodes;
         END IF;
+
+        SELECT current_setting('timescaledb.restoring') = 'on' INTO STRICT _is_restore_in_progress;
+        RAISE NOTICE 'is restore in progress? %', _is_restore_in_progress;
     END IF;
 
-    IF _is_timescaledb_installed THEN
+    IF _is_timescaledb_installed AND NOT _is_restore_in_progress THEN
         IF _is_multinode THEN
             PERFORM public.create_distributed_hypertable(
                 '_ps_trace.span'::regclass,

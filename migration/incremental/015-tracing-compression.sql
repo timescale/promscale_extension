@@ -116,7 +116,7 @@ CREATE TYPE ps_trace.trace_id(
     alignment = char
 );
 
-CREATE OPERATOR ps_trace.= ( 
+CREATE OPERATOR ps_trace.= (
     FUNCTION=_ps_trace.trace_id_eq,
     LEFTARG=ps_trace.trace_id,
     RIGHTARG=ps_trace.trace_id,
@@ -126,7 +126,7 @@ CREATE OPERATOR ps_trace.= (
     JOIN=eqjoinsel,
     HASHES, MERGES);
 
-CREATE OPERATOR ps_trace.<> ( 
+CREATE OPERATOR ps_trace.<> (
     FUNCTION=_ps_trace.trace_id_ne,
     LEFTARG=ps_trace.trace_id,
     RIGHTARG=ps_trace.trace_id,
@@ -135,7 +135,7 @@ CREATE OPERATOR ps_trace.<> (
     RESTRICT=neqsel,
     JOIN=neqjoinsel);
 
-CREATE OPERATOR ps_trace.> ( 
+CREATE OPERATOR ps_trace.> (
     FUNCTION=_ps_trace.trace_id_gt,
     LEFTARG=ps_trace.trace_id,
     RIGHTARG=ps_trace.trace_id,
@@ -144,7 +144,7 @@ CREATE OPERATOR ps_trace.> (
     RESTRICT=scalargtsel,
     JOIN=scalargtjoinsel);
 
-CREATE OPERATOR ps_trace.>= ( 
+CREATE OPERATOR ps_trace.>= (
     FUNCTION=_ps_trace.trace_id_ge,
     LEFTARG=ps_trace.trace_id,
     RIGHTARG=ps_trace.trace_id,
@@ -153,7 +153,7 @@ CREATE OPERATOR ps_trace.>= (
     RESTRICT=scalargesel,
     JOIN=scalargejoinsel);
 
-CREATE OPERATOR ps_trace.< ( 
+CREATE OPERATOR ps_trace.< (
     FUNCTION=_ps_trace.trace_id_lt,
     LEFTARG=ps_trace.trace_id,
     RIGHTARG=ps_trace.trace_id,
@@ -162,7 +162,7 @@ CREATE OPERATOR ps_trace.< (
     RESTRICT=scalarltsel,
     JOIN=scalarltjoinsel);
 
-CREATE OPERATOR ps_trace.<= ( 
+CREATE OPERATOR ps_trace.<= (
     FUNCTION=_ps_trace.trace_id_le,
     LEFTARG=ps_trace.trace_id,
     RIGHTARG=ps_trace.trace_id,
@@ -181,7 +181,7 @@ DEFAULT FOR TYPE ps_trace.trace_id USING btree AS
     FUNCTION 1 _ps_trace.trace_id_cmp(ps_trace.trace_id,ps_trace.trace_id);
 
 CREATE OPERATOR CLASS ps_trace.hash_trace_id_ops
-DEFAULT FOR TYPE ps_trace.trace_id USING hash AS 
+DEFAULT FOR TYPE ps_trace.trace_id USING hash AS
     OPERATOR 1 ps_trace.=,
     FUNCTION 1 _ps_trace.trace_id_hash(ps_trace.trace_id);
 
@@ -261,82 +261,97 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.link TO prom_writer;
 */
 DO $block$
 DECLARE
-    _is_timescaledb_installed boolean = false;
     _is_compression_available boolean = false;
-    _is_multinode boolean = false;
-    _saved_search_path text;
+    _rec record;
 BEGIN
-    _is_timescaledb_installed = _prom_catalog.is_timescaledb_installed();
-  
-
-    IF _is_timescaledb_installed THEN
-        _is_compression_available = NOT (current_setting('timescaledb.license') = 'apache');
-        _is_multinode = _prom_catalog.is_multinode();
+    IF _prom_catalog.is_restore_in_progress() THEN
+        RETURN;
     END IF;
 
-    IF _is_timescaledb_installed THEN
-        IF _is_multinode THEN
-            PERFORM public.create_distributed_hypertable(
-                '_ps_trace.span'::regclass,
-                'start_time'::name,
-                partitioning_column=>'trace_id'::name,
-                number_partitions=>1::int,
-                chunk_time_interval=>'1 hours'::interval,
-                create_default_indexes=>false
-            );
-            PERFORM public.create_distributed_hypertable(
-                '_ps_trace.event'::regclass,
-                'time'::name,
-                partitioning_column=>'trace_id'::name,
-                number_partitions=>1::int,
-                chunk_time_interval=>'1 hours'::interval,
-                create_default_indexes=>false
-            );
-            PERFORM public.create_distributed_hypertable(
-                '_ps_trace.link'::regclass,
-                'span_start_time'::name,
-                partitioning_column=>'trace_id'::name,
-                number_partitions=>1::int,
-                chunk_time_interval=>'1 hours'::interval,
-                create_default_indexes=>false
-            );
-        ELSE -- not multinode
-            PERFORM public.create_hypertable(
-                '_ps_trace.span'::regclass,
-                'start_time'::name,
-                partitioning_column=>'trace_id'::name,
-                number_partitions=>1::int,
-                chunk_time_interval=>'1 hours'::interval,
-                create_default_indexes=>false
-            );
-            PERFORM public.create_hypertable(
-                '_ps_trace.event'::regclass,
-                'time'::name,
-                partitioning_column=>'trace_id'::name,
-                number_partitions=>1::int,
-                chunk_time_interval=>'1 hours'::interval,
-                create_default_indexes=>false
-            );
-            PERFORM public.create_hypertable(
-                '_ps_trace.link'::regclass,
-                'span_start_time'::name,
-                partitioning_column=>'trace_id'::name,
-                number_partitions=>1::int,
-                chunk_time_interval=>'1 hours'::interval,
-                create_default_indexes=>false
-            );
-        END IF;
+    IF NOT _prom_catalog.is_timescaledb_installed() THEN
+        RETURN;
+    END IF;
 
-        IF _is_compression_available THEN
-            -- turn on compression
-            ALTER TABLE _ps_trace.span SET (timescaledb.compress, timescaledb.compress_orderby='trace_id,span_id,start_time');
-            ALTER TABLE _ps_trace.event SET (timescaledb.compress, timescaledb.compress_orderby='trace_id,span_id,time');
-            ALTER TABLE _ps_trace.link SET (timescaledb.compress, timescaledb.compress_orderby='trace_id,span_id,span_start_time');
+    IF _prom_catalog.is_multinode() THEN
+        PERFORM public.create_distributed_hypertable(
+            '_ps_trace.span'::regclass,
+            'start_time'::name,
+            partitioning_column=>'trace_id'::name,
+            number_partitions=>1::int,
+            chunk_time_interval=>'1 hours'::interval,
+            create_default_indexes=>false
+        );
+        PERFORM public.create_distributed_hypertable(
+            '_ps_trace.event'::regclass,
+            'time'::name,
+            partitioning_column=>'trace_id'::name,
+            number_partitions=>1::int,
+            chunk_time_interval=>'1 hours'::interval,
+            create_default_indexes=>false
+        );
+        PERFORM public.create_distributed_hypertable(
+            '_ps_trace.link'::regclass,
+            'span_start_time'::name,
+            partitioning_column=>'trace_id'::name,
+            number_partitions=>1::int,
+            chunk_time_interval=>'1 hours'::interval,
+            create_default_indexes=>false
+        );
+    ELSE -- not multinode
+        PERFORM public.create_hypertable(
+            '_ps_trace.span'::regclass,
+            'start_time'::name,
+            partitioning_column=>'trace_id'::name,
+            number_partitions=>1::int,
+            chunk_time_interval=>'1 hours'::interval,
+            create_default_indexes=>false
+        );
+        PERFORM public.create_hypertable(
+            '_ps_trace.event'::regclass,
+            'time'::name,
+            partitioning_column=>'trace_id'::name,
+            number_partitions=>1::int,
+            chunk_time_interval=>'1 hours'::interval,
+            create_default_indexes=>false
+        );
+        PERFORM public.create_hypertable(
+            '_ps_trace.link'::regclass,
+            'span_start_time'::name,
+            partitioning_column=>'trace_id'::name,
+            number_partitions=>1::int,
+            chunk_time_interval=>'1 hours'::interval,
+            create_default_indexes=>false
+        );
+    END IF;
 
-            PERFORM public.add_compression_policy('_ps_trace.span', INTERVAL '1 hours');
-            PERFORM public.add_compression_policy('_ps_trace.event', INTERVAL '1 hours');
-            PERFORM public.add_compression_policy('_ps_trace.link', INTERVAL '1 hours');
-        END IF;
+    _is_compression_available = NOT (current_setting('timescaledb.license') = 'apache');
+    IF _is_compression_available THEN
+        -- turn on compression
+        ALTER TABLE _ps_trace.span SET (timescaledb.compress, timescaledb.compress_orderby='trace_id,span_id,start_time');
+        ALTER TABLE _ps_trace.event SET (timescaledb.compress, timescaledb.compress_orderby='trace_id,span_id,time');
+        ALTER TABLE _ps_trace.link SET (timescaledb.compress, timescaledb.compress_orderby='trace_id,span_id,span_start_time');
+
+        PERFORM public.add_compression_policy('_ps_trace.span', INTERVAL '1 hours');
+        PERFORM public.add_compression_policy('_ps_trace.event', INTERVAL '1 hours');
+        PERFORM public.add_compression_policy('_ps_trace.link', INTERVAL '1 hours');
+
+        -- we do not want the compressed hypertables to be associated with the extension
+        -- we want both the table definitions and data to be dumped by pg_dump
+        -- we cannot call create_hypertable during the restore, so we want the definitions in the dump
+        FOR _rec IN
+        (
+            SELECT c.schema_name, c.table_name
+            FROM _timescaledb_catalog.hypertable h
+            INNER JOIN _timescaledb_catalog.hypertable c
+            ON (h.compressed_hypertable_id = c.id)
+            WHERE h.schema_name = '_ps_trace'
+            AND h.table_name IN ('span', 'link', 'event')
+        )
+        LOOP
+            RAISE NOTICE 'removing %.% from extension', _rec.schema_name, _rec.table_name;
+            EXECUTE format($sql$ALTER EXTENSION promscale DROP TABLE %I.%I;$sql$, _rec.schema_name, _rec.table_name);
+        END LOOP;
+
     END IF;
 END;
 $block$
