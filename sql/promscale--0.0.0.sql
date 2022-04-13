@@ -1,3 +1,4 @@
+SET LOCAL search_path = pg_catalog;
 DROP TABLE public.prom_schema_migrations;
 
 REVOKE EXECUTE ON FUNCTION ps_trace.delete_all_traces() FROM prom_writer;
@@ -481,7 +482,7 @@ CREATE TYPE _prom_ext.GapfillDeltaTransition;
 
 -- src/aggregates/gapfill_delta.rs:29
 -- promscale::aggregates::gapfill_delta::gapfilldeltatransition_in
-CREATE OR REPLACE FUNCTION _prom_ext."gapfilldeltatransition_in"(
+CREATE FUNCTION _prom_ext."gapfilldeltatransition_in"(
 	"input" cstring /* &cstr_core::CStr */
 ) RETURNS _prom_ext.GapfillDeltaTransition /* promscale::aggregates::gapfill_delta::GapfillDeltaTransition */
 IMMUTABLE PARALLEL SAFE STRICT
@@ -490,7 +491,7 @@ AS '$libdir/promscale-0.5.0', 'gapfilldeltatransition_in_wrapper';
 
 -- src/aggregates/gapfill_delta.rs:29
 -- promscale::aggregates::gapfill_delta::gapfilldeltatransition_out
-CREATE OR REPLACE FUNCTION _prom_ext."gapfilldeltatransition_out"(
+CREATE FUNCTION _prom_ext."gapfilldeltatransition_out"(
 	"input" _prom_ext.GapfillDeltaTransition /* promscale::aggregates::gapfill_delta::GapfillDeltaTransition */
 ) RETURNS cstring /* &cstr_core::CStr */
 IMMUTABLE PARALLEL SAFE STRICT
@@ -505,3 +506,354 @@ CREATE TYPE _prom_ext.GapfillDeltaTransition (
 	OUTPUT = _prom_ext.gapfilldeltatransition_out, /* promscale::aggregates::gapfill_delta::gapfilldeltatransition_out */
 	STORAGE = extended
 );
+
+
+
+--make sure the objects that we have made part of the extension are secure
+DO $block$
+DECLARE
+    obj_owner_oid oid;
+    is_super boolean;
+    errors text[];
+BEGIN
+    --the owner of extension objects is whoever is executing this script
+    SELECT usesysid INTO STRICT obj_owner_oid FROM pg_user WHERE usename = current_user;
+
+    --figure out if whoever is executing the extension is a superuser;
+    --use session and not current user to be compatible with pgextwlist
+    --namely, we want to check the user installing the extension, not whoever
+    --is running this script because pgextwlist would make that the bootstrap superuser.
+    --note that @ext_owner@ is also changed to superuser under pgextwlist (even if trusted extension).
+    --in general, it seems using the session_user is safer than other alternatives.
+    SELECT usesuper INTO STRICT is_super FROM pg_user WHERE usename = session_user;
+
+    --way out of these checks for superusers
+    IF NOT (is_super AND coalesce(current_setting('promscale.disable_security_check', true)::boolean, false))
+    THEN
+        --the basic approach here is find all objects depending on our extension and make sure they have the right owner
+        --the first query handles most types of object but some objects need special handling.
+        --those can be found further down.
+
+        --this code does not need to say "ok" to all types of objects, just those that exists in the connector 0.10.0
+        --schema. On the other hand it /must/ fail all other objects.
+        with recursive cte AS (
+            select
+                    0 as level,
+                    ARRAY[pg_describe_object(classid, objid, objsubid)] descr,
+                false is_cycle,
+                classid,
+                objid,
+                objsubid
+            from pg_depend
+            where deptype='e' and
+                refclassid='pg_catalog.pg_extension'::regclass and
+                refobjid = (select oid from pg_extension where extname='promscale')
+            UNION ALL
+            select
+                level + 1,
+                cte.descr || pg_describe_object(dep.classid, dep.objid, dep.objsubid),
+                pg_describe_object(dep.classid, dep.objid, dep.objsubid) = ANY(descr),
+                dep.classid,
+                dep.objid,
+                dep.objsubid
+            from cte
+            inner join pg_depend dep ON (cte.classid = dep.refclassid
+                                    AND cte.objid = dep.refobjid)
+            where NOT is_cycle
+        ),
+        with_owner as (
+            SELECT
+                CASE
+                WHEN classid = 'pg_class'::regclass THEN
+                    (select relowner from pg_class where oid = objid)
+                WHEN classid = 'pg_type'::regclass THEN
+                    (select typowner from pg_type where oid = objid)
+                WHEN classid = 'pg_proc'::regclass THEN
+                    (select proowner from pg_proc where oid = objid)
+                WHEN classid = 'pg_namespace'::regclass THEN
+                    (select nspowner from pg_namespace where oid = objid)
+                WHEN classid = 'pg_operator'::regclass THEN
+                    (select oprowner from pg_operator where oid = objid)
+                ELSE
+                    -1
+                END as owner,
+                *
+            FROM cte
+            --each of these classes is handled separately below
+            WHERE classid NOT IN (
+                'pg_constraint'::regclass,
+                'pg_trigger'::regclass,
+                'pg_rewrite'::regclass,
+                'pg_attrdef'::regclass
+            )
+        )
+        select array_agg (
+                'Object ' || pg_describe_object(classid, objid, objsubid) || ' is owned by ' || owner::text
+        )
+        into errors
+        from with_owner
+        where (
+            --either the owner is the object owner
+            (owner = obj_owner_oid)
+            OR
+            --or prom_admin (these are for metric and series tables)
+            (owner = (SELECT oid FROM pg_roles WHERE rolname = 'prom_admin') AND classid IN ('pg_class'::regclass, 'pg_type'::regclass))
+        ) is not true;
+
+        IF array_length(errors, 1) > 0 THEN
+            RAISE EXCEPTION 'could not secure the promscale installation: %', array_to_string(errors, ', ');
+        END IF;
+
+        --check constraints: make sure all check constraints use expressions recognized by us
+        with recursive cte AS (
+            select
+                    0 as level,
+                    ARRAY[pg_describe_object(classid, objid, objsubid)] descr,
+                false is_cycle,
+                classid,
+                objid,
+                objsubid
+            from pg_depend
+            where deptype='e' and
+                refclassid='pg_catalog.pg_extension'::regclass and
+                refobjid = (select oid from pg_extension where extname='promscale')
+            UNION ALL
+            select
+                level + 1,
+                cte.descr || pg_describe_object(dep.classid, dep.objid, dep.objsubid),
+                pg_describe_object(dep.classid, dep.objid, dep.objsubid) = ANY(descr),
+                dep.classid,
+                dep.objid,
+                dep.objsubid
+            from cte
+            inner join pg_depend dep ON (cte.classid = dep.refclassid
+                                    AND cte.objid = dep.refobjid)
+            where NOT is_cycle
+        ),
+        constr as (
+            SELECT *
+            FROM cte
+            INNER JOIN pg_constraint c ON (
+                    cte.classid = 'pg_constraint'::regclass AND
+                    c.oid = cte.objid)
+            WHERE c.contype NOT IN ('f','p','u') --fk, pk, and unique are safe
+        )
+        select array_agg (
+                'constraint ' || pg_describe_object(classid, objid, objsubid) || ' has unrecognized check constraint ' || pg_get_constraintdef(oid)
+        )
+        into errors
+        FROM constr
+        WHERE ( --if the part inside the parenthesis returns true, the constraint is safe
+        pg_get_constraintdef(oid) = ANY(
+            $${
+            "CHECK ((VALUE <> ''::text))",
+            "CHECK ((jsonb_typeof(VALUE) = 'object'::text))",
+            "CHECK ((VALUE <> '00000000-0000-0000-0000-000000000000'::uuid))",
+            "CHECK ((VALUE <> '00000000-0000-0000-0000-000000000000'::uuid))",
+            "CHECK ((VALUE <> ''::text))",
+            "CHECK ((jsonb_typeof(VALUE) = 'object'::text))",
+            "CHECK ((is_unique = true))",
+            "CHECK ((id > 0))",
+            "CHECK ((((uuid = '00000000-0000-0000-0000-000000000000'::uuid) OR (NOT is_counter_reset_row)) AND ((uuid <> '00000000-0000-0000-0000-000000000000'::uuid) OR is_counter_reset_row)))",
+            "CHECK ((span_id <> 0))",
+            "CHECK ((linked_span_id <> 0))",
+            "CHECK ((parent_span_id <> 0))",
+            "CHECK ((span_name <> ''::text))",
+            "CHECK ((start_time <= end_time))",
+            "CHECK ((trace_state <> ''::text))",
+            "CHECK ((url <> ''::text))"
+            }$$::text[]
+        )
+        OR
+        pg_get_constraintdef(oid) similar to 'CHECK \(\(metric_id = \d*\)\)'
+        OR
+        pg_get_constraintdef(oid) similar to 'CHECK \(\(\(labels\[1\] = \d*\) AND \(labels\[1\] IS NOT NULL\)\)\)'
+        OR
+        pg_get_constraintdef(oid) similar to $$CHECK \(\(\("time" >= '(\d|\-| |\.|\:|\+)*'::timestamp with time zone\) AND \("time" < '(\d|\-| |\.|\:|\+)*'::timestamp with time zone\)\)\)$$
+        ) IS NOT TRUE; --use is not true for correct NULL handling
+
+        IF array_length(errors, 1) > 0 THEN
+            RAISE EXCEPTION 'could not secure the promscale installation: %', array_to_string(errors, ', ');
+        END IF;
+
+        --triggers: make sure associated functions owned by us or a superuser (superuser own fk triggers, cont agg triggers)
+        with recursive cte AS (
+            select
+                    0 as level,
+                    ARRAY[pg_describe_object(classid, objid, objsubid)] descr,
+                false is_cycle,
+                classid,
+                objid,
+                objsubid
+            from pg_depend
+            where deptype='e' and
+                refclassid='pg_catalog.pg_extension'::regclass and
+                refobjid = (select oid from pg_extension where extname='promscale')
+            UNION ALL
+            select
+                level + 1,
+                cte.descr || pg_describe_object(dep.classid, dep.objid, dep.objsubid),
+                pg_describe_object(dep.classid, dep.objid, dep.objsubid) = ANY(descr),
+                dep.classid,
+                dep.objid,
+                dep.objsubid
+            from cte
+            inner join pg_depend dep ON (cte.classid = dep.refclassid
+                                    AND cte.objid = dep.refobjid)
+            where NOT is_cycle
+        ),
+        trigger as (
+            SELECT *
+            FROM cte
+            INNER JOIN pg_trigger t ON (
+                    cte.classid = 'pg_trigger'::regclass AND
+                    t.oid = cte.objid)
+            LEFT JOIN pg_proc p ON (p.oid = t.tgfoid)
+            LEFT JOIN pg_authid a ON (p.proowner = a.oid)
+        )
+        SELECT array_agg (
+                'Trigger ' || pg_describe_object(classid, objid, objsubid) || ' is owned by ' || t.proowner::text
+                )
+        INTO errors
+        FROM trigger t
+        WHERE t.proowner != obj_owner_oid and not t.rolsuper;
+
+        IF array_length(errors, 1) > 0 THEN
+            RAISE EXCEPTION 'could not secure the promscale installation: %', array_to_string(errors, ', ');
+        END IF;
+
+        --rewrite rules must refer to views owned by us
+        with recursive cte AS (
+            select
+                    0 as level,
+                    ARRAY[pg_describe_object(classid, objid, objsubid)] descr,
+                false is_cycle,
+                classid,
+                objid,
+                objsubid,
+                refclassid,
+                refobjid,
+                refobjsubid
+            from pg_depend
+            where deptype='e' and
+                refclassid='pg_catalog.pg_extension'::regclass and
+                refobjid = (select oid from pg_extension where extname='promscale')
+            UNION ALL
+            select
+                level + 1,
+                cte.descr || pg_describe_object(dep.classid, dep.objid, dep.objsubid),
+                pg_describe_object(dep.classid, dep.objid, dep.objsubid) = ANY(descr),
+                dep.classid,
+                dep.objid,
+                dep.objsubid,
+                dep.refclassid,
+                dep.refobjid,
+                dep.refobjsubid
+            from cte
+            inner join pg_depend dep ON (cte.classid = dep.refclassid
+                                    AND cte.objid = dep.refobjid)
+            where NOT is_cycle
+        ),
+        rewrite as (
+            SELECT *
+            FROM cte
+            INNER JOIN pg_rewrite r ON (
+                    cte.classid = 'pg_rewrite'::regclass AND
+                    r.oid = cte.objid)
+            LEFT JOIN pg_class c ON (r.ev_class = c.oid)
+        )
+        SELECT array_agg (
+                'rewrite rule ' || pg_describe_object(classid, objid, objsubid) || ' is owned by ' || relowner::text
+        )
+        INTO errors
+        FROM rewrite
+        WHERE ( --if the part inside the parenthesis returns true, the rewrite is safe
+            --views owned by us are safe
+            (relowner = obj_owner_oid and relkind = 'v' and rulename='_RETURN')
+            OR
+            --views owned by prom_admin are safe (these are metric and series views)
+            (relowner = (SELECT oid FROM pg_roles WHERE rolname = 'prom_admin') and relkind = 'v' and rulename='_RETURN')
+            OR
+            --views using our functions are safe (probably in user-defined views)
+            (refclassid = 'pg_proc'::regclass)
+            OR
+            --column references are safe (probably in user-defined views)
+            (refclassid = 'pg_class'::regclass AND refobjsubid != 0)
+        ) IS NOT TRUE; --use "is not true" for correct NULL handling
+
+        IF array_length(errors, 1) > 0 THEN
+            RAISE EXCEPTION 'could not secure the promscale installation: %', array_to_string(errors, ', ');
+        END IF;
+
+        --all column defaults refer to sequences owned by us or known values
+        with recursive cte AS (
+            select
+                    0 as level,
+                    ARRAY[pg_describe_object(classid, objid, objsubid)] descr,
+                false is_cycle,
+                classid,
+                objid,
+                objsubid
+            from pg_depend
+            where deptype='e' and
+                refclassid='pg_catalog.pg_extension'::regclass and
+                refobjid = (select oid from pg_extension where extname='promscale')
+            UNION ALL
+            select
+                level + 1,
+                cte.descr || pg_describe_object(dep.classid, dep.objid, dep.objsubid),
+                pg_describe_object(dep.classid, dep.objid, dep.objsubid) = ANY(descr),
+                dep.classid,
+                dep.objid,
+                dep.objsubid
+            from cte
+            inner join pg_depend dep ON (cte.classid = dep.refclassid
+                                    AND cte.objid = dep.refobjid)
+            where NOT is_cycle
+        ),
+        attrdef as (
+            SELECT pg_get_expr(adbin, adrelid) expr, cte.*, upstream_seq_class.relowner as seq_owner
+            FROM cte
+            INNER JOIN pg_attrdef a ON (
+                    cte.classid = 'pg_attrdef'::regclass AND
+                    a.oid = cte.objid)
+            LEFT JOIN pg_depend upstream_seq ON (
+                    upstream_seq.objid = a.oid AND
+                    upstream_seq.classid = 'pg_attrdef'::regclass AND
+                    upstream_seq.refclassid = 'pg_class'::regclass AND
+                    (SELECT relkind = 'S' FROM pg_class c WHERE c.oid=upstream_seq.refobjid)
+            )
+            LEFT JOIN pg_class upstream_seq_class ON (
+                upstream_seq_class.oid = upstream_seq.refobjid
+            )
+        )
+        SELECT array_agg (
+                'attribute default ' || pg_describe_object(classid, objid, objsubid) || ' is unrecognized: ' || expr
+        )
+        INTO errors
+        FROM attrdef
+        WHERE ( --if the part in the parenthesis returns true it means the default is safe
+            --sequeneces owned by the owner are safe
+            (seq_owner is not null and seq_owner = obj_owner_oid)
+            OR
+            --known expressions are good
+            (expr = ANY(
+                    $${
+                    "'prom_data'::name",
+                    "(EXTRACT(epoch FROM (end_time - start_time)) * 1000.0)",
+                    "(date_part('epoch'::text, (end_time - start_time)) * (1000.0)::double precision)",
+                    "0",
+                    "clock_timestamp()",
+                    "false",
+                    "true"
+                    }$$::text[]
+               )
+            )
+        ) IS NOT TRUE; --use "is not true" for correct NULL handling
+
+        IF array_length(errors, 1) > 0 THEN
+            RAISE EXCEPTION 'could not secure the promscale installation: %', array_to_string(errors, ', ');
+        END IF;
+    END IF;
+END
+$block$;
