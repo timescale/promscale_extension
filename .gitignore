@@ -3,6 +3,6 @@ dist/*.rpm
 dist/*.deb
 dist/*.tar
 target
-hand-written-migration.sql
-bootstrap.sql
+/hand-written-migration.sql
 /promscale.control
+/bootstrap.sql

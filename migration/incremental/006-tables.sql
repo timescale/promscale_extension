@@ -35,14 +35,20 @@ CREATE TABLE _prom_catalog.series (
     labels prom_api.label_array NOT NULL, --labels are globally unique because of how partitions are defined
     delete_epoch bigint NULL DEFAULT NULL -- epoch after which this row can be deleted
 ) PARTITION BY LIST(metric_id);
+/*
+We need to drop the _prom_catalog.series_deleted and _prom_catalog.series_labels_id
+indexes. They are defined on the _prom_catalog.series table which is partitioned. We
+don't want the index defined on the parent. We want it defined on each child individually
+manually. Having it defined on the parent causes the indexes to be defined automatically
+on the partitions which causes issues with the dump/restore process.
+*/
+--CREATE INDEX series_labels_id ON _prom_catalog.series USING GIN (labels);
+--CREATE INDEX series_deleted
+--    ON _prom_catalog.series(delete_epoch, id)
+--    WHERE delete_epoch IS NOT NULL;
 GRANT SELECT ON TABLE _prom_catalog.series TO prom_reader;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _prom_catalog.series TO prom_writer;
 
-
-CREATE INDEX series_labels_id ON _prom_catalog.series USING GIN (labels);
-CREATE INDEX series_deleted
-    ON _prom_catalog.series(delete_epoch, id)
-    WHERE delete_epoch IS NOT NULL;
 
 CREATE SEQUENCE _prom_catalog.series_id;
 GRANT USAGE ON SEQUENCE _prom_catalog.series_id TO prom_writer;
@@ -69,8 +75,20 @@ CREATE TABLE _prom_catalog.ids_epoch(
 GRANT SELECT ON TABLE _prom_catalog.ids_epoch TO prom_reader;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _prom_catalog.ids_epoch TO prom_writer;
 
--- uses an arbitrary start time so pristine and migrated DBs have the same values
-INSERT INTO _prom_catalog.ids_epoch VALUES (0, '1970-01-01 00:00:00 UTC', true);
+DO $block$
+DECLARE
+    _is_restore_in_progress boolean = false;
+BEGIN
+    _is_restore_in_progress = coalesce((SELECT setting::boolean from pg_catalog.pg_settings where name = 'timescaledb.restoring'), false);
+    IF _is_restore_in_progress THEN
+        -- if a restore is in progress, we want the value from the backup, not this hardcoded init value
+        RAISE NOTICE 'restore in progress. skipping insert into _prom_catalog.ids_epoch';
+        RETURN;
+    END IF;
+    -- uses an arbitrary start time so pristine and migrated DBs have the same values
+    INSERT INTO _prom_catalog.ids_epoch VALUES (0, '1970-01-01 00:00:00 UTC', true);
+END;
+$block$;
 
 --This table creates a unique mapping
 --between label keys and their column names across metrics.

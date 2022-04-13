@@ -138,7 +138,12 @@ fn render_file(path: PathBuf, sql_type: &SqlType) -> Result<String, Error> {
         assert_eq!(
             curr,
             prev + 1,
-            "there must be no gaps nor duplicates in the ordering of incremental and idempotent files"
+            "there must be no gaps nor duplicates in the ordering of {} files: {}",
+            match sql_type {
+                SqlType::Incremental => "incremental",
+                SqlType::Idempotent => "idempotent",
+            },
+            path.to_str().unwrap()
         );
         prev = curr;
         result += wrap(&path, sql_type).as_str();

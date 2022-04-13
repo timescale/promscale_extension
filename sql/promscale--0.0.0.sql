@@ -11,6 +11,7 @@ DROP OPERATOR IF EXISTS prom_api.==~ (prom_api.label_key, prom_api.pattern);
 DO $block$
 DECLARE
     _rec record;
+    _config_filter text;
 BEGIN
     FOR _rec IN
     (
@@ -52,7 +53,7 @@ BEGIN
         , ('TABLE', '_ps_trace.span')
         , ('TABLE', '_ps_trace.tag')
         , ('TABLE', '_ps_trace.tag_key')
-        , ('TABLE', 'public.prom_installation_info')
+        --, ('TABLE', 'public.prom_installation_info') this will be dropped immediately in 0.5.0
         , ('VIEW', 'prom_info.label')
         , ('VIEW', 'prom_info.metric')
         , ('VIEW', 'prom_info.metric_stats')
@@ -333,8 +334,13 @@ BEGIN
         EXECUTE format('ALTER EXTENSION promscale ADD %s %s', _rec.objtype, _rec.objname);
         EXECUTE format('ALTER %s %s OWNER TO %I', _rec.objtype, _rec.objname, current_user);
 
-        IF _rec.objtype = 'TABLE' THEN
-            EXECUTE format($sql$SELECT pg_catalog.pg_extension_config_dump(%L, '')$sql$, _rec.objname);
+        IF _rec.objtype IN ('TABLE', 'SEQUENCE') AND _rec.objname NOT IN ('_ps_catalog.migration', '_ps_catalog.promscale_instance_information') THEN
+            _config_filter = case _rec.objname
+                when '_prom_catalog.remote_commands' then 'where seq >= 1000'
+                when '_ps_trace.tag_key' then 'where id >= 1000'
+                else ''
+            end;
+            EXECUTE format($sql$SELECT pg_catalog.pg_extension_config_dump(%L, %L)$sql$, _rec.objname, _config_filter);
         END IF;
     END LOOP;
 END;
@@ -353,28 +359,6 @@ BEGIN
         EXECUTE format($sql$SELECT pg_catalog.pg_extension_config_dump('_ps_trace.tag_%s', '')$sql$, _i);
    END LOOP;
 END
-$block$
-;
-
---tracing hypertables
-DO $block$
-DECLARE
-    _rec record;
-BEGIN
-    FOR _rec IN
-    (
-        SELECT c.schema_name, c.table_name
-        FROM _timescaledb_catalog.hypertable h
-        INNER JOIN _timescaledb_catalog.hypertable c
-        ON (h.compressed_hypertable_id = c.id)
-        WHERE h.schema_name = '_ps_trace'
-        AND h.table_name IN ('span', 'link', 'event')
-    )
-    LOOP
-        EXECUTE format($sql$ALTER EXTENSION promscale ADD TABLE %I.%I;$sql$, _rec.schema_name, _rec.table_name);
-        EXECUTE format($sql$SELECT pg_catalog.pg_extension_config_dump('%I.%I', '')$sql$, _rec.schema_name, _rec.table_name);
-    END LOOP;
-END;
 $block$
 ;
 

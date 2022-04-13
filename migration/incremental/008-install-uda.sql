@@ -58,8 +58,14 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.is_multinode() TO prom_reader;
 
 --add 2 jobs executing every 30 min by default for timescaledb 2.0
 DO $$
+DECLARE
+    _is_restore_in_progress boolean = false;
 BEGIN
-    IF NOT _prom_catalog.is_timescaledb_oss() AND _prom_catalog.get_timescale_major_version() >= 2 THEN
+    _is_restore_in_progress = coalesce((SELECT setting::boolean from pg_catalog.pg_settings where name = 'timescaledb.restoring'), false);
+    IF  NOT _prom_catalog.is_timescaledb_oss()
+        AND _prom_catalog.get_timescale_major_version() >= 2
+        AND NOT _is_restore_in_progress
+        THEN
        PERFORM public.add_job('_prom_catalog.execute_maintenance_job', '30 min');
        PERFORM public.add_job('_prom_catalog.execute_maintenance_job', '30 min');
     END IF;

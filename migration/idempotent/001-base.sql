@@ -1,6 +1,57 @@
 --NOTES
 --This code assumes that table names can only be 63 chars long
 
+CREATE OR REPLACE VIEW _prom_catalog.initial_default AS
+SELECT *
+FROM
+(
+    VALUES
+    ('chunk_interval'           , (INTERVAL '8 hours')::text),
+    ('retention_period'         , (90 * INTERVAL '1 day')::text),
+    ('metric_compression'       , (exists(select 1 from pg_catalog.pg_proc where proname = 'compress_chunk')::text)),
+    ('trace_retention_period'   , (30 * INTERVAL '1 days')::text),
+    ('ha_lease_timeout'         , '1m'),
+    ('ha_lease_refresh'         , '10s')
+) d(key, value)
+;
+GRANT SELECT ON _prom_catalog.initial_default TO prom_reader;
+
+CREATE OR REPLACE FUNCTION _prom_catalog.get_default_value(_key text)
+    RETURNS TEXT
+    SET search_path = pg_catalog
+AS $func$
+    -- if there is a user-supplied default value, take it
+    -- otherwise take the initial default value
+    SELECT coalesce(d.value, dd.value)
+    FROM _prom_catalog.initial_default dd
+    LEFT OUTER JOIN _prom_catalog.default d ON (dd.key = d.key)
+    WHERE dd.key = _key;
+$func$
+LANGUAGE SQL STABLE PARALLEL SAFE;
+GRANT EXECUTE ON FUNCTION _prom_catalog.get_default_value(text) TO prom_reader;
+
+CREATE OR REPLACE FUNCTION _prom_catalog.set_default_value(_key text, _value text)
+    RETURNS VOID
+    SET search_path = pg_catalog
+AS $func$
+    INSERT INTO _prom_catalog.default (key, value)
+    VALUES (_key, _value)
+    ON CONFLICT (key) DO
+    UPDATE SET value = excluded.value
+    ;
+$func$
+LANGUAGE SQL VOLATILE;
+GRANT EXECUTE ON FUNCTION _prom_catalog.set_default_value(text, text) TO prom_admin;
+
+CREATE OR REPLACE FUNCTION _prom_catalog.is_restore_in_progress()
+RETURNS BOOLEAN
+SET search_path = pg_catalog
+AS $func$
+    SELECT coalesce((SELECT setting::boolean from pg_catalog.pg_settings where name = 'timescaledb.restoring'), false)
+$func$
+LANGUAGE sql STABLE;
+GRANT EXECUTE ON FUNCTION _prom_catalog.is_restore_in_progress() TO prom_reader;
+
 CREATE OR REPLACE PROCEDURE _prom_catalog.execute_everywhere(command_key text, command TEXT, transactional BOOLEAN = true)
     SET search_path = pg_catalog
 AS $func$
@@ -11,6 +62,12 @@ BEGIN
     END IF;
 
     EXECUTE command;
+
+    -- do not call distributed_exec if we are in the middle of restoring from backup
+    IF _prom_catalog.is_restore_in_progress() THEN
+        RAISE NOTICE 'restore in progress. skipping %', coalesce(command_key, 'anonymous command');
+        RETURN;
+    END IF;
     BEGIN
         CALL public.distributed_exec(command);
     EXCEPTION
@@ -42,7 +99,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.get_default_chunk_interval()
     RETURNS INTERVAL
     SET search_path = pg_catalog
 AS $func$
-    SELECT value::INTERVAL FROM _prom_catalog.default WHERE key='chunk_interval';
+    SELECT _prom_catalog.get_default_value('chunk_interval')::pg_catalog.interval;
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION _prom_catalog.get_default_chunk_interval() TO prom_reader;
@@ -69,7 +126,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.get_default_retention_period()
     RETURNS INTERVAL
     SET search_path = pg_catalog
 AS $func$
-    SELECT value::INTERVAL FROM _prom_catalog.default WHERE key='retention_period';
+    SELECT _prom_catalog.get_default_value('retention_period')::pg_catalog.interval;
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION _prom_catalog.get_default_retention_period() TO prom_reader;
@@ -110,7 +167,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.get_default_compression_setting()
     RETURNS BOOLEAN
     SET search_path = pg_catalog
 AS $func$
-    SELECT value::BOOLEAN FROM _prom_catalog.default WHERE key='metric_compression';
+    SELECT _prom_catalog.get_default_value('metric_compression')::boolean;
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION _prom_catalog.get_default_compression_setting() TO prom_reader;
@@ -302,26 +359,30 @@ AS $func$
 DECLARE
   label_id INT;
 BEGIN
-
-   -- Note: if the inserted metric is a view, nothing to do.
-   IF NEW.is_view THEN
+    -- if a database restore is in progress do not create metric tables as they will be created as a part of the restore
+    IF _prom_catalog.is_restore_in_progress() THEN
         RETURN NEW;
-   END IF;
+    END IF;
 
-   EXECUTE format('CREATE TABLE %I.%I(time TIMESTAMPTZ NOT NULL, value DOUBLE PRECISION NOT NULL, series_id BIGINT NOT NULL) WITH (autovacuum_vacuum_threshold = 50000, autovacuum_analyze_threshold = 50000)',
+    -- Note: if the inserted metric is a view, nothing to do.
+    IF NEW.is_view THEN
+        RETURN NEW;
+    END IF;
+
+    EXECUTE format('CREATE TABLE %I.%I(time TIMESTAMPTZ NOT NULL, value DOUBLE PRECISION NOT NULL, series_id BIGINT NOT NULL) WITH (autovacuum_vacuum_threshold = 50000, autovacuum_analyze_threshold = 50000)',
                     NEW.table_schema, NEW.table_name);
-   EXECUTE format('GRANT SELECT ON TABLE %I.%I TO prom_reader', NEW.table_schema, NEW.table_name);
-   EXECUTE format('GRANT SELECT, INSERT ON TABLE %I.%I TO prom_writer', NEW.table_schema, NEW.table_name);
-   EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I.%I TO prom_modifier', NEW.table_schema, NEW.table_name);
-   EXECUTE format('CREATE UNIQUE INDEX data_series_id_time_%s ON %I.%I (series_id, time) INCLUDE (value)',
+    EXECUTE format('GRANT SELECT ON TABLE %I.%I TO prom_reader', NEW.table_schema, NEW.table_name);
+    EXECUTE format('GRANT SELECT, INSERT ON TABLE %I.%I TO prom_writer', NEW.table_schema, NEW.table_name);
+    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I.%I TO prom_modifier', NEW.table_schema, NEW.table_name);
+    EXECUTE format('CREATE UNIQUE INDEX data_series_id_time_%s ON %I.%I (series_id, time) INCLUDE (value)',
                     NEW.id, NEW.table_schema, NEW.table_name);
-  
-   --dynamically created tables are owned by our highest-privileged role, prom_admin
-   --these cannot be made part of the extension since we cannot make them config
-   --tables outside of extension upgrade/install scripts. They cannot be superuser
-   --owned without being part extension since that would prevent dump/restore from
-   --working on any environment without SU privileges (such as cloud).
-   EXECUTE format('ALTER TABLE %I.%I OWNER TO prom_admin', NEW.table_schema, NEW.table_name);
+
+    --dynamically created tables are owned by our highest-privileged role, prom_admin
+    --these cannot be made part of the extension since we cannot make them config
+    --tables outside of extension upgrade/install scripts. They cannot be superuser
+    --owned without being part extension since that would prevent dump/restore from
+    --working on any environment without SU privileges (such as cloud).
+    EXECUTE format('ALTER TABLE %I.%I OWNER TO prom_admin', NEW.table_schema, NEW.table_name);
 
     IF _prom_catalog.is_timescaledb_installed() THEN
         IF _prom_catalog.is_multinode() THEN
@@ -344,10 +405,9 @@ BEGIN
     --Do not move this into the finalize step, because it's cheap to do while the table is empty
     --but takes a heavyweight blocking lock otherwise.
     IF  _prom_catalog.is_timescaledb_installed()
-            AND _prom_catalog.get_default_compression_setting() THEN
-            PERFORM prom_api.set_compression_on_metric_table(NEW.table_name, TRUE);
+        AND _prom_catalog.get_default_compression_setting() THEN
+        PERFORM prom_api.set_compression_on_metric_table(NEW.table_name, TRUE);
     END IF;
-
 
     SELECT _prom_catalog.get_or_create_label_id('__name__', NEW.metric_name)
     INTO STRICT label_id;
@@ -364,12 +424,17 @@ BEGIN
             CONSTRAINT series_pkey_%3$s PRIMARY KEY(id)
         ) WITH (autovacuum_vacuum_threshold = 100, autovacuum_analyze_threshold = 100)
     $$, NEW.table_name, label_id, NEW.id);
-   EXECUTE format('GRANT SELECT ON TABLE prom_data_series.%I TO prom_reader', NEW.table_name);
-   EXECUTE format('GRANT SELECT, INSERT ON TABLE prom_data_series.%I TO prom_writer', NEW.table_name);
-   EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE prom_data_series.%I TO prom_modifier', NEW.table_name);
+    EXECUTE format('GRANT SELECT ON TABLE prom_data_series.%I TO prom_reader', NEW.table_name);
+    EXECUTE format('GRANT SELECT, INSERT ON TABLE prom_data_series.%I TO prom_writer', NEW.table_name);
+    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE prom_data_series.%I TO prom_modifier', NEW.table_name);
 
-   EXECUTE format('ALTER TABLE prom_data_series.%1$I OWNER TO prom_admin', NEW.table_name);
-   RETURN NEW;
+    --these indexes are logically on all series tables but they cannot be defined on the parent due to
+    --dump/restore issues.
+    EXECUTE format('CREATE INDEX series_labels_%s ON prom_data_series.%I USING GIN (labels)', NEW.id, NEW.table_name);
+    EXECUTE format('CREATE INDEX series_delete_epoch_id_%s ON prom_data_series.%I (delete_epoch, id) WHERE delete_epoch IS NOT NULL', NEW.id, NEW.table_name);
+
+    EXECUTE format('ALTER TABLE prom_data_series.%1$I OWNER TO prom_admin', NEW.table_name);
+    RETURN NEW;
 END
 $func$
 LANGUAGE PLPGSQL;
@@ -1325,8 +1390,7 @@ CREATE OR REPLACE FUNCTION prom_api.set_default_chunk_interval(chunk_interval IN
     VOLATILE
     SET search_path = pg_catalog
 AS $$
-    INSERT INTO _prom_catalog.default(key, value) VALUES('chunk_interval', chunk_interval::text)
-    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+    SELECT _prom_catalog.set_default_value('chunk_interval', chunk_interval::pg_catalog.text);
 
     SELECT _prom_catalog.set_chunk_interval_on_metric_table(metric_name, chunk_interval)
     FROM _prom_catalog.metric
@@ -1409,8 +1473,7 @@ CREATE OR REPLACE FUNCTION prom_api.set_default_retention_period(retention_perio
     VOLATILE
     SET search_path = pg_catalog
 AS $$
-    INSERT INTO _prom_catalog.default(key, value) VALUES('retention_period', retention_period::text)
-    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+    SELECT _prom_catalog.set_default_value('retention_period', retention_period::text);
     SELECT true;
 $$
 LANGUAGE SQL;
@@ -1608,8 +1671,7 @@ BEGIN
         RAISE EXCEPTION 'Cannot enable metrics compression, feature not found';
     END IF;
 
-    INSERT INTO _prom_catalog.default(key, value) VALUES('metric_compression', compression_setting::text)
-    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+    PERFORM _prom_catalog.set_default_value('metric_compression', compression_setting::text);
 
     PERFORM prom_api.set_compression_on_metric_table(table_name, compression_setting)
     FROM _prom_catalog.metric
