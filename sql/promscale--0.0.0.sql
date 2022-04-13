@@ -11,6 +11,7 @@ DROP OPERATOR IF EXISTS prom_api.==~ (prom_api.label_key, prom_api.pattern);
 DO $block$
 DECLARE
     _rec record;
+    _config_filter text;
 BEGIN
     FOR _rec IN
     (
@@ -336,8 +337,13 @@ BEGIN
         END IF;
         EXECUTE format('ALTER %s %s OWNER TO %I', _rec.objtype, _rec.objname, current_user);
 
-        IF _rec.objtype = 'TABLE' THEN
-            EXECUTE format($sql$SELECT pg_catalog.pg_extension_config_dump(%L, '')$sql$, _rec.objname);
+        IF _rec.objtype = 'TABLE' AND _rec.objname NOT IN ('_ps_catalog.migration', '_ps_catalog.promscale_instance_information') THEN
+            _config_filter = case _rec.objname
+                when '_prom_catalog.remote_commands' then 'where seq >= 1000'
+                when '_ps_trace.tag_key' then 'where id >= 1000'
+                else ''
+            end;
+            EXECUTE format($sql$SELECT pg_catalog.pg_extension_config_dump(%L, %L)$sql$, _rec.objname, _config_filter);
         END IF;
     END LOOP;
 END;

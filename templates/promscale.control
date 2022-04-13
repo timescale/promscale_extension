@@ -3,7 +3,7 @@ comment = 'Promscale support functions'
 default_version = '@CARGO_VERSION@'
 module_pathname = '$libdir/promscale'
 relocatable = false
-schema = _prom_ext
+schema = public
 superuser = true
 {%if !is_pg_12 -%}
 trusted = true

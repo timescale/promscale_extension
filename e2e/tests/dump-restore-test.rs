@@ -13,7 +13,8 @@ fn run_postgres<'a>(docker: &'a Cli, db: &str, username: &str) -> Container<'a, 
     //    String::from("ghcr.io/timescale/dev_promscale_extension:develop-ts2-pg14")
     //});
     // todo: hardcoded for now. fix when the extension is installed in public schema instead of _prom_ext
-    let docker_image = "ghcr.io/timescale/dev_promscale_extension:jg-sec-audit-prom-ext-ts2-pg14";
+    let docker_image = "local/dev_promscale_extension:head-ts2-pg14";
+//    let docker_image = "ghcr.io/timescale/dev_promscale_extension:jg-sec-audit-prom-ext-ts2-pg14";
 
     let src = concat!(env!("CARGO_MANIFEST_DIR"), "/scripts");
     let dest = "/scripts";
@@ -157,10 +158,10 @@ fn dump_db(container: &Container<Cli, GenericImage>, db: &str, username: &str) -
         .args(["-F", "p"])
         .args(["-T", "_prom_catalog.\"default\""]) // todo: undecided atm
         .args(["-T", "_prom_catalog.ids_epoch"]) // todo: Mat to look at
-        .args(["-T", "_prom_catalog.remote_commands"]) // todo: set seq to start at 1000, only dump records >= 1000
-        .args(["-T", "_ps_catalog.migration"]) // todo: should NOT be a config table. must restore at the same version at which we dumped
+        //.args(["-T", "_prom_catalog.remote_commands"]) // todo: set seq to start at 1000, only dump records >= 1000
+        //.args(["-T", "_ps_catalog.migration"]) // todo: should NOT be a config table. must restore at the same version at which we dumped
         .args(["-T", "_ps_catalog.promscale_instance_information"]) // todo: should NOT be a config table
-        .args(["-T", "_ps_trace.tag_key"]) // todo: only dump records >= 1000
+        //.args(["-T", "_ps_trace.tag_key"]) // todo: only dump records >= 1000
         .args(["-T", "public.prom_installation_info"]) // todo: ???
         .args(["-N", "_timescaledb_internal"])
         .args(["-N", "_timescaledb_cache"])
