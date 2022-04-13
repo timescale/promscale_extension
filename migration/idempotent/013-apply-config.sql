@@ -96,6 +96,7 @@ BEGIN
         AND k.relkind IN ('r', 'p')
         AND (n.nspname, k.relname) NOT IN
         (
+            -- these should NOT be config tables
             ('_ps_catalog', 'migration'),
             ('_ps_catalog', 'promscale_instance_information')
         )
