@@ -512,15 +512,12 @@ BEGIN
 
     IF NOT FOUND THEN
         INSERT INTO _ps_trace.schema_url (url)
-        VALUES
-        (
-            _schema_url
-        )
+        VALUES (_schema_url)
         ON CONFLICT DO NOTHING
         RETURNING id INTO _schema_url_id;
 
         IF _schema_url_id IS NULL THEN
-            SELECT id INTO _schema_url_id
+            SELECT id INTO STRICT _schema_url_id
             FROM _ps_trace.schema_url
             WHERE url = _schema_url;
         END IF;

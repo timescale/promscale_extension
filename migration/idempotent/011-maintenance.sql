@@ -297,8 +297,7 @@ CREATE OR REPLACE FUNCTION ps_trace.set_trace_retention_period(_trace_retention_
     VOLATILE
     SET search_path = pg_catalog
 AS $$
-    INSERT INTO _prom_catalog.default(key, value) VALUES ('trace_retention_period', _trace_retention_period::text)
-    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+    SELECT _prom_catalog.set_default_value('trace_retention_period', _trace_retention_period::text);
     SELECT true;
 $$
 LANGUAGE SQL;
@@ -310,9 +309,7 @@ CREATE OR REPLACE FUNCTION ps_trace.get_trace_retention_period()
 RETURNS INTERVAL
 SET search_path = pg_catalog
 AS $$
-    SELECT value::interval
-    FROM _prom_catalog.default
-    WHERE key = 'trace_retention_period'
+    SELECT _prom_catalog.get_default_value('trace_retention_period')::pg_catalog.interval;
 $$
 LANGUAGE SQL STABLE;
 COMMENT ON FUNCTION ps_trace.get_trace_retention_period()
@@ -604,4 +601,59 @@ LANGUAGE PLPGSQL;
 REVOKE ALL ON FUNCTION prom_api.config_maintenance_jobs(int, interval, jsonb) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION prom_api.config_maintenance_jobs(int, interval, jsonb) TO prom_admin;
 COMMENT ON FUNCTION prom_api.config_maintenance_jobs(int, interval, jsonb)
-IS 'Configure the number of maintence jobs run by the job scheduler, as well as their scheduled interval';
+IS 'Configure the number of maintenance jobs run by the job scheduler, as well as their scheduled interval';
+
+CREATE OR REPLACE FUNCTION prom_api.promscale_post_restore()
+RETURNS void
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $func$
+DECLARE
+    _sql text;
+BEGIN
+    IF _prom_catalog.is_timescaledb_installed() THEN
+        -- The span, event, and link hypertables themselves are not dumped by pg_dump
+        -- however the backing chunks ARE dumped by pg_dump
+
+        -- we cannot call create_hypertable during restore because timescaledb will not
+        -- allow it while the `timescaledb.restoring` setting is `on`. Because we don't
+        -- call create_hypertable, the ts_insert_blocker never gets added to these tables.
+        -- We add them manually here.
+        CREATE TRIGGER ts_insert_blocker
+        BEFORE INSERT ON _ps_trace.span
+        FOR EACH ROW EXECUTE FUNCTION _timescaledb_internal.insert_blocker();
+
+        CREATE TRIGGER ts_insert_blocker
+        BEFORE INSERT ON _ps_trace.event
+        FOR EACH ROW EXECUTE FUNCTION _timescaledb_internal.insert_blocker();
+
+        CREATE TRIGGER ts_insert_blocker
+        BEFORE INSERT ON _ps_trace.link
+        FOR EACH ROW EXECUTE FUNCTION _timescaledb_internal.insert_blocker();
+
+        -- Unfortunately, when adding a trigger to a parent table in an inheritance
+        -- relationship, the trigger is automatically added to all child tables too.
+        -- We don't want to block inserts into the chunks. So, we have to now manually
+        -- drop the trigger from the chunks
+        FOR _sql IN
+        (
+            SELECT format('DROP TRIGGER IF EXISTS ts_insert_blocker ON %I.%I RESTRICT', k.schema_name, k.table_name)
+            FROM _timescaledb_catalog.hypertable h
+            INNER JOIN _timescaledb_catalog.chunk k ON (k.hypertable_id = h.id)
+            WHERE h.schema_name = '_ps_trace'
+            AND h.table_name IN ('span', 'link', 'event')
+            ORDER BY h.table_name, k.table_name
+        )
+        LOOP
+            EXECUTE _sql;
+        END LOOP
+        ;
+    END IF;
+END
+$func$
+LANGUAGE PLPGSQL VOLATILE;
+--redundant given schema settings but extra caution for security definers
+REVOKE ALL ON FUNCTION prom_api.promscale_post_restore() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION prom_api.promscale_post_restore() TO prom_admin;
+COMMENT ON FUNCTION prom_api.promscale_post_restore()
+IS 'Performs required setup tasks after restoring the database from a logical backup';

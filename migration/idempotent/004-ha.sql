@@ -49,10 +49,7 @@ DECLARE
 BEGIN
 
     -- find lease_timeout setting;
-    SELECT value::INTERVAL
-    INTO lease_timeout
-    FROM _prom_catalog.default
-    WHERE key = 'ha_lease_timeout';
+    SELECT _prom_catalog.get_default_value('ha_lease_timeout')::pg_catalog.interval INTO lease_timeout;
 
     -- find latest leader and their lease time range;
     SELECT h.leader_name, h.lease_start, h.lease_until
@@ -78,10 +75,7 @@ BEGIN
     END IF;
 
     -- find lease_refresh setting;
-    SELECT value::INTERVAL
-    INTO lease_refresh
-    FROM _prom_catalog.default
-    WHERE key = 'ha_lease_refresh';
+    SELECT _prom_catalog.get_default_value('ha_lease_refresh')::pg_catalog.interval INTO lease_refresh;
 
     new_lease_timeout = max_time + lease_timeout;
     IF new_lease_timeout > lease_until + lease_refresh THEN
@@ -119,10 +113,7 @@ DECLARE
     lease_state _prom_catalog.ha_leases%ROWTYPE;
 BEGIN
     -- find lease_timeout setting;
-    SELECT value::INTERVAL
-    INTO lease_timeout
-    FROM _prom_catalog.default
-    WHERE key = 'ha_lease_timeout';
+    SELECT _prom_catalog.get_default_value('ha_lease_timeout')::pg_catalog.interval INTO lease_timeout;
 
     UPDATE _prom_catalog.ha_leases
     SET leader_name = new_leader,
