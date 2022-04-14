@@ -96,7 +96,7 @@ AS $func$
             1 as lvl,
             array[s1.span_id] as path
         FROM _ps_trace.span s1
-        WHERE s1.trace_id = _trace_id
+        WHERE s1.trace_id OPERATOR(ps_trace.=) _trace_id
         AND s1.parent_span_id IS NULL
         UNION ALL
         SELECT
@@ -111,7 +111,7 @@ AS $func$
                 s2.parent_span_id,
                 s2.span_id
             FROM _ps_trace.span s2
-            WHERE s2.trace_id = _trace_id
+            WHERE s2.trace_id OPERATOR(ps_trace.=) _trace_id
             AND s2.parent_span_id = x.span_id
         ) s2 ON (true)
     )
@@ -144,7 +144,7 @@ AS $func$
           0 as dist,
           array[s1.span_id] as path
         FROM _ps_trace.span s1
-        WHERE s1.trace_id = _trace_id
+        WHERE s1.trace_id OPERATOR(ps_trace.=) _trace_id
         AND s1.span_id = _span_id
         UNION ALL
         SELECT
@@ -159,7 +159,7 @@ AS $func$
                 s2.parent_span_id,
                 s2.span_id
             FROM _ps_trace.span s2
-            WHERE s2.trace_id = _trace_id
+            WHERE s2.trace_id OPERATOR(ps_trace.=) _trace_id
             AND s2.span_id = x.parent_span_id
         ) s2 ON (true)
         WHERE (_max_dist IS NULL OR x.dist + 1 <= _max_dist)
@@ -193,7 +193,7 @@ AS $func$
           0 as dist,
           array[s1.span_id] as path
         FROM _ps_trace.span s1
-        WHERE s1.trace_id = _trace_id
+        WHERE s1.trace_id OPERATOR(ps_trace.=) _trace_id
         AND s1.span_id = _span_id
         UNION ALL
         SELECT
@@ -206,7 +206,7 @@ AS $func$
         (
             SELECT *
             FROM _ps_trace.span s2
-            WHERE s2.trace_id = _trace_id
+            WHERE s2.trace_id OPERATOR(ps_trace.=) _trace_id
             AND s2.parent_span_id = x.span_id
         ) s2 ON (true)
         WHERE (_max_dist IS NULL OR x.dist + 1 <= _max_dist)
@@ -235,12 +235,12 @@ AS $func$
         s.parent_span_id,
         s.span_id
     FROM _ps_trace.span s
-    WHERE s.trace_id = _trace_id
+    WHERE s.trace_id OPERATOR(ps_trace.=) _trace_id
     AND s.parent_span_id =
     (
         SELECT parent_span_id
         FROM _ps_trace.span x
-        WHERE x.trace_id = _trace_id
+        WHERE x.trace_id OPERATOR(ps_trace.=) _trace_id
         AND x.span_id = _span_id
     )
 $func$ LANGUAGE sql STABLE PARALLEL SAFE;
@@ -262,7 +262,7 @@ AS $func$
     FROM
         _ps_trace.span child
     INNER JOIN
-        _ps_trace.span parent ON (parent.span_id = child.parent_span_id AND parent.trace_id = child.trace_id)
+        _ps_trace.span parent ON (parent.span_id = child.parent_span_id AND parent.trace_id OPERATOR(ps_trace.=) child.trace_id)
     WHERE
         child.start_time > _start_time_min AND child.start_time < _start_time_max AND
         parent.start_time > _start_time_min AND parent.start_time < _start_time_max

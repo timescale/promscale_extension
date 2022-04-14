@@ -2950,12 +2950,13 @@ BEGIN
         hypertable_row record;
         min_time_internal bigint;
     BEGIN
+        --note search_path cannot be set here because this is a proc that may be executed transactionally so schema qualify everything
         SELECT h.* INTO STRICT hypertable_row FROM _timescaledb_catalog.hypertable h
-        WHERE table_name = metric_table AND schema_name = 'prom_data';
+        WHERE h.table_name OPERATOR(pg_catalog.=) metric_table AND h.schema_name OPERATOR(pg_catalog.=) 'prom_data';
 
-        SELECT d.* INTO STRICT dimension_row FROM _timescaledb_catalog.dimension d WHERE hypertable_id = hypertable_row.id ORDER BY id LIMIT 1;
+        SELECT d.* INTO STRICT dimension_row FROM _timescaledb_catalog.dimension d WHERE d.hypertable_id OPERATOR(pg_catalog.=) hypertable_row.id ORDER BY d.id LIMIT 1;
 
-        IF min_time = timestamptz '-Infinity' THEN
+        IF min_time = pg_catalog.timestamptz '-Infinity' THEN
             min_time_internal := -9223372036854775808;
         ELSE
            SELECT _timescaledb_internal.time_to_internal(min_time) INTO STRICT min_time_internal;
@@ -2964,17 +2965,19 @@ BEGIN
         FOR chunk_row IN
             SELECT c.*
             FROM _timescaledb_catalog.dimension_slice ds
-            INNER JOIN _timescaledb_catalog.chunk_constraint cc ON cc.dimension_slice_id = ds.id
-            INNER JOIN _timescaledb_catalog.chunk c ON cc.chunk_id = c.id
-            WHERE dimension_id = dimension_row.id
+            INNER JOIN _timescaledb_catalog.chunk_constraint cc ON cc.dimension_slice_id OPERATOR(pg_catalog.=) ds.id
+            INNER JOIN _timescaledb_catalog.chunk c ON cc.chunk_id OPERATOR(pg_catalog.=) c.id
+            WHERE ds.dimension_id OPERATOR(pg_catalog.=) dimension_row.id
             -- the range_ends are non-inclusive
-            AND min_time_internal < ds.range_end
+            AND min_time_internal OPERATOR(pg_catalog.<) ds.range_end
             AND c.compressed_chunk_id IS NOT NULL
             ORDER BY ds.range_start
         LOOP
             PERFORM _prom_catalog.decompress_chunk_for_metric(metric_table, chunk_row.schema_name, chunk_row.table_name);
             IF NOT transactional THEN
               COMMIT;
+              -- reset search path after transaction end. This is ok to do iff we are in transactional mode.
+              SET LOCAL search_path = pg_catalog;
             END IF;
         END LOOP;
     END;
@@ -2985,9 +2988,11 @@ $DO$;
 $ee$);
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.decompress_chunks_after(metric_table NAME, min_time TIMESTAMPTZ, transactional BOOLEAN = false)
-SET search_path = pg_catalog
 AS $proc$
 BEGIN
+    --do not set search path here since this can be called transactionally or not
+    --make sure everything is schema qualified.
+
     -- In early versions of timescale multinode the access node catalog does not
     -- store whether chunks were compressed, so we need to run the actual search
     -- for nodes in need of decompression on the data nodes, and /not/ the
@@ -3045,6 +3050,10 @@ BEGIN
         chunk_range_end timestamptz;
         chunk_num INT;
     BEGIN
+        -- Note: We cannot use SET in the procedure declaration because we do transaction control
+        -- and we can _only_ use SET LOCAL in a procedure which _does_ transaction control
+        SET LOCAL search_path = pg_catalog;
+
         FOR chunk_schema_name, chunk_table_name, chunk_range_end, chunk_num IN
             SELECT
                 ch.schema_name as chunk_schema,
@@ -3065,6 +3074,8 @@ BEGIN
             CONTINUE WHEN chunk_num <= 1 OR chunk_range_end > compress_before;
             PERFORM _prom_catalog.compress_chunk_for_metric(metric_table, chunk_schema_name, chunk_table_name);
             COMMIT;
+            -- reset search path after transaction end
+            SET LOCAL search_path = pg_catalog;
         END LOOP;
     END;
     $$ LANGUAGE PLPGSQL;
@@ -3074,11 +3085,14 @@ $DO$;
 $ee$);
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.compress_metric_chunks(metric_name TEXT)
-    SET search_path = pg_catalog
 AS $$
 DECLARE
   metric_table NAME;
 BEGIN
+    -- Note: We cannot use SET in the procedure declaration because we do transaction control
+    -- and we can _only_ use SET LOCAL in a procedure which _does_ transaction control
+    SET LOCAL search_path = pg_catalog;
+
     SELECT table_name
     INTO STRICT metric_table
     FROM _prom_catalog.get_metric_table_name_if_exists('prom_data', metric_name);
@@ -3163,7 +3177,7 @@ BEGIN
 
     FOR r IN
         SELECT *
-        FROM unnest(remaining_metrics)
+        FROM pg_catalog.unnest(remaining_metrics)
     LOOP
         IF log_verbose THEN
             lockStartT := pg_catalog.clock_timestamp();
