@@ -51,7 +51,7 @@ DO $$
 DECLARE
    new_path text;
 BEGIN
-   new_path := current_setting('search_path') || format(',%L,%L,%L,%L,%L,%L', 'ps_tag', '_prom_ext', 'prom_api', 'prom_metric', '_prom_catalog', 'ps_trace');
+   new_path := format('%L,%L,%L,%L,%L,%L,%L,%L', '$user','public', 'ps_tag', '_prom_ext', 'prom_api', 'prom_metric', '_prom_catalog', 'ps_trace');
    execute format('ALTER DATABASE %I SET search_path = %s', current_database(), new_path);
    execute format('SET search_path = %s', new_path);
 END
