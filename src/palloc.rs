@@ -1,5 +1,7 @@
 use std::{
+    ffi::CStr,
     ops::{Deref, DerefMut},
+    os::raw::c_char,
     ptr::NonNull,
 };
 
@@ -11,6 +13,28 @@ pub unsafe fn in_memory_context<T, F: FnOnce() -> T>(mctx: pg_sys::MemoryContext
     let t = f();
     pg_sys::CurrentMemoryContext = prev_ctx;
     t
+}
+
+/// The type to take ownership of string values
+/// that a caller is supposed to pfree.
+pub struct PallocdString {
+    pg_box: PgBox<c_char, AllocatedByRust>,
+}
+
+impl PallocdString {
+    pub fn from_ptr(ptr: *mut c_char) -> Option<Self> {
+        if ptr.is_null() {
+            None
+        } else {
+            Some(PallocdString {
+                pg_box: unsafe { PgBox::<_, AllocatedByRust>::from_rust(ptr) },
+            })
+        }
+    }
+
+    pub fn as_c_str(&self) -> &CStr {
+        unsafe { CStr::from_ptr(self.pg_box.as_ptr()) }
+    }
 }
 
 pub use pgx::Internal;
