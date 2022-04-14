@@ -110,7 +110,7 @@ BEGIN
     INTO STRICT metric_id, metric_schema, metric_table, metric_series_table, is_metric_view
     FROM _prom_catalog.get_metric_table_name_if_exists(schema_name, metric_name);
 
-    SELECT older_than OPERATOR(pg_catalog.+) INTERVAL '1 hour'
+    SELECT older_than OPERATOR(pg_catalog.+) pg_catalog.interval '1 hour'
     INTO check_time;
 
     startT := pg_catalog.clock_timestamp();
@@ -426,7 +426,6 @@ IS 'drops old data according to the data retention policy. This procedure should
 GRANT EXECUTE ON PROCEDURE _ps_trace.execute_data_retention_policy(boolean) TO prom_maintenance;
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.execute_data_retention_policy(log_verbose boolean)
-SET search_path = pg_catalog
 AS $$
 DECLARE
     r _prom_catalog.metric;
@@ -486,11 +485,14 @@ GRANT EXECUTE ON PROCEDURE _prom_catalog.execute_data_retention_policy(boolean) 
 --should be the last thing run in a session so that all session locks
 --are guaranteed released on error.
 CREATE OR REPLACE PROCEDURE prom_api.execute_maintenance(log_verbose boolean = false)
-SET search_path = pg_catalog
 AS $$
 DECLARE
    startT TIMESTAMPTZ;
 BEGIN
+    -- Note: We cannot use SET in the procedure declaration because we do transaction control
+    -- and we can _only_ use SET LOCAL in a procedure which _does_ transaction control
+    SET LOCAL search_path = pg_catalog;
+
     startT := clock_timestamp();
     IF log_verbose THEN
         RAISE LOG 'promscale maintenance: data retention: starting';
@@ -524,7 +526,6 @@ IS 'Execute maintenance tasks like dropping data according to retention policy. 
 GRANT EXECUTE ON PROCEDURE prom_api.execute_maintenance(boolean) TO prom_maintenance;
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.execute_maintenance_job(job_id int, config jsonb)
-SET search_path = pg_catalog
 AS $$
 DECLARE
    log_verbose boolean;
@@ -532,6 +533,9 @@ DECLARE
    ae_value text;
    ae_load boolean := FALSE;
 BEGIN
+    -- Note: We cannot use SET in the procedure declaration because we do transaction control
+    -- and we can _only_ use SET LOCAL in a procedure which _does_ transaction control
+    SET LOCAL search_path = pg_catalog;
     log_verbose := coalesce(config->>'log_verbose', 'false')::boolean;
 
     --if auto_explain enabled in config, turn it on in a best-effort way

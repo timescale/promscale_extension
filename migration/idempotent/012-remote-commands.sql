@@ -19,11 +19,10 @@ WITH x(key, seq) AS
     ('create_prom_admin'                         ,  4),
     ('create_prom_maintenance'                   ,  5),
     ('grant_prom_reader_prom_writer'             ,  6),
-    ('create_schemas'                            ,  7),
-    ('tracing_types'                             ,  8),
-    ('grant_all_roles_to_extowner'               ,  9),
-    ('_prom_catalog.do_decompress_chunks_after'  , 10),
-    ('_prom_catalog.compress_old_chunks'         , 11)
+    ('tracing_types'                             ,  7),
+    ('grant_all_roles_to_extowner'               ,  8),
+    ('_prom_catalog.do_decompress_chunks_after'  , 9),
+    ('_prom_catalog.compress_old_chunks'         , 10)
 )
 UPDATE _prom_catalog.remote_commands u SET seq = z.seq
 FROM

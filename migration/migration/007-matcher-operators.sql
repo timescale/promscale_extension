@@ -32,7 +32,7 @@ RETURNS prom_api.matcher_positive
 AS $func$
     SELECT ARRAY(
            SELECT coalesce(l.id, -1) -- -1 indicates no such label
-           FROM _prom_catalog.label_jsonb_each_text(labels-'__name__') e
+           FROM _prom_catalog.label_jsonb_each_text(labels OPERATOR(pg_catalog.-) '__name__') e
            LEFT JOIN _prom_catalog.label l
                ON (l.key OPERATOR(pg_catalog.=) e.key AND l.value OPERATOR(pg_catalog.=) e.value)
         )::prom_api.matcher_positive
