@@ -89,7 +89,6 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.drop_metric_chunk_data(text, text, times
 CREATE OR REPLACE PROCEDURE _prom_catalog.drop_metric_chunks(
     schema_name TEXT, metric_name TEXT, older_than TIMESTAMPTZ, ran_at TIMESTAMPTZ = now(), log_verbose BOOLEAN = FALSE
 )
--- Note: Cannot SET search_path because we do transaction control
 AS $func$
 DECLARE
     metric_id int;
@@ -104,6 +103,9 @@ DECLARE
     lastT TIMESTAMPTZ;
     startT TIMESTAMPTZ;
 BEGIN
+    -- Note: We cannot use SET in the procedure declaration because we do transaction control
+    -- and we can _only_ use SET LOCAL in a procedure which _does_ transaction control
+    SET LOCAL search_path = pg_catalog;
     SELECT id, table_schema, table_name, series_table, is_view
     INTO STRICT metric_id, metric_schema, metric_table, metric_series_table, is_metric_view
     FROM _prom_catalog.get_metric_table_name_if_exists(schema_name, metric_name);
@@ -145,6 +147,8 @@ BEGIN
         SELECT current_epoch, last_update_time INTO present_epoch, last_updated FROM
             _prom_catalog.ids_epoch LIMIT 1;
     COMMIT;
+    -- reset search path after transaction end
+    SET LOCAL search_path = pg_catalog;
 
     IF older_than IS NULL THEN
         -- even though there are no new Ids in need of deletion,
@@ -167,6 +171,8 @@ BEGIN
             RAISE LOG 'promscale maintenance: data retention: metric %: done marking unused series in %', metric_name, pg_catalog.clock_timestamp() OPERATOR(pg_catalog.-) lastT;
         END IF;
     COMMIT;
+    -- reset search path after transaction end
+    SET LOCAL search_path = pg_catalog;
 
     -- transaction 3
         lastT := pg_catalog.clock_timestamp();
@@ -178,6 +184,8 @@ BEGIN
         SELECT current_epoch, last_update_time INTO present_epoch, last_updated FROM
             _prom_catalog.ids_epoch LIMIT 1;
     COMMIT;
+    -- reset search path after transaction end
+    SET LOCAL search_path = pg_catalog;
 
 
     -- transaction 4
@@ -312,7 +320,6 @@ IS 'get the retention period for trace data';
 GRANT EXECUTE ON FUNCTION ps_trace.get_trace_retention_period() TO prom_reader;
 
 CREATE OR REPLACE PROCEDURE _ps_trace.execute_data_retention_policy(log_verbose boolean)
-SET search_path = pg_catalog
 AS $$
 DECLARE
     _trace_retention_period interval;
@@ -323,6 +330,10 @@ DECLARE
     _pg_exception_detail text;
     _pg_exception_hint text;
 BEGIN
+    -- Note: We cannot use SET in the procedure declaration because we do transaction control
+    -- and we can _only_ use SET LOCAL in a procedure which _does_ transaction control
+    SET LOCAL search_path = pg_catalog;
+
     _start := clock_timestamp();
 
     PERFORM _prom_catalog.set_app_name('promscale maintenance: data retention: tracing');
@@ -364,6 +375,8 @@ BEGIN
             _message_text, _pg_exception_detail, _pg_exception_hint, clock_timestamp()-_last;
     END;
     COMMIT;
+    -- reset search path after transaction end
+    SET LOCAL search_path = pg_catalog;
 
     _last := clock_timestamp();
     PERFORM _prom_catalog.set_app_name('promscale maintenance: data retention: tracing: deleting event data');
@@ -381,6 +394,8 @@ BEGIN
             _message_text, _pg_exception_detail, _pg_exception_hint, clock_timestamp()-_last;
     END;
     COMMIT;
+    -- reset search path after transaction end
+    SET LOCAL search_path = pg_catalog;
 
     _last := clock_timestamp();
     PERFORM _prom_catalog.set_app_name('promscale maintenance: data retention: tracing: deleting span data');
@@ -398,6 +413,8 @@ BEGIN
             _message_text, _pg_exception_detail, _pg_exception_hint, clock_timestamp()-_last;
     END;
     COMMIT;
+    -- reset search path after transaction end
+    SET LOCAL search_path = pg_catalog;
 
     IF log_verbose THEN
         RAISE LOG 'promscale maintenance: data retention: tracing: finished in %', clock_timestamp()-_start;
@@ -415,6 +432,10 @@ DECLARE
     r _prom_catalog.metric;
     remaining_metrics _prom_catalog.metric[] DEFAULT '{}';
 BEGIN
+    -- Note: We cannot use SET in the procedure declaration because we do transaction control
+    -- and we can _only_ use SET LOCAL in a procedure which _does_ transaction control
+    SET LOCAL search_path = pg_catalog;
+
     --Do one loop with metric that could be locked without waiting.
     --This allows you to do everything you can while avoiding lock contention.
     --Then come back for the metrics that would have needed to wait on the lock.
@@ -432,6 +453,8 @@ BEGIN
         PERFORM _prom_catalog.unlock_metric_for_maintenance(r.id);
 
         COMMIT;
+        -- reset search path after transaction end
+        SET LOCAL search_path = pg_catalog;
     END LOOP;
 
     IF log_verbose AND array_length(remaining_metrics, 1) > 0 THEN
@@ -448,6 +471,8 @@ BEGIN
         PERFORM _prom_catalog.unlock_metric_for_maintenance(r.id);
 
         COMMIT;
+        -- reset search path after transaction end
+        SET LOCAL search_path = pg_catalog;
     END LOOP;
 END;
 $$ LANGUAGE PLPGSQL;

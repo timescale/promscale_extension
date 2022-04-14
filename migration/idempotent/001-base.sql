@@ -225,13 +225,15 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.attach_series_partition(_prom_catalog.me
 --lock-order: metric table, data_table, series parent, series partition
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.finalize_metric_creation()
--- Note: Cannot SET search_path because we do transaction control
 AS $proc$
 DECLARE
     r _prom_catalog.metric;
     created boolean;
     is_view boolean;
 BEGIN
+    -- Note: We cannot use SET in the procedure declaration because we do transaction control
+    -- and we can _only_ use SET LOCAL in a procedure which _does_ transaction control
+    SET LOCAL search_path = pg_catalog;
     FOR r IN
         SELECT *
         FROM _prom_catalog.metric
@@ -247,6 +249,8 @@ BEGIN
         IF created THEN
             --release row lock
             COMMIT;
+            -- reset search path after transaction end
+            SET LOCAL search_path = pg_catalog;
             CONTINUE;
         END IF;
 
@@ -257,6 +261,8 @@ BEGIN
         IF is_view THEN
             --release row lock
             COMMIT;
+            -- reset search path after transaction end
+            SET LOCAL search_path = pg_catalog;
             CONTINUE;
         END IF;
 
@@ -270,6 +276,8 @@ BEGIN
         PERFORM _prom_catalog.attach_series_partition(r);
 
         COMMIT;
+        -- reset search path after transaction end
+        SET LOCAL search_path = pg_catalog;
     END LOOP;
 END;
 $proc$ LANGUAGE PLPGSQL;
@@ -3113,7 +3121,6 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_metrics_that_need_compression() TO p
 
 --only for timescaledb 2.0 in 1.x we use compression policies
 CREATE OR REPLACE PROCEDURE _prom_catalog.execute_compression_policy(log_verbose boolean = false)
--- Note: Cannot SET search_path because we do transaction control
 AS $$
 DECLARE
     r _prom_catalog.metric;
@@ -3121,6 +3128,10 @@ DECLARE
     startT TIMESTAMPTZ;
     lockStartT TIMESTAMPTZ;
 BEGIN
+    -- Note: We cannot use SET in the procedure declaration because we do transaction control
+    -- and we can _only_ use SET LOCAL in a procedure which _does_ transaction control
+    SET LOCAL search_path = pg_catalog;
+
     --Do one loop with metric that could be locked without waiting.
     --This allows you to do everything you can while avoiding lock contention.
     --Then come back for the metrics that would have needed to wait on the lock.
@@ -3146,6 +3157,8 @@ BEGIN
         PERFORM _prom_catalog.unlock_metric_for_maintenance(r.id);
 
         COMMIT;
+        -- reset search path after transaction end
+        SET LOCAL search_path = pg_catalog;
     END LOOP;
 
     FOR r IN
@@ -3170,6 +3183,8 @@ BEGIN
         PERFORM _prom_catalog.unlock_metric_for_maintenance(r.id);
 
         COMMIT;
+        -- reset search path after transaction end
+        SET LOCAL search_path = pg_catalog;
     END LOOP;
 END;
 $$ LANGUAGE PLPGSQL;
