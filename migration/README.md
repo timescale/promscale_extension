@@ -40,7 +40,8 @@ The Promscale extension's approach to securing its SQL consists of the following
 2. Use `CREATE OR REPLACE` or `CREATE ... IF NOT EXISTS` in those schemas
 3. Use `SET search_path = pg_catalog` on functions and procedures where possible
 4. Explicitly schema-qualify all objects and operators in functions without `SET search_path = pg_catalog`
-5. Explicitly `REVOKE ALL ... FROM PUBLIC` for `SECURITY DEFINER` functions and procedures
+5. Use `SET LOCAL search_path = pg_catalog;` on procedures which perform transaction control
+6. Explicitly `REVOKE ALL ... FROM PUBLIC` for `SECURITY DEFINER` functions and procedures
 
 Step 1. ensures that the bootstrap superuser (on Postgres 13 and 14) or the
 installing superuser (on postgres 12) is the owner of all schemas. If a schema
@@ -62,7 +63,12 @@ or for functions which we desire to be inlined.
 
 Step 4. must be applied in situations in which Step 3. cannot be applied.
 
-Step 5. is necessary, as by default functions are executable by `PUBLIC`, which
+Step 5. provides additional security in procedures which perform transaction
+control. Note: This approach is not possible in functions, and not necessary
+for procedures which do not perform transaction control, which is why we do
+not use it for them.
+
+Step 6. is necessary, as by default functions are executable by `PUBLIC`, which
 is undesirable for `SECURITY DEFINER`.
 
 [1]: https://www.postgresql.org/docs/current/extend-extensions.html#EXTEND-EXTENSIONS-SECURITY
