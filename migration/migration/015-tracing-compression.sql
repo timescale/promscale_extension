@@ -191,13 +191,13 @@ GRANT USAGE ON TYPE ps_trace.trace_id TO prom_reader;
 CREATE TABLE _ps_trace.span
 (
     trace_id ps_trace.trace_id NOT NULL,
-    span_id bigint NOT NULL CHECK (span_id != 0),
-    parent_span_id bigint NULL CHECK (parent_span_id != 0),
+    span_id bigint NOT NULL, /* not allowed to be 0 */
+    parent_span_id bigint NULL, /* if set not allowed be 0 */
     operation_id bigint NOT NULL,
     start_time timestamptz NOT NULL,
     end_time timestamptz NOT NULL,
-    duration_ms double precision NOT NULL GENERATED ALWAYS AS ( extract(epoch from (end_time - start_time)) * 1000.0 ) STORED,
-    trace_state text CHECK (trace_state != ''),
+    duration_ms double precision NOT NULL,
+    trace_state text, /* empty string not allowed */
     span_tags ps_trace.tag_map NOT NULL,
     dropped_tags_count int NOT NULL default 0,
     event_time tstzrange default NULL,
@@ -209,8 +209,7 @@ CREATE TABLE _ps_trace.span
     resource_tags ps_trace.tag_map NOT NULL,
     resource_dropped_tags_count int NOT NULL default 0,
     resource_schema_url_id BIGINT,
-    PRIMARY KEY (span_id, trace_id, start_time),
-    CHECK (start_time <= end_time)
+    PRIMARY KEY (span_id, trace_id, start_time)
 );
 CREATE INDEX ON _ps_trace.span USING BTREE (trace_id, parent_span_id) INCLUDE (span_id); -- used for recursive CTEs for trace tree queries
 CREATE INDEX ON _ps_trace.span USING GIN (span_tags jsonb_path_ops); -- supports tag filters. faster ingest than json_ops
@@ -224,7 +223,7 @@ CREATE TABLE _ps_trace.event
 (
     time timestamptz NOT NULL,
     trace_id ps_trace.trace_id NOT NULL,
-    span_id bigint NOT NULL CHECK (span_id != 0),
+    span_id bigint NOT NULL, /* not allowed to be 0 */
     event_nbr int NOT NULL DEFAULT 0,
     name text NOT NULL,
     tags ps_trace.tag_map NOT NULL,
@@ -238,12 +237,12 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.event TO prom_writer;
 CREATE TABLE _ps_trace.link
 (
     trace_id ps_trace.trace_id NOT NULL,
-    span_id bigint NOT NULL CHECK (span_id != 0),
+    span_id bigint NOT NULL,
     span_start_time timestamptz NOT NULL,
     linked_trace_id ps_trace.trace_id NOT NULL,
-    linked_span_id bigint NOT NULL CHECK (linked_span_id != 0),
+    linked_span_id bigint NOT NULL, /* not allowed to be 0 */
     link_nbr int NOT NULL DEFAULT 0,
-    trace_state text CHECK (trace_state != ''),
+    trace_state text, /* empty string not allowed */
     tags ps_trace.tag_map NOT NULL,
     dropped_tags_count int NOT NULL DEFAULT 0
 );
