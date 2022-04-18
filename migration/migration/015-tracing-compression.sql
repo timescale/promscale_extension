@@ -197,18 +197,18 @@ CREATE TABLE _ps_trace.span
     start_time timestamptz NOT NULL,
     end_time timestamptz NOT NULL,
     duration_ms double precision NOT NULL,
-    trace_state text, /* empty string not allowed */
-    span_tags ps_trace.tag_map NOT NULL,
-    dropped_tags_count int NOT NULL default 0,
+    instrumentation_lib_id bigint,
+    resource_schema_url_id bigint,
     event_time tstzrange default NULL,
+    dropped_tags_count int NOT NULL default 0,
     dropped_events_count int NOT NULL default 0,
     dropped_link_count int NOT NULL default 0,
-    status_code ps_trace.status_code NOT NULL,
-    status_message text,
-    instrumentation_lib_id bigint,
-    resource_tags ps_trace.tag_map NOT NULL,
     resource_dropped_tags_count int NOT NULL default 0,
-    resource_schema_url_id BIGINT,
+    status_code ps_trace.status_code NOT NULL,
+    trace_state text, /* empty string not allowed */
+    span_tags ps_trace.tag_map NOT NULL,
+    status_message text,
+    resource_tags ps_trace.tag_map NOT NULL,
     PRIMARY KEY (span_id, trace_id, start_time)
 );
 CREATE INDEX ON _ps_trace.span USING BTREE (trace_id, parent_span_id) INCLUDE (span_id); -- used for recursive CTEs for trace tree queries
@@ -225,9 +225,9 @@ CREATE TABLE _ps_trace.event
     trace_id ps_trace.trace_id NOT NULL,
     span_id bigint NOT NULL, /* not allowed to be 0 */
     event_nbr int NOT NULL DEFAULT 0,
+    dropped_tags_count int NOT NULL DEFAULT 0,
     name text NOT NULL,
-    tags ps_trace.tag_map NOT NULL,
-    dropped_tags_count int NOT NULL DEFAULT 0
+    tags ps_trace.tag_map NOT NULL
 );
 CREATE INDEX ON _ps_trace.event USING GIN (tags jsonb_path_ops);
 CREATE INDEX ON _ps_trace.event USING BTREE (trace_id, span_id);
@@ -242,9 +242,9 @@ CREATE TABLE _ps_trace.link
     linked_trace_id ps_trace.trace_id NOT NULL,
     linked_span_id bigint NOT NULL, /* not allowed to be 0 */
     link_nbr int NOT NULL DEFAULT 0,
+    dropped_tags_count int NOT NULL DEFAULT 0,
     trace_state text, /* empty string not allowed */
-    tags ps_trace.tag_map NOT NULL,
-    dropped_tags_count int NOT NULL DEFAULT 0
+    tags ps_trace.tag_map NOT NULL
 );
 CREATE INDEX ON _ps_trace.link USING BTREE (trace_id, span_id);
 CREATE INDEX ON _ps_trace.link USING GIN (tags jsonb_path_ops);
