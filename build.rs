@@ -110,10 +110,30 @@ fn render_file(path: PathBuf, sql_type: &SqlType) -> Result<String, Error> {
     let mut result = String::new();
     let mut paths: Vec<PathBuf> = fs::read_dir(path)?.map(|f| f.unwrap().path()).collect();
     paths.sort();
+    let mut prev = 0;
     paths.into_iter().for_each(|path| {
+        let curr = numeric_prefix(&path);
+        // assert that the numeric prefixes are in order with no gaps or duplicates
+        assert_eq!(
+            curr,
+            prev + 1,
+            "there must be no gaps nor duplicates in the ordering of migration and idempotent files"
+        );
+        prev = curr;
         result += wrap(&path, sql_type).as_str();
     });
     Ok(result)
+}
+
+/// Parses and returns the numeric prefix in the filename of each idempotent and migration file
+fn numeric_prefix(path: &Path) -> i32 {
+    let file_name = path.file_name().unwrap().to_str().unwrap();
+    let (prefix, _) = file_name
+        .split_once('-')
+        .expect("failed to split filename on dash delimiter");
+    prefix
+        .parse()
+        .expect("failed to parse numeric prefix from filename")
 }
 
 #[derive(Copy, Clone, Debug)]
