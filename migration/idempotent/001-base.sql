@@ -3000,7 +3000,7 @@ BEGIN
     -- and locking for no result.
     IF _prom_catalog.is_multinode() THEN
         CALL public.distributed_exec(
-            format(
+            pg_catalog.format(
                 $dist$ CALL _prom_catalog.do_decompress_chunks_after(%L, %L, %L) $dist$,
                 metric_table, min_time, transactional),
             transactional => false);
