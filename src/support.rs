@@ -127,6 +127,11 @@ mod _prom_ext {
     /// WHERE map_attribute @> _ps_trace.OP_rewrite_helper(key, value)
     /// ```
     ///
+    /// For helper functions that return `jsonb[]` ANY is inserted automatically:
+    /// ```sql
+    /// WHERE map_attribute @> ANY (_ps_trace.OP_rewrite_helper(key, value))
+    /// ```
+    ///
     /// Furthermore, if both `key` and `value` are constant expressions,
     /// [`rewrite_fn_call_to_subquery`] will be used on the rhs to further optimize it:
     /// ```sql
@@ -209,6 +214,7 @@ mod _prom_ext {
                     helper_func_name
                 );
             }
+            let helper_func_returns_array = pg_sys::type_is_array(helper_func_detail.ret_type_oid);
 
             // Locate @> jsonb operator
             let jsonb_contains_fully_qualified_name = build_pg_list_of_strings(CONTAINS_OP_PATH);
@@ -253,16 +259,36 @@ mod _prom_ext {
             .filter(|&expr| !expr.is_null())
             .unwrap_or(helper_func_expr);
 
-            // Make a planner node for the @> operator (this is our new root)
-            let contains_op_expr = pg_sys::make_opclause(
-                jsonb_contains_op_oid,
-                pg_sys::BOOLOID,
-                false, // not a set returning operator
-                denormalize_arg.cast::<pg_sys::Expr>(),
-                helper_expr_init_plan.cast::<pg_sys::Expr>(),
-                (*op_func_expr).funccollid,
-                (*op_func_expr).inputcollid,
-            );
+            let contains_op_expr = if helper_func_returns_array {
+                // Make a planner node for the @> ANY(...) construct
+                let mut args = PgList::new();
+                args.push(denormalize_arg.cast::<pg_sys::Expr>());
+                args.push(helper_expr_init_plan.cast::<pg_sys::Expr>());
+
+                let mut scalar_array_op = PgBox::<pg_sys::ScalarArrayOpExpr>::alloc_node(
+                    pg_sys::NodeTag_T_ScalarArrayOpExpr,
+                );
+                scalar_array_op.opno = jsonb_contains_op_oid;
+                scalar_array_op.opfuncid = pg_sys::get_opcode(jsonb_contains_op_oid);
+                scalar_array_op.args = args.into_pg();
+                scalar_array_op.useOr = true; // true for ANY, false for ALL
+                scalar_array_op.inputcollid = (*op_func_expr).inputcollid;
+                scalar_array_op.location = -1;
+                set_sa_hashfuncid(&mut scalar_array_op, pg_sys::InvalidOid);
+                scalar_array_op.into_pg().cast::<pg_sys::Node>()
+            } else {
+                // Make a planner node for the @> operator
+                pg_sys::make_opclause(
+                    jsonb_contains_op_oid,
+                    pg_sys::BOOLOID,
+                    false, // not a set returning operator
+                    denormalize_arg.cast::<pg_sys::Expr>(),
+                    helper_expr_init_plan.cast::<pg_sys::Expr>(),
+                    (*op_func_expr).funccollid,
+                    (*op_func_expr).inputcollid,
+                )
+                .cast::<pg_sys::Node>()
+            };
 
             Ok(contains_op_expr.internal())
         }
@@ -423,7 +449,7 @@ mod tests {
 
         let init_plan_result = Spi::get_one::<Json>(
             r#"
-                EXPLAIN (COSTS OFF, FORMAT JSON)
+                EXPLAIN (ANALYZE, COSTS OFF, FORMAT JSON)
                     SELECT * FROM gfs_test_table 
                     WHERE tag_v_eq(ps_trace.tag_map_denormalize(tm)->'a', 0::text::jsonb);
             "#,
@@ -455,7 +481,7 @@ mod tests {
 
         let no_init_plan_result = Spi::get_one::<Json>(
             r#"
-                EXPLAIN (COSTS OFF, FORMAT JSON)
+                EXPLAIN (ANALYZE, COSTS OFF, FORMAT JSON)
                     SELECT * FROM gfs_test_table 
                     WHERE tag_v_eq(ps_trace.tag_map_denormalize(tm)->'a', v::text::jsonb);
             "#,
@@ -465,6 +491,31 @@ mod tests {
         assert_eq!(
             no_init_plan_result.0[0]["Plan"]["Filter"],
             "(tm @> _ps_trace.tag_v_eq_rewrite_helper('a'::text, ((v)::text)::jsonb))"
+        );
+
+        let neg_result = Spi::get_one::<Json>(
+            r#"
+                EXPLAIN (ANALYZE, COSTS OFF, FORMAT JSON)
+                    SELECT * FROM gfs_test_table 
+                    WHERE tag_v_ne(ps_trace.tag_map_denormalize(tm)->'a', 0::text::jsonb);
+            "#,
+        )
+        .expect("SQL query failed");
+
+        assert_eq!(neg_result.0[0]["Plan"]["Filter"], "(tm @> ANY ($0))");
+
+        let no_init_plan_neg_result = Spi::get_one::<Json>(
+            r#"
+                EXPLAIN (ANALYZE, COSTS OFF, FORMAT JSON)
+                    SELECT * FROM gfs_test_table 
+                    WHERE tag_v_ne(ps_trace.tag_map_denormalize(tm)->'a', v::text::jsonb);
+            "#,
+        )
+        .expect("SQL query failed");
+
+        assert_eq!(
+            no_init_plan_neg_result.0[0]["Plan"]["Filter"],
+            "(tm @> ANY (_ps_trace.tag_v_ne_rewrite_helper('a'::text, ((v)::text)::jsonb)))"
         );
     }
 }
