@@ -78,6 +78,24 @@ where
     fd_struct
 }
 
+#[cfg(not(any(feature = "pg12", feature = "pg13")))]
+#[inline]
+pub fn set_sa_hashfuncid(
+    scalar_array_op: &mut pg_sys::ScalarArrayOpExpr,
+    hash_func_oid: pg_sys::Oid,
+) {
+    scalar_array_op.hashfuncid = hash_func_oid;
+}
+
+#[cfg(any(feature = "pg12", feature = "pg13"))]
+#[inline]
+pub fn set_sa_hashfuncid(
+    _scalar_array_op: &mut pg_sys::ScalarArrayOpExpr,
+    _hash_func_oid: pg_sys::Oid,
+) {
+    // the field didn't exist prior to pg14
+}
+
 // pg_guard doesn't compile, so we have to do without it for now.
 // TODO maybe suggest adding "parser/parse_oper.h" to PGX's pg_sys
 extern "C" {
