@@ -297,8 +297,7 @@ CREATE OR REPLACE FUNCTION ps_trace.set_trace_retention_period(_trace_retention_
     VOLATILE
     SET search_path = pg_catalog
 AS $$
-    INSERT INTO _prom_catalog.default(key, value) VALUES ('trace_retention_period', _trace_retention_period::text)
-    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+    SELECT _prom_catalog.set_default_value('trace_retention_period', _trace_retention_period::text);
     SELECT true;
 $$
 LANGUAGE SQL;
@@ -310,9 +309,7 @@ CREATE OR REPLACE FUNCTION ps_trace.get_trace_retention_period()
 RETURNS INTERVAL
 SET search_path = pg_catalog
 AS $$
-    SELECT value::interval
-    FROM _prom_catalog.default
-    WHERE key = 'trace_retention_period'
+    SELECT _prom_catalog.get_default_value('trace_retention_period')::pg_catalog.interval;
 $$
 LANGUAGE SQL STABLE;
 COMMENT ON FUNCTION ps_trace.get_trace_retention_period()

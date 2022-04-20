@@ -97,10 +97,10 @@ $$
         SELECT count(*)::TEXT INTO result FROM _prom_catalog.metadata;
         PERFORM _ps_catalog.apply_telemetry('metrics_metadata_total', result);
 
-        SELECT value INTO result FROM _prom_catalog.default WHERE key = 'retention_period';
+        SELECT _prom_catalog.get_default_value('retention_period') INTO result;
         PERFORM _ps_catalog.apply_telemetry('metrics_default_retention', result);
 
-        SELECT value INTO result FROM _prom_catalog.default WHERE key = 'chunk_interval';
+        SELECT _prom_catalog.get_default_value('chunk_interval') INTO result;
         PERFORM _ps_catalog.apply_telemetry('metrics_default_chunk_interval', result);
 
         -- Traces telemetry.

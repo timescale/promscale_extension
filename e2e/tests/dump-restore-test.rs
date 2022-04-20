@@ -253,7 +253,7 @@ fn dump_db(container: &PostgresContainer, db: &str, username: &str, path: &Path)
         .args(["-d", db])
         .arg("-v")
         .args(["-F", "p"])
-        .args(["-T", "_prom_catalog.\"default\""]) // todo: wrap in functions and only insert if not default value
+        //.args(["-T", "_prom_catalog.\"default\""]) // todo: wrap in functions and only insert if not default value
         //.args(["-T", "_prom_catalog.ids_epoch"]) // todo: don't insert row if restoring
         //.args(["-T", "_prom_catalog.remote_commands"]) // todo: set seq to start at 1000, only dump records >= 1000
         //.args(["-T", "_ps_catalog.migration"]) // todo: should NOT be a config table. must restore at the same version at which we dumped

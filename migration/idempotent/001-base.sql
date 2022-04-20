@@ -1,6 +1,61 @@
 --NOTES
 --This code assumes that table names can only be 63 chars long
 
+CREATE OR REPLACE VIEW _prom_catalog.default_default AS
+SELECT *
+FROM
+(
+    VALUES
+    ('chunk_interval'           , (INTERVAL '8 hours')::text),
+    ('retention_period'         , (90 * INTERVAL '1 day')::text),
+    ('metric_compression'       , (exists(select 1 from pg_catalog.pg_proc where proname = 'compress_chunk')::text)),
+    ('trace_retention_period'   , (30 * INTERVAL '1 days')::text),
+    ('ha_lease_timeout'         , '1m'),
+    ('ha_lease_refresh'         , '10s')
+) dd(key, value)
+;
+
+-- the _prom_catalog.default table contains user-supplied values that override
+-- the "default defaults". We don't need to keep values in the default table
+-- if they are the same as the default defaults
+DELETE FROM _prom_catalog.default x
+WHERE x.key IN
+(
+    SELECT d.key
+    FROM _prom_catalog.default d
+    LEFT OUTER JOIN _prom_catalog.default_default dd ON (d.key = dd.key)
+    WHERE d.value is not distinct from dd.value
+);
+
+CREATE OR REPLACE FUNCTION _prom_catalog.get_default_value(_key text)
+    RETURNS TEXT
+    SET search_path = pg_catalog
+AS $func$
+    -- if there is a user-supplied default value, take it
+    -- otherwise take the default default value
+    SELECT coalesce(d.value, dd.value)
+    FROM _prom_catalog.default_default dd
+    LEFT OUTER JOIN _prom_catalog.default d ON (dd.key = d.key)
+    WHERE dd.key = _key;
+$func$
+LANGUAGE SQL STABLE PARALLEL SAFE;
+GRANT EXECUTE ON FUNCTION _prom_catalog.get_default_value(text) TO prom_reader;
+
+CREATE OR REPLACE FUNCTION _prom_catalog.set_default_value(_key text, _value text)
+    RETURNS VOID
+    SET search_path = pg_catalog
+AS $func$
+    -- remove the existing user-supplied default value if one exists
+    DELETE FROM _prom_catalog.default d WHERE d.key = _key;
+    -- insert the user-supplied value into the default table, unless the value is the same as the default default value
+    INSERT INTO _prom_catalog.default (key, value)
+    SELECT _key, _value
+    WHERE (_key, _value) NOT IN (SELECT dd.key, dd.value FROM _prom_catalog.default_default dd)
+    ;
+$func$
+LANGUAGE SQL VOLATILE;
+GRANT EXECUTE ON FUNCTION _prom_catalog.set_default_value(text, text) TO prom_admin;
+
 CREATE OR REPLACE PROCEDURE _prom_catalog.execute_everywhere(command_key text, command TEXT, transactional BOOLEAN = true)
     SET search_path = pg_catalog
 AS $func$
@@ -51,7 +106,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.get_default_chunk_interval()
     RETURNS INTERVAL
     SET search_path = pg_catalog
 AS $func$
-    SELECT value::INTERVAL FROM _prom_catalog.default WHERE key='chunk_interval';
+    SELECT _prom_catalog.get_default_value('chunk_interval')::pg_catalog.interval;
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION _prom_catalog.get_default_chunk_interval() TO prom_reader;
@@ -78,7 +133,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.get_default_retention_period()
     RETURNS INTERVAL
     SET search_path = pg_catalog
 AS $func$
-    SELECT value::INTERVAL FROM _prom_catalog.default WHERE key='retention_period';
+    SELECT _prom_catalog.get_default_value('retention_period')::pg_catalog.interval;
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION _prom_catalog.get_default_retention_period() TO prom_reader;
@@ -119,7 +174,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.get_default_compression_setting()
     RETURNS BOOLEAN
     SET search_path = pg_catalog
 AS $func$
-    SELECT value::BOOLEAN FROM _prom_catalog.default WHERE key='metric_compression';
+    SELECT _prom_catalog.get_default_value('metric_compression')::boolean;
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION _prom_catalog.get_default_compression_setting() TO prom_reader;
@@ -1334,8 +1389,7 @@ CREATE OR REPLACE FUNCTION prom_api.set_default_chunk_interval(chunk_interval IN
     VOLATILE
     SET search_path = pg_catalog
 AS $$
-    INSERT INTO _prom_catalog.default(key, value) VALUES('chunk_interval', chunk_interval::text)
-    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+    SELECT _prom_catalog.set_default_value('chunk_interval', chunk_interval::pg_catalog.text);
 
     SELECT _prom_catalog.set_chunk_interval_on_metric_table(metric_name, chunk_interval)
     FROM _prom_catalog.metric
@@ -1418,8 +1472,7 @@ CREATE OR REPLACE FUNCTION prom_api.set_default_retention_period(retention_perio
     VOLATILE
     SET search_path = pg_catalog
 AS $$
-    INSERT INTO _prom_catalog.default(key, value) VALUES('retention_period', retention_period::text)
-    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+    SELECT _prom_catalog.set_default_value('retention_period', retention_period::text);
     SELECT true;
 $$
 LANGUAGE SQL;
@@ -1617,8 +1670,7 @@ BEGIN
         RAISE EXCEPTION 'Cannot enable metrics compression, feature not found';
     END IF;
 
-    INSERT INTO _prom_catalog.default(key, value) VALUES('metric_compression', compression_setting::text)
-    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+    PERFORM _prom_catalog.set_default_value('metric_compression', compression_setting::text);
 
     PERFORM prom_api.set_compression_on_metric_table(table_name, compression_setting)
     FROM _prom_catalog.metric
