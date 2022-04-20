@@ -2956,7 +2956,7 @@ BEGIN
 
         SELECT d.* INTO STRICT dimension_row FROM _timescaledb_catalog.dimension d WHERE d.hypertable_id OPERATOR(pg_catalog.=) hypertable_row.id ORDER BY d.id LIMIT 1;
 
-        IF min_time = pg_catalog.timestamptz '-Infinity' THEN
+        IF min_time OPERATOR(pg_catalog.=) pg_catalog.timestamptz '-Infinity' THEN
             min_time_internal := -9223372036854775808;
         ELSE
            SELECT _timescaledb_internal.time_to_internal(min_time) INTO STRICT min_time_internal;
