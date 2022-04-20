@@ -253,20 +253,6 @@ fn dump_db(container: &PostgresContainer, db: &str, username: &str, path: &Path)
         .args(["-d", db])
         .arg("-v")
         .args(["-F", "p"])
-        //.args(["-T", "_prom_catalog.\"default\""]) // todo: wrap in functions and only insert if not default value
-        //.args(["-T", "_prom_catalog.ids_epoch"]) // todo: don't insert row if restoring
-        //.args(["-T", "_prom_catalog.remote_commands"]) // todo: set seq to start at 1000, only dump records >= 1000
-        //.args(["-T", "_ps_catalog.migration"]) // todo: should NOT be a config table. must restore at the same version at which we dumped
-        //.args(["-T", "_ps_catalog.promscale_instance_information"]) // todo: should NOT be a config table
-        //.args(["-T", "_ps_trace.tag_key"]) // todo: only dump records >= 1000
-        //.args(["-T", "public.prom_installation_info"]) // todo: drop???
-        //.args(["-N", "_timescaledb_internal"])
-        //.args(["-N", "_timescaledb_cache"])
-        //.args(["-N", "_timescaledb_catalog"])
-        //.args(["-N", "_timescaledb_config"])
-        //.args(["-N", "_timescaledb_internal"])
-        //.args(["-N", "timescaledb_experimental"])
-        //.args(["-N", "timescaledb_information"])
         .args(["-f", dump.to_str().unwrap()])
         .spawn()
         .unwrap()
@@ -307,14 +293,8 @@ fn restore_db(container: &PostgresContainer, db: &str, username: &str, path: &Pa
 /// 6. restore into the new database
 /// 7. snapshot the database
 /// 8. compare the two snapshots. they should be equal
-/// 9. compare one of the snapshots to a known good snapshot. they should be equal
 #[test]
 fn dump_restore_test() {
-    let docker = clients::Cli::default();
-    let postgres_image = postgres_image();
-    // mount the <project>/e2e/scripts directory to the /scripts path in the container
-    let volumes = vec![(concat!(env!("CARGO_MANIFEST_DIR"), "/scripts"), "/scripts")];
-
     // create a temp dir to use for the test
     let dir = &env::temp_dir().join("promscale-dump-restore-test");
     if dir.exists() {
@@ -322,6 +302,13 @@ fn dump_restore_test() {
     }
     fs::create_dir_all(dir).expect("failed to create temp dir");
     let dump = dir.join("dump.sql");
+
+    println!("temp test files in {}", dir.display());
+
+    let docker = clients::Cli::default();
+    let postgres_image = postgres_image();
+    // mount the <project>/e2e/scripts directory to the /scripts path in the container
+    let volumes = vec![(concat!(env!("CARGO_MANIFEST_DIR"), "/scripts"), "/scripts")];
 
     // create the first container, load it with data, snapshot it, and dump it
     let container = run_postgres(
@@ -362,7 +349,7 @@ create user bob;
 grant all on database db to bob;
 grant postgres to bob;"#, // todo: bob should not need postgres role
     );
-    psql_cmd(
+    psql_script(
         &container,
         "db",
         "postgres", // todo: use bob for this
@@ -384,8 +371,6 @@ select public.promscale_post_restore();"#,
     let snapshot1 = snapshot_db(&container, "db", "bob", &dir.join("snapshot1.txt"));
     container.stop();
     container.rm();
-
-    println!("temp test files in {}", dir.display());
 
     // don't do `assert_eq!(snapshot0, snapshot1);`
     // it prints both entire snapshots and is impossible to read

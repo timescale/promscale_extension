@@ -56,6 +56,15 @@ $func$
 LANGUAGE SQL VOLATILE;
 GRANT EXECUTE ON FUNCTION _prom_catalog.set_default_value(text, text) TO prom_admin;
 
+CREATE OR REPLACE FUNCTION _prom_catalog.is_restore_in_progress()
+RETURNS BOOLEAN
+SET search_path = pg_catalog
+AS $func$
+    SELECT coalesce((SELECT setting = 'on' from pg_catalog.pg_settings where name = 'timescaledb.restoring'), false)
+$func$
+LANGUAGE sql STABLE;
+GRANT EXECUTE ON FUNCTION _prom_catalog.is_restore_in_progress() TO prom_reader;
+
 CREATE OR REPLACE PROCEDURE _prom_catalog.execute_everywhere(command_key text, command TEXT, transactional BOOLEAN = true)
     SET search_path = pg_catalog
 AS $func$
@@ -366,26 +375,30 @@ AS $func$
 DECLARE
   label_id INT;
 BEGIN
-
-   -- Note: if the inserted metric is a view, nothing to do.
-   IF NEW.is_view THEN
+    -- if a database restore is in progress do not create metric tables as they will be created as a part of the restore
+    IF _prom_catalog.is_restore_in_progress() THEN
         RETURN NEW;
-   END IF;
+    END IF;
 
-   EXECUTE format('CREATE TABLE %I.%I(time TIMESTAMPTZ NOT NULL, value DOUBLE PRECISION NOT NULL, series_id BIGINT NOT NULL) WITH (autovacuum_vacuum_threshold = 50000, autovacuum_analyze_threshold = 50000)',
+    -- Note: if the inserted metric is a view, nothing to do.
+    IF NEW.is_view THEN
+        RETURN NEW;
+    END IF;
+
+    EXECUTE format('CREATE TABLE %I.%I(time TIMESTAMPTZ NOT NULL, value DOUBLE PRECISION NOT NULL, series_id BIGINT NOT NULL) WITH (autovacuum_vacuum_threshold = 50000, autovacuum_analyze_threshold = 50000)',
                     NEW.table_schema, NEW.table_name);
-   EXECUTE format('GRANT SELECT ON TABLE %I.%I TO prom_reader', NEW.table_schema, NEW.table_name);
-   EXECUTE format('GRANT SELECT, INSERT ON TABLE %I.%I TO prom_writer', NEW.table_schema, NEW.table_name);
-   EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I.%I TO prom_modifier', NEW.table_schema, NEW.table_name);
-   EXECUTE format('CREATE UNIQUE INDEX data_series_id_time_%s ON %I.%I (series_id, time) INCLUDE (value)',
+    EXECUTE format('GRANT SELECT ON TABLE %I.%I TO prom_reader', NEW.table_schema, NEW.table_name);
+    EXECUTE format('GRANT SELECT, INSERT ON TABLE %I.%I TO prom_writer', NEW.table_schema, NEW.table_name);
+    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I.%I TO prom_modifier', NEW.table_schema, NEW.table_name);
+    EXECUTE format('CREATE UNIQUE INDEX data_series_id_time_%s ON %I.%I (series_id, time) INCLUDE (value)',
                     NEW.id, NEW.table_schema, NEW.table_name);
-  
-   --dynamically created tables are owned by our highest-privileged role, prom_admin
-   --these cannot be made part of the extension since we cannot make them config
-   --tables outside of extension upgrade/install scripts. They cannot be superuser
-   --owned without being part extension since that would prevent dump/restore from
-   --working on any environment without SU privileges (such as cloud).
-   EXECUTE format('ALTER TABLE %I.%I OWNER TO prom_admin', NEW.table_schema, NEW.table_name);
+
+    --dynamically created tables are owned by our highest-privileged role, prom_admin
+    --these cannot be made part of the extension since we cannot make them config
+    --tables outside of extension upgrade/install scripts. They cannot be superuser
+    --owned without being part extension since that would prevent dump/restore from
+    --working on any environment without SU privileges (such as cloud).
+    EXECUTE format('ALTER TABLE %I.%I OWNER TO prom_admin', NEW.table_schema, NEW.table_name);
 
     IF _prom_catalog.is_timescaledb_installed() THEN
         IF _prom_catalog.is_multinode() THEN
@@ -408,10 +421,9 @@ BEGIN
     --Do not move this into the finalize step, because it's cheap to do while the table is empty
     --but takes a heavyweight blocking lock otherwise.
     IF  _prom_catalog.is_timescaledb_installed()
-            AND _prom_catalog.get_default_compression_setting() THEN
-            PERFORM prom_api.set_compression_on_metric_table(NEW.table_name, TRUE);
+        AND _prom_catalog.get_default_compression_setting() THEN
+        PERFORM prom_api.set_compression_on_metric_table(NEW.table_name, TRUE);
     END IF;
-
 
     SELECT _prom_catalog.get_or_create_label_id('__name__', NEW.metric_name)
     INTO STRICT label_id;
@@ -428,12 +440,12 @@ BEGIN
             CONSTRAINT series_pkey_%3$s PRIMARY KEY(id)
         ) WITH (autovacuum_vacuum_threshold = 100, autovacuum_analyze_threshold = 100)
     $$, NEW.table_name, label_id, NEW.id);
-   EXECUTE format('GRANT SELECT ON TABLE prom_data_series.%I TO prom_reader', NEW.table_name);
-   EXECUTE format('GRANT SELECT, INSERT ON TABLE prom_data_series.%I TO prom_writer', NEW.table_name);
-   EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE prom_data_series.%I TO prom_modifier', NEW.table_name);
+    EXECUTE format('GRANT SELECT ON TABLE prom_data_series.%I TO prom_reader', NEW.table_name);
+    EXECUTE format('GRANT SELECT, INSERT ON TABLE prom_data_series.%I TO prom_writer', NEW.table_name);
+    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE prom_data_series.%I TO prom_modifier', NEW.table_name);
 
-   EXECUTE format('ALTER TABLE prom_data_series.%1$I OWNER TO prom_admin', NEW.table_name);
-   RETURN NEW;
+    EXECUTE format('ALTER TABLE prom_data_series.%1$I OWNER TO prom_admin', NEW.table_name);
+    RETURN NEW;
 END
 $func$
 LANGUAGE PLPGSQL;
