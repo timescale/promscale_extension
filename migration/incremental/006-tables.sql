@@ -39,11 +39,6 @@ GRANT SELECT ON TABLE _prom_catalog.series TO prom_reader;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _prom_catalog.series TO prom_writer;
 
 
-CREATE INDEX series_labels_id ON _prom_catalog.series USING GIN (labels);
-CREATE INDEX series_deleted
-    ON _prom_catalog.series(delete_epoch, id)
-    WHERE delete_epoch IS NOT NULL;
-
 CREATE SEQUENCE _prom_catalog.series_id;
 GRANT USAGE ON SEQUENCE _prom_catalog.series_id TO prom_writer;
 

@@ -444,6 +444,9 @@ BEGIN
     EXECUTE format('GRANT SELECT, INSERT ON TABLE prom_data_series.%I TO prom_writer', NEW.table_name);
     EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE prom_data_series.%I TO prom_modifier', NEW.table_name);
 
+    EXECUTE format('CREATE INDEX ON prom_data_series.%I USING GIN (labels)', NEW.table_name);
+    EXECUTE format('CREATE INDEX ON prom_data_series.%I (delete_epoch, id) WHERE delete_epoch IS NOT NULL', NEW.table_name);
+
     EXECUTE format('ALTER TABLE prom_data_series.%1$I OWNER TO prom_admin', NEW.table_name);
     RETURN NEW;
 END
