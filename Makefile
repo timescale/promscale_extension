@@ -94,6 +94,7 @@ package: promscale.control ## Generate extension artifacts for packaging
 
 .PHONY: install
 install: promscale.control ## Install the extension in the Postgres found via pg_config
+	cargo pgx schema pg${PG_BUILD_VERSION} --out sql/promscale--${EXT_VERSION}.sql --release
 	bash create-upgrade-symlinks.sh
 	cargo pgx install --pg-config ${PG_CONFIG}
 

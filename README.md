@@ -72,6 +72,13 @@ See the Postgres [documentation](https://www.postgresql.org/download/linux/redha
     yum localinstall -y promscale_extension-0.3.0.pg14.x86_64.rpm
     ```
 
+### Docker images
+
+- [Official HA](https://hub.docker.com/r/timescale/timescaledb-ha). This very image is available at Timescale Cloud. They are updated along with tagged releases.
+- HA-based CI image - used in the GitHub Actions CI pipeline. Use at your own peril. It could be handy to play with pre-release versions. 
+- `alpine` - legacy and local development -- Avoid if you can. It will eat your ~laundry~ collation.
+- `quick` and package building images are not published anywhere and are used for local development and building packages 
+
 ### Compile From Source
 
 The extension is installed by default on the
