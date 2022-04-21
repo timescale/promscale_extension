@@ -9,7 +9,7 @@ CREATE EXTENSION
 make sure the view returns what we expect it to
 select key, value
 from _prom_catalog.default_default dd
-union
+except
 select key, value
 from
 (
@@ -22,15 +22,9 @@ from
     ('ha_lease_refresh'         , '10s')
 ) x(key, value)
 ;
-          key           |  value   
-------------------------+----------
- retention_period       | 90 days
- metric_compression     | true
- chunk_interval         | 08:00:00
- ha_lease_refresh       | 10s
- trace_retention_period | 30 days
- ha_lease_timeout       | 1m
-(6 rows)
+ key | value 
+-----+-------
+(0 rows)
 
 \echo make sure the getter returns the expected value
 make sure the getter returns the expected value
