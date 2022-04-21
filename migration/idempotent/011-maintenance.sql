@@ -605,7 +605,6 @@ IS 'Configure the number of maintenance jobs run by the job scheduler, as well a
 
 CREATE OR REPLACE FUNCTION public.promscale_post_restore()
 RETURNS void
---security definer to add jobs as the logged-in user
 SECURITY DEFINER
 SET search_path = pg_catalog
 AS $func$
