@@ -2,8 +2,6 @@ name: ci
 on:
   pull_request:
     paths-ignore:
-    - '.github/workflows/docker.yaml'
-    - '.github/workflows/lint.yaml'
     - '.github/workflows/release.yaml'
     - '*.md'
     - 'dist/*'
