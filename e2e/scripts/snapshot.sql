@@ -36,8 +36,8 @@ cross join unnest(array[
     '\dT'
 ]) c(c)
 order by c.c, s.s
-\g (tuples_only=on format=csv) /lz/describe.sql
-\i /lz/describe.sql
+\g (tuples_only=on format=csv) describe.sql
+\i describe.sql
 
 -- snapshot the data from all the tables
 select

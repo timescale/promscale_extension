@@ -250,8 +250,9 @@ BEGIN
             FROM timescaledb_information.data_nodes;
         END IF;
 
-        SELECT current_setting('timescaledb.restoring') = 'on' INTO STRICT _is_restore_in_progress;
-        RAISE NOTICE 'is restore in progress? %', _is_restore_in_progress;
+        _is_restore_in_progress = coalesce(
+            (SELECT setting = 'on' from pg_catalog.pg_settings where name = 'timescaledb.restoring'), false
+            );
     END IF;
 
     IF _is_timescaledb_installed AND NOT _is_restore_in_progress THEN
