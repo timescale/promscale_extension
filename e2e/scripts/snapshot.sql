@@ -1,4 +1,7 @@
 \pset pager off
+
+select version();
+
 \drds
 \du
 \dx
