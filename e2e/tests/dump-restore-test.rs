@@ -318,11 +318,11 @@ fn dump_restore_test() {
     let docker = clients::Cli::default();
     let postgres_image = postgres_image();
 
-    let dir = &PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("landing-zone");
+    let dir = &env::temp_dir().join("promscale-dump-restore-test");
     if dir.exists() {
-        fs::remove_dir_all(dir).expect("failed to remove landing-zone dir");
+        fs::remove_dir_all(dir).expect("failed to remove temp dir");
     }
-    fs::create_dir_all(dir).expect("failed to create landing-zone dir");
+    fs::create_dir_all(dir).expect("failed to create temp dir");
     let volumes = vec![
         (concat!(env!("CARGO_MANIFEST_DIR"), "/scripts"), "/scripts"),
         (dir.to_str().unwrap(), "/lz"),
