@@ -91,7 +91,9 @@ BEGIN
         AND (n.nspname, k.relname) NOT IN
         (
             -- these should NOT be config tables
+            -- migration table will be populated by the installation of extension
             ('_ps_catalog'::name, 'migration'::name),
+            -- we want the telemetry data reset with restores
             ('_ps_catalog'::name, 'promscale_instance_information'::name)
         )
         ORDER BY n.nspname, k.relname
