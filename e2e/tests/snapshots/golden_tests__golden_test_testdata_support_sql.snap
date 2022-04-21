@@ -39,7 +39,7 @@ INSERT 0 10
 --this is thanks to the support function make_call_subquery_support
 ANALYZE;
 ANALYZE
-EXPLAIN (costs off) SELECT time, value, prom_api.jsonb(labels), prom_api.val(namespace_id) FROM prom_metric.cpu_usage WHERE labels OPERATOR(_prom_catalog.?) ('namespace' OPERATOR(ps_tag.!==) 'dev' ) ORDER BY time, series_id LIMIT 5;
+EXPLAIN (costs off) SELECT time, value, prom_api.jsonb(labels), prom_api.val(namespace_id) FROM prom_metric.cpu_usage WHERE labels OPERATOR(prom_api.?) ('namespace' OPERATOR(ps_tag.!==) 'dev' ) ORDER BY time, series_id LIMIT 5;
                                        QUERY PLAN                                       
 ----------------------------------------------------------------------------------------
  Limit
