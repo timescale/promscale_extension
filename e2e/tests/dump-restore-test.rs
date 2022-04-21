@@ -1,4 +1,5 @@
-use similar::{ChangeTag, TextDiff};
+use regex::Regex;
+use similar::{ChangeTag, DiffableStr, TextDiff};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -189,6 +190,20 @@ fn copy_out(container: &Container<Cli, GenericImage>, src: &Path, dest: &Path) {
     );
 }
 
+/// Edits a snapshot file to account for acceptable differences
+fn edit_snapshot(path: &Path) -> String {
+    let snapshot = fs::read_to_string(path).expect("failed to read snapshot file");
+
+    let re = Regex::new(r"Partition constraint: satisfies_hash_partition\('\d+'::oid").unwrap();
+    let snapshot = re.replace_all(
+        &snapshot,
+        "Partition constraint: satisfies_hash_partition('*'::oid",
+    );
+
+    fs::write(path, snapshot.as_bytes()).expect("failed to write snapshot file");
+    snapshot.to_string()
+}
+
 /// Captures a "snapshot" of a database's state
 ///
 /// Executes the script at e2e/scripts/snapshot.sql against the database in the container,
@@ -203,7 +218,7 @@ fn copy_out(container: &Container<Cli, GenericImage>, src: &Path, dest: &Path) {
 /// * `name` - the filename of the snapshot
 ///
 fn snapshot_db(container: &PostgresContainer, db: &str, username: &str, path: &Path) -> String {
-    let snapshot = &Path::new("/tmp/snapshot.txt");
+    let snapshot = Path::new("/tmp/snapshot.txt");
     println!("snapshotting database {} via {} user...", db, username);
     let exit = Command::new("docker")
         .arg("exec")
@@ -229,7 +244,7 @@ fn snapshot_db(container: &PostgresContainer, db: &str, username: &str, path: &P
         exit
     );
     copy_out(container, snapshot, path);
-    fs::read_to_string(path).expect("failed to read snapshot file")
+    edit_snapshot(path)
 }
 
 /// Uses pg_dump to create a logical backup
@@ -393,7 +408,7 @@ fn dump_restore_test() {
                 ChangeTag::Insert => "+",
                 ChangeTag::Equal => " ",
             };
-            print!("{}{}", sign, change);
+            println!("{} {}", sign, change);
         }
     }
     assert!(are_snapshots_equal);

@@ -263,12 +263,16 @@ DO $block$
 DECLARE
     _is_compression_available boolean = false;
     _rec record;
+    _is_restore_in_progress boolean = false;
 BEGIN
-    IF _prom_catalog.is_restore_in_progress() THEN
+
+    IF NOT _prom_catalog.is_timescaledb_installed() THEN
         RETURN;
     END IF;
 
-    IF NOT _prom_catalog.is_timescaledb_installed() THEN
+    _is_restore_in_progress = coalesce(
+        (SELECT setting = 'on' from pg_catalog.pg_settings where name = 'timescaledb.restoring'), false);
+    IF _is_restore_in_progress THEN
         RETURN;
     END IF;
 
