@@ -48,8 +48,7 @@ fn run_postgres<'a>(
 
 /// Runs a SQL script file in the docker container
 ///
-/// The script file is copied into the container, and executed with
-/// psql using the `-f` flag.
+/// Executes a script file in the container with psql using the `-f` flag.
 ///
 /// # Arguments
 ///
