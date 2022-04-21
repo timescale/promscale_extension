@@ -6,3 +6,4 @@ target
 /hand-written-migration.sql
 /promscale.control
 /bootstrap.sql
+/e2e/landing-zone/**

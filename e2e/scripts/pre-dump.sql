@@ -27,3 +27,7 @@ SELECT public.compress_chunk(public.show_chunks('prom_data.cpu_usage'));
 -- todo: add exemplars
 
 -- todo: add traces
+
+
+create user bob;
+grant prom_admin, postgres to bob; -- todo: bob should not need postgres role
