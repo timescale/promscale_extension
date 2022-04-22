@@ -34,6 +34,7 @@ cross join unnest(array
 , '\dy'
 , '\do'
 , '\dT'
+, '\dS+'
 ]) c(c)
 order by c.c, s.s
 \g (tuples_only=on format=csv) describe.sql

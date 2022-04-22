@@ -27,7 +27,12 @@ SELECT public.compress_chunk(public.show_chunks('prom_data.cpu_usage'));
 -- todo: add exemplars
 
 -- todo: add traces
-
+select ps_trace.put_tag_key('test-tag-0', ps_trace.span_tag_type());
+select ps_trace.put_tag_key('test-tag-1', ps_trace.span_tag_type());
+select ps_trace.put_tag('test-tag-0', to_jsonb(0), ps_trace.span_tag_type());
+select ps_trace.put_tag('test-tag-1', to_jsonb(1), ps_trace.span_tag_type());
+select ps_trace.put_instrumentation_lib('test-inst-lib-0', '9.9.9', ps_trace.put_schema_url('foo.bar.baz'));
+select ps_trace.put_operation('test-service-0', 'endpoint-0', 'SPAN_KIND_SERVER'::ps_trace.span_kind);
 
 create user bob;
 grant prom_admin, postgres to bob; -- todo: bob should not need postgres role
