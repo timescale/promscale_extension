@@ -18,12 +18,5 @@ select ps_trace.put_tag_key('test-tag-3', ps_trace.span_tag_type());
 select ps_trace.put_tag('test-tag-2', to_jsonb(2), ps_trace.span_tag_type());
 select ps_trace.put_tag('test-tag-3', to_jsonb(3), ps_trace.span_tag_type());
 select * from _ps_trace.schema_url;
-DO $block$
-DECLARE
-    _id bigint;
-BEGIN
-    select ps_trace.put_schema_url('buz.bam.bip') into strict _id;
-    perform ps_trace.put_instrumentation_lib('test-inst-lib-1', '9.9.9', _id);
-    perform ps_trace.put_operation('test-service-1', 'endpoint-1', 'SPAN_KIND_SERVER'::ps_trace.span_kind);
-END;
-$block$;
+select ps_trace.put_instrumentation_lib('test-inst-lib-1', '9.9.9', ps_trace.put_schema_url('buz.bam.bip'));
+select ps_trace.put_operation('test-service-1', 'endpoint-1', 'SPAN_KIND_SERVER'::ps_trace.span_kind);
