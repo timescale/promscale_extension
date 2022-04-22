@@ -1,5 +1,5 @@
 use regex::Regex;
-use similar::{ChangeTag, DiffableStr, TextDiff};
+use similar::{ChangeTag, TextDiff};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};

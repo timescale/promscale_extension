@@ -10,30 +10,30 @@ select version();
 
 -- dynamically generate meta commands to describe objects in the schemas
 select format('%s %s', c.c, s.s)
-from unnest(array[
-    'public.*',
-    '_prom_catalog.*',
-    '_prom_ext.*',
-    '_ps_catalog.*',
-    '_ps_trace.*',
-    'prom_api.*',
-    'prom_data.*',
-    'prom_data_exemplar.*',
-    'prom_data_series.*',
-    'prom_info.*',
-    'prom_metric.*',
-    'prom_series.*',
-    'ps_tag.*',
-    'ps_trace.*'
+from unnest(array
+[ 'public.*'
+, '_prom_catalog.*'
+, '_prom_ext.*'
+, '_ps_catalog.*'
+, '_ps_trace.*'
+, 'prom_api.*'
+, 'prom_data.*'
+, 'prom_data_exemplar.*'
+, 'prom_data_series.*'
+, 'prom_info.*'
+, 'prom_metric.*'
+, 'prom_series.*'
+, 'ps_tag.*'
+, 'ps_trace.*'
 ]) s(s)
-cross join unnest(array[
-    '\d+',
-    '\df+',
-    '\dp+',
-    '\di',
-    '\dy',
-    '\do',
-    '\dT'
+cross join unnest(array
+[ '\d+'
+, '\df+'
+, '\dp+'
+, '\di'
+, '\dy'
+, '\do'
+, '\dT'
 ]) c(c)
 order by c.c, s.s
 \g (tuples_only=on format=csv) describe.sql
