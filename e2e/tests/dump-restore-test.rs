@@ -324,6 +324,16 @@ fn post_restore(container: &PostgresContainer) {
     );
 }
 
+/// Runs the post-snapshot sql script in the container
+fn post_snapshot(container: &PostgresContainer) {
+    psql_file(
+        &container,
+        "db",
+        "bob",
+        Path::new("/scripts/post-snapshot.sql"),
+    );
+}
+
 /// Tests the process of dumping and restoring a database using pg_dump
 ///
 /// 1. create a postgres docker container
@@ -333,7 +343,8 @@ fn post_restore(container: &PostgresContainer) {
 /// 5. destroy the docker container and create a new one
 /// 6. restore into the new database
 /// 7. snapshot the database
-/// 8. compare the two snapshots. they should be equal
+/// 8. create more data to make sure things are still wired up correctly
+/// 9. compare the two snapshots. they should be equal
 #[test]
 fn dump_restore_test() {
     let docker = clients::Cli::default();
@@ -389,6 +400,7 @@ fn dump_restore_test() {
             "bob",
             dir.join("snapshot-1.txt").as_path(),
         );
+        post_snapshot(&container);
         container.stop();
         container.rm();
         snapshot1
