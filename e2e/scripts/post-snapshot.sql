@@ -81,3 +81,44 @@ insert into _ps_trace.span
 , 4
 , 1
 );
+
+
+INSERT INTO _ps_trace.event
+( time
+, trace_id
+, span_id
+, event_nbr
+, name
+, tags
+, dropped_tags_count
+) VALUES
+( '2030-01-06 01:02:03'::timestamptz
+, 'd7d6d485-0470-4e88-86af-8e512e3be557'::ps_trace.trace_id
+, 456789
+, 1
+, 'this is a test event'
+, ps_trace.get_tag_map(jsonb_build_object('test-tag-1', to_jsonb(1)))
+, 0
+);
+
+INSERT INTO _ps_trace.link
+( trace_id
+, span_id
+, span_start_time
+, linked_trace_id
+, linked_span_id
+, link_nbr
+, trace_state
+, tags
+, dropped_tags_count
+) VALUES
+( 'd7d6d485-0470-4e88-86af-8e512e3be557'::ps_trace.trace_id
+, 456789
+, '2030-01-06 01:02'::timestamptz
+, 'd43807ea-b28c-4587-8f50-373d9a04ce16'::ps_trace.trace_id
+, 123456
+, 1
+, 'OK'
+, ps_trace.get_tag_map(jsonb_build_object('test-tag-0', to_jsonb(0), 'test-tag-1', to_jsonb(1)))
+, 0
+);
