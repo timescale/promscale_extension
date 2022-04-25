@@ -58,7 +58,7 @@ BEGIN
     FROM _ps_trace.operation;
     EXECUTE _sql;
 
-    SELECT setval('exemplar_id_seq'::regclass, max(id), true)
+    PERFORM setval('_prom_catalog.exemplar_id_seq'::regclass, max(id), true)
     FROM _prom_catalog.exemplar
     ;
 
