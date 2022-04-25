@@ -19,6 +19,20 @@ BEGIN
     BEFORE INSERT ON _ps_trace.link
     FOR EACH ROW EXECUTE FUNCTION _timescaledb_internal.insert_blocker();
 
+    FOR _sql IN
+    (
+        SELECT format('DROP TRIGGER IF EXISTS ts_insert_blocker ON %I.%I RESTRICT', k.schema_name, k.table_name)
+        FROM _timescaledb_catalog.hypertable h
+        INNER JOIN _timescaledb_catalog.chunk k ON (k.hypertable_id = h.id)
+        WHERE h.schema_name = '_ps_trace'
+        AND h.table_name IN ('span', 'link', 'event')
+        ORDER BY h.table_name, k.table_name
+    )
+    LOOP
+        EXECUTE _sql;
+    END LOOP
+    ;
+
     SELECT format('ALTER TABLE _ps_trace.tag_key ALTER COLUMN id RESTART WITH %s', max(id) + 1)
     INTO STRICT _sql
     FROM _ps_trace.tag_key;
