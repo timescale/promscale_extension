@@ -25,8 +25,8 @@ FROM generate_series(1,10) g;
 SELECT public.compress_chunk(public.show_chunks('prom_data.cpu_usage'));
 
 -- todo: add exemplars
+select _prom_catalog.create_exemplar_table_if_not_exists('cpu_total');
 
--- todo: add traces
 select ps_trace.put_tag_key('test-tag-0', ps_trace.span_tag_type());
 select ps_trace.put_tag_key('test-tag-1', ps_trace.span_tag_type());
 select ps_trace.put_tag('test-tag-0', to_jsonb(0), ps_trace.span_tag_type());

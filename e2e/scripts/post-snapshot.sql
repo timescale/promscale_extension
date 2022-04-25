@@ -13,6 +13,9 @@ INSERT INTO prom_data.cpu_total
 SELECT timestamptz '2030-01-02 02:03:04'+(interval '1s' * g), 100.0, _prom_catalog.get_or_create_series_id('{"__name__": "cpu_total", "namespace":"production", "node": "pinky", "new_tag_2":"bar"}')
 FROM generate_series(1,10) g;
 
+select _prom_catalog.create_exemplar_table_if_not_exists('cpu_usage');
+
+
 select ps_trace.put_tag_key('test-tag-2', ps_trace.span_tag_type());
 select ps_trace.put_tag_key('test-tag-3', ps_trace.span_tag_type());
 select ps_trace.put_tag('test-tag-2', to_jsonb(2), ps_trace.span_tag_type());
@@ -81,7 +84,6 @@ insert into _ps_trace.span
 , 4
 , 1
 );
-
 
 INSERT INTO _ps_trace.event
 ( time
