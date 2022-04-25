@@ -25,6 +25,12 @@ from unnest(array
 , 'prom_series.*'
 , 'ps_tag.*'
 , 'ps_trace.*'
+, '_timescaledb_cache'
+, '_timescaledb_catalog'
+, '_timescaledb_config'
+, '_timescaledb_internal'
+, 'timescaledb_experimental'
+, 'timescaledb_information'
 ]) s(s)
 cross join unnest(array
 [ '\d+'
