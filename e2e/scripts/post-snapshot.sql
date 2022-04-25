@@ -15,6 +15,13 @@ FROM generate_series(1,10) g;
 
 select _prom_catalog.create_exemplar_table_if_not_exists('cpu_usage');
 
+select _prom_catalog.insert_exemplar_row
+( 'cpu_usage'::text
+, array['2030-01-01 02:03:04'::timestamptz]
+, array[1::bigint]
+, array[array['cpu_usage', 'dev', 'brain']::label_value_array]
+, array[42::double precision]
+);
 
 select ps_trace.put_tag_key('test-tag-2', ps_trace.span_tag_type());
 select ps_trace.put_tag_key('test-tag-3', ps_trace.span_tag_type());
