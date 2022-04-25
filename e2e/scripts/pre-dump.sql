@@ -34,5 +34,67 @@ select ps_trace.put_tag('test-tag-1', to_jsonb(1), ps_trace.span_tag_type());
 select ps_trace.put_instrumentation_lib('test-inst-lib-0', '9.9.9', ps_trace.put_schema_url('foo.bar.baz'));
 select ps_trace.put_operation('test-service-0', 'endpoint-0', 'SPAN_KIND_SERVER'::ps_trace.span_kind);
 
+insert into _ps_trace.span
+( trace_id
+, span_id
+, parent_span_id
+, operation_id
+, start_time
+, end_time
+, duration_ms
+, trace_state
+, span_tags
+, dropped_tags_count
+, event_time
+, dropped_events_count
+, dropped_link_count
+, status_code
+, status_message
+, instrumentation_lib_id
+, resource_tags
+, resource_dropped_tags_count
+, resource_schema_url_id
+) values
+( 'd43807ea-b28c-4587-8f50-373d9a04ce16'::ps_trace.trace_id
+, 123456
+, null
+, 1
+, '2030-01-06 01:02'::timestamptz
+, '2030-01-06 01:03'::timestamptz
+, extract(epoch from ('2030-01-06 01:03'::timestamptz - '2030-01-06 01:02'::timestamptz)) * 1000
+, 'TEST'
+, ps_trace.get_tag_map(jsonb_build_object('test-tag-0', to_jsonb(0), 'test-tag-1', to_jsonb(1)))
+, 1
+, tstzrange('2030-01-06 01:02'::timestamptz, '2030-01-06 01:03'::timestamptz, '[)')
+, 2
+, 3
+, 'STATUS_CODE_OK'::ps_trace.status_code
+, 'OK'
+, 1
+, ps_trace.get_tag_map(jsonb_build_object('test-tag-1', to_jsonb(1)))
+, 4
+, 1
+),
+( 'd43807ea-b28c-4587-8f50-373d9a04ce16'::ps_trace.trace_id
+, 654321
+, 123456
+, 1
+, '2030-01-06 01:02'::timestamptz
+, '2030-01-06 01:03'::timestamptz
+, extract(epoch from ('2030-01-06 01:03'::timestamptz - '2030-01-06 01:02'::timestamptz)) * 1000
+, 'TEST'
+, ps_trace.get_tag_map(jsonb_build_object('test-tag-0', to_jsonb(0), 'test-tag-1', to_jsonb(1)))
+, 1
+, tstzrange('2030-01-06 01:02'::timestamptz, '2030-01-06 01:03'::timestamptz, '[)')
+, 2
+, 3
+, 'STATUS_CODE_OK'::ps_trace.status_code
+, 'OK'
+, 1
+, ps_trace.get_tag_map(jsonb_build_object('test-tag-1', to_jsonb(1)))
+, 4
+, 1
+);
+
 create user bob;
 grant prom_admin, postgres to bob; -- todo: bob should not need postgres role
