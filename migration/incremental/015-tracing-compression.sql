@@ -2,8 +2,8 @@
 DROP TABLE _ps_trace.link CASCADE;
 DROP TABLE _ps_trace.event CASCADE;
 DROP TABLE _ps_trace.span CASCADE;
+DROP TABLE _ps_trace.tag CASCADE;
 
-TRUNCATE TABLE _ps_trace.tag;
 DELETE FROM _ps_trace.tag_key WHERE id >= 1000;
 ANALYZE _ps_trace.tag_key;
 REINDEX TABLE _ps_trace.tag_key;
@@ -15,8 +15,16 @@ ANALYZE _ps_trace.instrumentation_lib;
 TRUNCATE TABLE _ps_trace.schema_url CASCADE;
 ANALYZE _ps_trace.schema_url;
 
-ALTER TABLE _ps_trace.tag DROP CONSTRAINT tag_key_value_id_key_id_key;
-CREATE UNIQUE INDEX tag_key_value_id_key_id_key ON _ps_trace.tag (key, _prom_ext.jsonb_digest(value)) INCLUDE (id, key_id);
+CREATE TABLE _ps_trace.tag (
+    id BIGINT NOT NULL GENERATED ALWAYS AS IDENTITY,
+    key_id BIGINT NOT NULL,
+    tag_type ps_trace.tag_type NOT NULL,
+    key ps_trace.tag_k NOT NULL REFERENCES _ps_trace.tag_key (key) ON DELETE CASCADE,
+    value ps_trace.tag_v NOT NULL
+);
+CREATE UNIQUE INDEX tag_key_value_id_key_id_key_idx ON _ps_trace.tag (key, _prom_ext.jsonb_digest(value)) INCLUDE (id, key_id);
+GRANT SELECT ON TABLE _ps_trace.tag TO prom_reader;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.tag TO prom_writer;
 
 -- We are replacing domain with custom type
 DROP DOMAIN ps_trace.trace_id CASCADE;
