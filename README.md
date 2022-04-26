@@ -157,3 +157,7 @@ This extension will be created via `CREATE EXTENSION` automatically by the Proms
 ## Common Compilation Issues
 
 - `cargo: No such file or directory` means the [Rust compiler](https://www.rust-lang.org/tools/install) is not installed
+
+## Development
+
+To understand more about how to write SQL migration files for this extension, consult [this](migration/README.md) guide.
