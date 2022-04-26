@@ -335,80 +335,84 @@ fn post_snapshot(container: &PostgresContainer) {
     );
 }
 
-/// Tests the process of dumping and restoring a database using pg_dump
-///
-/// 1. create a postgres docker container
-/// 2. create metrics, series, samples, exemplars, traces in the database
-/// 3. snapshot the database
-/// 4. use pg_dump to create a logical sql dump
-/// 5. destroy the docker container and create a new one
-/// 6. restore into the new database
-/// 7. snapshot the database
-/// 8. create more data to make sure things are still wired up correctly
-/// 9. compare the two snapshots. they should be equal
-#[test]
-fn dump_restore_test() {
-    let docker = clients::Cli::default();
-    let postgres_image = postgres_image();
-    let volumes = vec![(concat!(env!("CARGO_MANIFEST_DIR"), "/scripts"), "/scripts")];
-
-    let dir = &env::temp_dir().join("promscale-dump-restore-test");
+/// Removes the working directory if it exists, then creates it
+fn make_working_dir(dir: &Path) {
     println!("temp dir at: {}", dir.to_str().unwrap());
     if dir.exists() {
         fs::remove_dir_all(dir).expect("failed to remove temp dir");
     }
     fs::create_dir_all(dir).expect("failed to create temp dir");
-    let dump = dir.join("dump.sql");
+}
 
-    // create the first container, load it with data, snapshot it, and dump it
-    let snapshot0 = {
-        let container = run_postgres(
-            &docker,
-            postgres_image.as_str(),
-            "db",
-            "postgres",
-            Some(&volumes),
-        );
-        pre_dump(&container);
-        let snapshot0 = snapshot_db(
-            &container,
-            "db",
-            "bob",
-            dir.join("snapshot-0.txt").as_path(),
-        );
-        dump_db(&container, "db", "postgres", &dump); // todo: dump using bob user
-        container.stop();
-        container.rm();
-        snapshot0
-    };
+/// Performs all operations on the first database container
+///
+/// 1. creates the container
+/// 2. adds metric, exemplar, and tracing data to it
+/// 3. snapshots the database
+/// 4. uses pg_dump to create a logical backup
+/// 5. stops the container
+/// 6. returns the snapshot
+///
+fn first_db(
+    docker: &Cli,
+    postgres_image: &str,
+    volumes: Option<&Vec<(&str, &str)>>,
+    dir: &Path,
+    dump: &Path,
+) -> String {
+    let container = run_postgres(docker, postgres_image, "db", "postgres", volumes);
+    pre_dump(&container);
+    let snapshot0 = snapshot_db(
+        &container,
+        "db",
+        "bob",
+        dir.join("snapshot-0.txt").as_path(),
+    );
+    dump_db(&container, "db", "postgres", dump); // todo: dump using bob user
+    container.stop();
+    container.rm();
+    snapshot0
+}
 
-    // create the second container, restore into it, snapshot it
-    let snapshot1 = {
-        let container = run_postgres(
-            &docker,
-            postgres_image.as_str(),
-            "db",
-            "postgres",
-            Some(&volumes),
-        );
-        pre_restore(&container);
-        restore_db(&container, "db", "postgres", &dump);
-        post_restore(&container);
-        psql_cmd(&container, "db", "postgres", "grant prom_admin to bob;");
-        let snapshot1 = snapshot_db(
-            &container,
-            "db",
-            "bob",
-            dir.join("snapshot-1.txt").as_path(),
-        );
-        post_snapshot(&container);
-        container.stop();
-        container.rm();
-        snapshot1
-    };
+/// Performs all operations on the second database container
+///
+/// 1. creates the container
+/// 2. runs the pre-restore script
+/// 3. uses the logical backup to restore the database
+/// 4. runs the post-restore script
+/// 5. snapshots the database
+/// 6. runs the post-snapshot script to add more data to the database
+/// 7. stops the container
+/// 8. returns the snapshot
+///
+fn second_db(
+    docker: &Cli,
+    postgres_image: String,
+    volumes: Option<&Vec<(&str, &str)>>,
+    dir: &Path,
+    dump: &Path,
+) -> String {
+    let container = run_postgres(docker, postgres_image.as_str(), "db", "postgres", volumes);
+    pre_restore(&container);
+    restore_db(&container, "db", "postgres", dump);
+    post_restore(&container);
+    psql_cmd(&container, "db", "postgres", "grant prom_admin to bob;");
+    let snapshot1 = snapshot_db(
+        &container,
+        "db",
+        "bob",
+        dir.join("snapshot-1.txt").as_path(),
+    );
+    post_snapshot(&container);
+    container.stop();
+    container.rm();
+    snapshot1
+}
 
-    // don't do `assert_eq!(snapshot0, snapshot1);`
-    // it prints both entire snapshots and is impossible to read
+/// Diffs the two snapshots.
+/// Differences are printed to the console.
+/// Returns a boolean. True indicates the two snapshots are identical
+fn are_snapshots_equal(snapshot0: String, snapshot1: String) -> bool {
     let are_snapshots_equal = snapshot0 == snapshot1;
     if !are_snapshots_equal {
         let diff = TextDiff::from_lines(snapshot0.as_str(), snapshot1.as_str());
@@ -424,5 +428,28 @@ fn dump_restore_test() {
             println!("{} {}", sign, change);
         }
     }
+    are_snapshots_equal
+}
+
+/// Tests the process of dumping and restoring a database using pg_dump
+#[test]
+fn dump_restore_test() {
+    let docker = clients::Cli::default();
+    let postgres_image = postgres_image();
+    let volumes = vec![(concat!(env!("CARGO_MANIFEST_DIR"), "/scripts"), "/scripts")];
+
+    let dir = &env::temp_dir().join("promscale-dump-restore-test");
+    make_working_dir(dir);
+    let dump = dir.join("dump.sql");
+
+    // create the first container, load it with data, snapshot it, and dump it
+    let snapshot0 = first_db(&docker, &postgres_image, Some(&volumes), dir, &dump);
+
+    // create the second container, restore into it, snapshot it, add more data
+    let snapshot1 = second_db(&docker, postgres_image, Some(&volumes), dir, &dump);
+
+    // don't do `assert_eq!(snapshot0, snapshot1);`
+    // it prints both entire snapshots and is impossible to read
+    let are_snapshots_equal = are_snapshots_equal(snapshot0, snapshot1);
     assert!(are_snapshots_equal);
 }
