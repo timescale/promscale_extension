@@ -14,6 +14,7 @@ FROM
     ('ha_lease_refresh'         , '10s')
 ) dd(key, value)
 ;
+GRANT SELECT ON _prom_catalog.default_default TO prom_reader;
 
 -- the _prom_catalog.default table contains user-supplied values that override
 -- the "default defaults". We don't need to keep values in the default table

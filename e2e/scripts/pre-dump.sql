@@ -3,7 +3,7 @@
 
 CREATE EXTENSION promscale;
 
-SELECT _prom_catalog.set_default_value('ha_lease_timeout', '200 hours');
+SELECT _prom_catalog.set_default_value('ha_lease_timeout'::text, '200 hours'::text);
 
 SELECT _prom_catalog.get_or_create_metric_table_name('cpu_usage');
 SELECT _prom_catalog.get_or_create_metric_table_name('cpu_total');
