@@ -35,6 +35,17 @@ CREATE TABLE _prom_catalog.series (
     labels prom_api.label_array NOT NULL, --labels are globally unique because of how partitions are defined
     delete_epoch bigint NULL DEFAULT NULL -- epoch after which this row can be deleted
 ) PARTITION BY LIST(metric_id);
+/*
+We need to drop the _prom_catalog.series_deleted and _prom_catalog.series_labels_id
+indexes. They are defined on the _prom_catalog.series table which is partitioned. We
+don't want the index defined on the parent. We want it defined on each child individually
+manually. Having it defined on the parent causes the indexes to be defined automatically
+on the partitions which causes issues with the dump/restore process.
+-- CREATE INDEX series_labels_id ON _prom_catalog.series USING GIN (labels);
+-- CREATE INDEX series_deleted
+--     ON _prom_catalog.series(delete_epoch, id)
+--     WHERE delete_epoch IS NOT NULL;
+*/
 GRANT SELECT ON TABLE _prom_catalog.series TO prom_reader;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _prom_catalog.series TO prom_writer;
 
