@@ -13,6 +13,12 @@ INSERT INTO prom_data.cpu_total
 SELECT timestamptz '2030-01-02 02:03:04'+(interval '1s' * g), 100.0, _prom_catalog.get_or_create_series_id('{"__name__": "cpu_total", "namespace":"production", "node": "pinky", "new_tag_2":"bar"}')
 FROM generate_series(1,10) g;
 
+SELECT _prom_catalog.get_or_create_metric_table_name('dilithium_total');
+CALL _prom_catalog.finalize_metric_creation();
+INSERT INTO prom_data.dilithium_total
+SELECT timestamptz '2030-01-01 02:03:04'+(interval '1s' * g), 100.1 + g, _prom_catalog.get_or_create_series_id('{"__name__": "dilithium_total", "namespace":"tng", "node": "enterprise"}')
+FROM generate_series(1,10) g;
+
 select _prom_catalog.create_exemplar_table_if_not_exists('cpu_usage');
 
 select _prom_catalog.insert_exemplar_row

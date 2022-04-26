@@ -70,7 +70,7 @@ DECLARE
 BEGIN
     FOR _sql IN
     (
-        -- find tables which belong to the extension so we can mark them to have
+        -- find tables and sequences which belong to the extension so we can mark them to have
         -- their data dumped by pg_dump
         SELECT format($$SELECT pg_catalog.pg_extension_config_dump('%I.%I', %L)$$,
             n.nspname,
@@ -87,7 +87,7 @@ BEGIN
         WHERE d.refclassid = 'pg_catalog.pg_extension'::pg_catalog.regclass
         AND d.deptype = 'e'
         AND e.extname = 'promscale'
-        AND k.relkind IN ('r', 'p')
+        AND k.relkind IN ('r', 'p', 'S') -- tables AND sequences
         AND (n.nspname, k.relname) NOT IN
         (
             -- these should NOT be config tables

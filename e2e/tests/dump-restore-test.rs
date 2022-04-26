@@ -245,7 +245,7 @@ fn snapshot_db(container: &PostgresContainer, db: &str, username: &str, path: &P
         exit
     );
     copy_out(container, snapshot, path);
-    edit_snapshot(path)
+    normalize_snapshot(path)
 }
 
 /// Uses pg_dump to create a logical backup

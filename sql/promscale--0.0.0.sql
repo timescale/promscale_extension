@@ -334,7 +334,7 @@ BEGIN
         EXECUTE format('ALTER EXTENSION promscale ADD %s %s', _rec.objtype, _rec.objname);
         EXECUTE format('ALTER %s %s OWNER TO %I', _rec.objtype, _rec.objname, current_user);
 
-        IF _rec.objtype = 'TABLE' AND _rec.objname NOT IN ('_ps_catalog.migration', '_ps_catalog.promscale_instance_information') THEN
+        IF _rec.objtype IN ('TABLE', 'SEQUENCE') AND _rec.objname NOT IN ('_ps_catalog.migration', '_ps_catalog.promscale_instance_information') THEN
             _config_filter = case _rec.objname
                 when '_prom_catalog.remote_commands' then 'where seq >= 1000'
                 when '_ps_trace.tag_key' then 'where id >= 1000'
