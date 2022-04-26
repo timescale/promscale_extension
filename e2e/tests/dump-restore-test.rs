@@ -194,6 +194,7 @@ fn copy_out(container: &Container<Cli, GenericImage>, src: &Path, dest: &Path) {
 fn edit_snapshot(path: &Path) -> String {
     let snapshot = fs::read_to_string(path).expect("failed to read snapshot file");
 
+    // partition constraints are printed with the OID of the table, but OIDs are allowed to change
     let re = Regex::new(r"Partition constraint: satisfies_hash_partition\('\d+'::oid").unwrap();
     let snapshot = re.replace_all(
         &snapshot,
