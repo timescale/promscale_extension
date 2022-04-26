@@ -12,28 +12,16 @@ FROM
     ('trace_retention_period'   , (30 * INTERVAL '1 days')::text),
     ('ha_lease_timeout'         , '1m'),
     ('ha_lease_refresh'         , '10s')
-) dd(key, value)
+) d(key, value)
 ;
 GRANT SELECT ON _prom_catalog.initial_default TO prom_reader;
-
--- the _prom_catalog.default table contains user-supplied values that override
--- the "default defaults". We don't need to keep values in the default table
--- if they are the same as the default defaults
-DELETE FROM _prom_catalog.default x
-WHERE x.key IN
-(
-    SELECT d.key
-    FROM _prom_catalog.default d
-    LEFT OUTER JOIN _prom_catalog.initial_default dd ON (d.key = dd.key)
-    WHERE d.value is not distinct from dd.value
-);
 
 CREATE OR REPLACE FUNCTION _prom_catalog.get_default_value(_key text)
     RETURNS TEXT
     SET search_path = pg_catalog
 AS $func$
     -- if there is a user-supplied default value, take it
-    -- otherwise take the default default value
+    -- otherwise take the initial default value
     SELECT coalesce(d.value, dd.value)
     FROM _prom_catalog.initial_default dd
     LEFT OUTER JOIN _prom_catalog.default d ON (dd.key = d.key)
@@ -46,12 +34,10 @@ CREATE OR REPLACE FUNCTION _prom_catalog.set_default_value(_key text, _value tex
     RETURNS VOID
     SET search_path = pg_catalog
 AS $func$
-    -- remove the existing user-supplied default value if one exists
-    DELETE FROM _prom_catalog.default d WHERE d.key = _key;
-    -- insert the user-supplied value into the default table, unless the value is the same as the default default value
     INSERT INTO _prom_catalog.default (key, value)
-    SELECT _key, _value
-    WHERE (_key, _value) NOT IN (SELECT dd.key, dd.value FROM _prom_catalog.initial_default dd)
+    VALUES (_key, _value)
+    ON CONFLICT (key) DO
+    UPDATE SET value = excluded.value
     ;
 $func$
 LANGUAGE SQL VOLATILE;

@@ -34,22 +34,34 @@ select _prom_catalog.get_default_value('chunk_interval') = (INTERVAL '8 hours'):
  t
 (1 row)
 
-\echo setting the default value to the same as the default default should be a noop
-setting the default value to the same as the default default should be a noop
-select _prom_catalog.set_default_value('chunk_interval', (INTERVAL '8 hours')::text);
- set_default_value 
--------------------
- 
-(1 row)
-
 select count(*) = 0 from _prom_catalog.default d where d.key = 'chunk_interval';
  ?column? 
 ----------
  t
 (1 row)
 
-\echo overriding the default default should land a new row in the default table
-overriding the default default should land a new row in the default table
+\echo setting the default value to the same as the initial default
+setting the default value to the same as the initial default
+select _prom_catalog.set_default_value('chunk_interval', (INTERVAL '8 hours')::text);
+ set_default_value 
+-------------------
+ 
+(1 row)
+
+select count(*) = 1 from _prom_catalog.default d where d.key = 'chunk_interval';
+ ?column? 
+----------
+ t
+(1 row)
+
+select _prom_catalog.get_default_value('chunk_interval') = (INTERVAL '8 hours')::text;
+ ?column? 
+----------
+ t
+(1 row)
+
+\echo overriding the initial default
+overriding the initial default
 select _prom_catalog.set_default_value('chunk_interval', (INTERVAL '99 hours')::text);
  set_default_value 
 -------------------
@@ -62,23 +74,27 @@ select count(*) = 1 from _prom_catalog.default d where d.key = 'chunk_interval';
  t
 (1 row)
 
-\echo make sure the getter returns the new value
-make sure the getter returns the new value
 select _prom_catalog.get_default_value('chunk_interval') = (INTERVAL '99 hours')::text;
  ?column? 
 ----------
  t
 (1 row)
 
-\echo setting the default value BACK to the same as the default default should remove the row from the default table
-setting the default value BACK to the same as the default default should remove the row from the default table
+\echo setting the default value BACK to the same as the initial default
+setting the default value BACK to the same as the initial default
 select _prom_catalog.set_default_value('chunk_interval', (INTERVAL '8 hours')::text);
  set_default_value 
 -------------------
  
 (1 row)
 
-select count(*) = 0 from _prom_catalog.default d where d.key = 'chunk_interval';
+select count(*) = 1 from _prom_catalog.default d where d.key = 'chunk_interval';
+ ?column? 
+----------
+ t
+(1 row)
+
+select _prom_catalog.get_default_value('chunk_interval') = (INTERVAL '8 hours')::text;
  ?column? 
 ----------
  t
