@@ -251,7 +251,7 @@ BEGIN
         END IF;
 
         _is_restore_in_progress = coalesce(
-            (SELECT setting = 'on' from pg_catalog.pg_settings where name = 'timescaledb.restoring'), false
+            (SELECT setting::boolean from pg_catalog.pg_settings where name = 'timescaledb.restoring'), false
             );
     END IF;
 

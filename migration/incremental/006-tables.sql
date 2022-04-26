@@ -68,7 +68,7 @@ DO $block$
 DECLARE
     _is_restore_in_progress boolean = false;
 BEGIN
-    _is_restore_in_progress = coalesce((SELECT setting = 'on' from pg_catalog.pg_settings where name = 'timescaledb.restoring'), false);
+    _is_restore_in_progress = coalesce((SELECT setting::boolean from pg_catalog.pg_settings where name = 'timescaledb.restoring'), false);
     IF _is_restore_in_progress THEN
         -- if a restore is in progress, we want the value from the backup, not this hardcoded init value
         RAISE NOTICE 'restore in progress. skipping insert into _prom_catalog.ids_epoch';

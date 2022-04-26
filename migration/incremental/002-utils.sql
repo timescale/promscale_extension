@@ -24,7 +24,7 @@ BEGIN
     EXECUTE command;
 
     -- do not call distributed_exec if we are in the middle of restoring from backup
-    _is_restore_in_progress = coalesce((SELECT setting = 'on' from pg_catalog.pg_settings where name = 'timescaledb.restoring'), false);
+    _is_restore_in_progress = coalesce((SELECT setting::boolean from pg_catalog.pg_settings where name = 'timescaledb.restoring'), false);
     IF _is_restore_in_progress THEN
         RAISE NOTICE 'restore in progress. skipping %', coalesce(command_key, 'anonymous command');
         RETURN;

@@ -61,7 +61,7 @@ DO $$
 DECLARE
     _is_restore_in_progress boolean = false;
 BEGIN
-    _is_restore_in_progress = coalesce((SELECT setting = 'on' from pg_catalog.pg_settings where name = 'timescaledb.restoring'), false);
+    _is_restore_in_progress = coalesce((SELECT setting::boolean from pg_catalog.pg_settings where name = 'timescaledb.restoring'), false);
     IF  NOT _prom_catalog.is_timescaledb_oss()
         AND _prom_catalog.get_timescale_major_version() >= 2
         AND NOT _is_restore_in_progress
