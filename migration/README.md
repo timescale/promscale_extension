@@ -2,7 +2,39 @@
 
 ## General structure
 
-TODO james
+This directory contains the component sql scripts which are merged together to
+form the extension install and upgrade script. The three components are
+`bootstrap`, `incremental`, and `idempotent`.
+
+The final sql script is constructed by concatenating the following individual
+pieces, in this order:
+
+- bootstrap
+- auto-generated idempotent pgx SQL
+- incremental
+- idempotent
+
+## Writing SQL migrations
+
+When adding new SQL, you need only consider the `incremental` and `idempotent`
+directories. The `incremental` directory contains sql scripts which should
+each be applied to the database only one time, in deterministic order.  The
+`idempotent` directory contains sql scripts which can or should be applied
+repeatedly.
+
+As a general rule of thumb, new table/type/function/view additions all belong
+in `incremental`. A further general rule is that existing `incremental` files
+_should not_ be modified.
+
+The following belongs in `idempotent`:
+
+- redefinition of an existing function/view
+- redefinition of an existing operator (as long as failed creation is caught)  
+
+In principle, the `idempotent` folder provides an overview of the current
+implementation of all functions, and a mechanism to simply change the
+implementation. When adding a new function in an `incremental` script, it is
+recommended to add the same function to a script in `idempotent`.
 
 ## Security
 
