@@ -1,4 +1,4 @@
-use crate::SqlType::{Idempotent, Migration};
+use crate::SqlType::{Idempotent, Incremental};
 use askama::Template;
 use std::fs::File;
 use std::io::{Error, Read, Write};
@@ -7,8 +7,8 @@ use std::string::String;
 use std::{env, fs};
 
 #[derive(Template)]
-#[template(path = "migration-wrapper.sql", escape = "none")]
-struct MigrationWrapper<'a> {
+#[template(path = "incremental-wrapper.sql", escape = "none")]
+struct IncrementalWrapper<'a> {
     filename: &'a str,
     version: &'a str,
     body: &'a str,
@@ -35,7 +35,7 @@ fn main() {
     println!("cargo:rerun-if-changed=Cargo.lock");
     // Note: directories are not traversed, instead Cargo looks at the mtime of the directory.
     println!("cargo:rerun-if-changed=migration");
-    println!("cargo:rerun-if-changed=migration/migration");
+    println!("cargo:rerun-if-changed=migration/incremental");
     println!("cargo:rerun-if-changed=migration/idempotent");
     println!("cargo:rerun-if-changed=templates");
     println!("cargo:rerun-if-changed=migration/bootstrap");
@@ -74,7 +74,7 @@ fn generate_control_file(manifest_dir: &str) {
         .expect("unable to write control file contents");
 }
 
-/// This procedure reads the SQL files placed in the `migration/{idempotent,migration}`
+/// This procedure reads the SQL files placed in the `migration/{idempotent,incremental}`
 /// directories, wraps each file in its respective template (in the `templates` directory), and
 /// outputs the whole contents as one long SQL file (`MIGRATION_FILE_NAME`) in the root directory.
 fn generate_migration_sql(manifest_dir: &str) {
@@ -100,7 +100,7 @@ fn render_bootstrap(manifest_dir: &str) -> String {
 
     let mut ext_schema_path = PathBuf::from(manifest_dir);
     ext_schema_path.push("migration/bootstrap/001-create-ext-schema.sql");
-    let ext_schema_sql = wrap(ext_schema_path.as_path(), &Migration);
+    let ext_schema_sql = wrap(ext_schema_path.as_path(), &Incremental);
 
     let mut result = String::from("");
     result.push_str(&migration_table_sql);
@@ -112,7 +112,7 @@ fn render_sql() -> Result<String, Error> {
     let mut migration_dir = env::current_dir()?;
     migration_dir.push("migration");
     let mut result = String::new();
-    for sql_type in &[Migration, Idempotent] {
+    for sql_type in &[Incremental, Idempotent] {
         let mut path = migration_dir.clone();
         path.push(dir_for_type(sql_type));
         result += render_file(path, sql_type)?.as_str();
@@ -122,7 +122,7 @@ fn render_sql() -> Result<String, Error> {
 
 fn dir_for_type(sql_type: &SqlType) -> String {
     match sql_type {
-        Migration => "migration".to_string(),
+        Incremental => "incremental".to_string(),
         Idempotent => "idempotent".to_string(),
     }
 }
@@ -138,7 +138,7 @@ fn render_file(path: PathBuf, sql_type: &SqlType) -> Result<String, Error> {
         assert_eq!(
             curr,
             prev + 1,
-            "there must be no gaps nor duplicates in the ordering of migration and idempotent files"
+            "there must be no gaps nor duplicates in the ordering of incremental and idempotent files"
         );
         prev = curr;
         result += wrap(&path, sql_type).as_str();
@@ -146,7 +146,7 @@ fn render_file(path: PathBuf, sql_type: &SqlType) -> Result<String, Error> {
     Ok(result)
 }
 
-/// Parses and returns the numeric prefix in the filename of each idempotent and migration file
+/// Parses and returns the numeric prefix in the filename of each idempotent and incremental file
 fn numeric_prefix(path: &Path) -> i32 {
     let file_name = path.file_name().unwrap().to_str().unwrap();
     let (prefix, _) = file_name
@@ -159,7 +159,7 @@ fn numeric_prefix(path: &Path) -> i32 {
 
 #[derive(Copy, Clone, Debug)]
 enum SqlType {
-    Migration,
+    Incremental,
     Idempotent,
 }
 
@@ -172,7 +172,7 @@ fn wrap(path: &Path, sql_type: &SqlType) -> String {
     let version = env!("CARGO_PKG_VERSION");
     let body = read_file(path);
     match sql_type {
-        SqlType::Migration => wrap_migration_file(filename, version, &body),
+        SqlType::Incremental => wrap_incremental_file(filename, version, &body),
         SqlType::Idempotent => wrap_idempotent_file(filename, version, &body),
     }
 }
@@ -184,13 +184,13 @@ fn wrap_idempotent_file(filename: &str, _version: &str, body: &str) -> String {
         .expect("unable to render template")
 }
 
-fn wrap_migration_file(filename: &str, version: &str, body: &str) -> String {
-    let migration_wrapper = MigrationWrapper {
+fn wrap_incremental_file(filename: &str, version: &str, body: &str) -> String {
+    let incremental_wrapper = IncrementalWrapper {
         filename,
         version,
         body,
     };
-    migration_wrapper
+    incremental_wrapper
         .render()
         .expect("unable to render template")
 }
