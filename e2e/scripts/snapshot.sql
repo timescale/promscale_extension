@@ -51,7 +51,7 @@ select
     format($$select '%I.%I' as table_snapshot;$$, n.nspname, k.relname),
     case (n.nspname, k.relname)
         -- we don't care about comparing the applied_at_version and applied_at columns of the migration table
-        when ('_ps_catalog'::name, 'migration'::name) then 'select name, body from _ps_catalog.migration;'
+        when ('_ps_catalog'::name, 'migration'::name) then 'select name, body from _ps_catalog.migration order by name, body;'
         else format('select * from %I.%I tbl order by tbl;', n.nspname, k.relname)
     end
 from pg_namespace n
