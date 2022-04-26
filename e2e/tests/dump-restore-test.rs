@@ -191,7 +191,7 @@ fn copy_out(container: &Container<Cli, GenericImage>, src: &Path, dest: &Path) {
 }
 
 /// Edits a snapshot file to account for acceptable differences
-fn edit_snapshot(path: &Path) -> String {
+fn normalize_snapshot(path: &Path) -> String {
     let snapshot = fs::read_to_string(path).expect("failed to read snapshot file");
 
     // partition constraints are printed with the OID of the table, but OIDs are allowed to change
