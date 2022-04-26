@@ -352,7 +352,6 @@ BEGIN
             AND h.table_name IN ('span', 'link', 'event')
         )
         LOOP
-            RAISE NOTICE 'removing %.% from extension', _rec.schema_name, _rec.table_name;
             EXECUTE format($sql$ALTER EXTENSION promscale DROP TABLE %I.%I;$sql$, _rec.schema_name, _rec.table_name);
         END LOOP;
 
