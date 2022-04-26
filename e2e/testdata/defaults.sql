@@ -4,7 +4,7 @@ create extension promscale;
 
 \echo make sure the view returns what we expect it to
 select key, value
-from _prom_catalog.default_default dd
+from _prom_catalog.initial_default dd
 except
 select key, value
 from
