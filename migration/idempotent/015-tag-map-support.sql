@@ -4,21 +4,6 @@ CREATE AGGREGATE ps_trace.jsonb_cat(pg_catalog.jsonb)
     STYPE = pg_catalog.jsonb
 );
 
-/* NOTE: This function cannot be inlined since it's used in a scalar
- * context and uses an aggregate
- */
-CREATE FUNCTION ps_trace.tag_map_denormalize(_map ps_trace.tag_map)
-    RETURNS ps_trace.tag_map
-    LANGUAGE sql STABLE
-    PARALLEL SAFE AS
-$fnc$
-    SELECT ps_trace.jsonb_cat(pg_catalog.jsonb_build_object(t.key, t.value))
-        FROM pg_catalog.jsonb_each(_map) f(k,v)
-            JOIN _ps_trace.tag t ON
-                    f.k::int8 = t.key_id
-                AND f.v::int8 = t.id;
-$fnc$;
-
 CREATE FUNCTION ps_trace.tag_v_eq(ps_trace.tag_v, pg_catalog.jsonb)
     RETURNS pg_catalog.bool
     LANGUAGE internal
