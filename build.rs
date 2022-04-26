@@ -140,7 +140,7 @@ fn render_file(path: PathBuf, sql_type: &SqlType) -> Result<String, Error> {
             prev + 1,
             "there must be no gaps nor duplicates in the ordering of {} files: {}",
             match sql_type {
-                SqlType::Migration => "migration",
+                SqlType::Incremental => "incremental",
                 SqlType::Idempotent => "idempotent",
             },
             path.to_str().unwrap()
