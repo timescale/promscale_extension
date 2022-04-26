@@ -52,7 +52,7 @@ select
     case (n.nspname, k.relname)
         -- we don't care about comparing the applied_at_version and applied_at columns of the migration table
         when ('_ps_catalog'::name, 'migration'::name) then 'select name, body from _ps_catalog.migration;'
-        else format('select * from %I.%I;', n.nspname, k.relname)
+        else format('select * from %I.%I tbl order by tbl;', n.nspname, k.relname)
     end
 from pg_namespace n
 inner join pg_class k on (n.oid = k.relnamespace)
