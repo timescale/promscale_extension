@@ -1,7 +1,7 @@
 --NOTES
 --This code assumes that table names can only be 63 chars long
 
-CREATE OR REPLACE VIEW _prom_catalog.default_default AS
+CREATE OR REPLACE VIEW _prom_catalog.initial_default AS
 SELECT *
 FROM
 (
@@ -14,7 +14,7 @@ FROM
     ('ha_lease_refresh'         , '10s')
 ) dd(key, value)
 ;
-GRANT SELECT ON _prom_catalog.default_default TO prom_reader;
+GRANT SELECT ON _prom_catalog.initial_default TO prom_reader;
 
 -- the _prom_catalog.default table contains user-supplied values that override
 -- the "default defaults". We don't need to keep values in the default table
@@ -24,7 +24,7 @@ WHERE x.key IN
 (
     SELECT d.key
     FROM _prom_catalog.default d
-    LEFT OUTER JOIN _prom_catalog.default_default dd ON (d.key = dd.key)
+    LEFT OUTER JOIN _prom_catalog.initial_default dd ON (d.key = dd.key)
     WHERE d.value is not distinct from dd.value
 );
 
@@ -35,7 +35,7 @@ AS $func$
     -- if there is a user-supplied default value, take it
     -- otherwise take the default default value
     SELECT coalesce(d.value, dd.value)
-    FROM _prom_catalog.default_default dd
+    FROM _prom_catalog.initial_default dd
     LEFT OUTER JOIN _prom_catalog.default d ON (dd.key = d.key)
     WHERE dd.key = _key;
 $func$
@@ -51,7 +51,7 @@ AS $func$
     -- insert the user-supplied value into the default table, unless the value is the same as the default default value
     INSERT INTO _prom_catalog.default (key, value)
     SELECT _key, _value
-    WHERE (_key, _value) NOT IN (SELECT dd.key, dd.value FROM _prom_catalog.default_default dd)
+    WHERE (_key, _value) NOT IN (SELECT dd.key, dd.value FROM _prom_catalog.initial_default dd)
     ;
 $func$
 LANGUAGE SQL VOLATILE;
