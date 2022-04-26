@@ -55,8 +55,6 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.is_restore_in_progress() TO prom_reader;
 CREATE OR REPLACE PROCEDURE _prom_catalog.execute_everywhere(command_key text, command TEXT, transactional BOOLEAN = true)
     SET search_path = pg_catalog
 AS $func$
-DECLARE
-    _is_restore_in_progress boolean = false;
 BEGIN
     IF command_key IS NOT NULL THEN
        INSERT INTO _prom_catalog.remote_commands(key, command, transactional) VALUES(command_key, command, transactional)
@@ -66,8 +64,7 @@ BEGIN
     EXECUTE command;
 
     -- do not call distributed_exec if we are in the middle of restoring from backup
-    _is_restore_in_progress = coalesce((SELECT setting::boolean from pg_catalog.pg_settings where name = 'timescaledb.restoring'), false);
-    IF _is_restore_in_progress THEN
+    IF _prom_catalog.is_restore_in_progress() THEN
         RAISE NOTICE 'restore in progress. skipping %', coalesce(command_key, 'anonymous command');
         RETURN;
     END IF;
