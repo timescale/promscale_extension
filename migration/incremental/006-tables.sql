@@ -41,11 +41,11 @@ indexes. They are defined on the _prom_catalog.series table which is partitioned
 don't want the index defined on the parent. We want it defined on each child individually
 manually. Having it defined on the parent causes the indexes to be defined automatically
 on the partitions which causes issues with the dump/restore process.
--- CREATE INDEX series_labels_id ON _prom_catalog.series USING GIN (labels);
--- CREATE INDEX series_deleted
---     ON _prom_catalog.series(delete_epoch, id)
---     WHERE delete_epoch IS NOT NULL;
 */
+--CREATE INDEX series_labels_id ON _prom_catalog.series USING GIN (labels);
+--CREATE INDEX series_deleted
+--    ON _prom_catalog.series(delete_epoch, id)
+--    WHERE delete_epoch IS NOT NULL;
 GRANT SELECT ON TABLE _prom_catalog.series TO prom_reader;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _prom_catalog.series TO prom_writer;
 
