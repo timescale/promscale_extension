@@ -90,6 +90,7 @@ BEGIN
         END LOOP;
     END IF;
 
+    -- rename the indexes on any existing series partitions to match the new naming scheme
     FOR _cmd IN
     (
         SELECT format('ALTER INDEX IF EXISTS prom_data_series.%I RENAME TO series_delete_epoch_id_%s', f.indexname, m.id)
@@ -111,6 +112,7 @@ BEGIN
         EXECUTE _cmd;
     END LOOP;
 
+    -- rename the indexes on any existing series partitions to match the new naming scheme
     FOR _cmd IN
     (
         SELECT format('ALTER INDEX IF EXISTS prom_data_series.%I RENAME TO series_labels_%s', f.indexname, m.id)
