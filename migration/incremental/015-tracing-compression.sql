@@ -403,7 +403,7 @@ ALTER DOMAIN ps_trace.tag_map_old
     $do$;
 
     GRANT USAGE ON TYPE ps_trace.tag_map TO prom_reader;
-    GRANT USAGE ON TYPE ps_trace.tag_v TO prom_reader;
+    GRANT USAGE ON TYPE _ps_trace.tag_v TO prom_reader;
 
     /* XXX
     * _ps_trace.span table is now used indirectly, thus its name has changed
@@ -447,7 +447,7 @@ ALTER DOMAIN ps_trace.tag_map_old
         LANGUAGE sql STABLE
         PARALLEL SAFE AS
     $fnc$
-        SELECT ps_trace.jsonb_cat(pg_catalog.jsonb_build_object(t.key, t.value))
+        SELECT _ps_trace.jsonb_cat(pg_catalog.jsonb_build_object(t.key, t.value))
             FROM pg_catalog.jsonb_each(_map) f(k,v)
                 JOIN _ps_trace.tag t ON
                         f.k::int8 OPERATOR(pg_catalog.=) t.key_id
