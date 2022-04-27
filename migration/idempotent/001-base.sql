@@ -431,7 +431,7 @@ BEGIN
     --these indexes are logically on all series tables but they cannot be defined on the parent due to
     --dump/restore issues.
     EXECUTE format('CREATE INDEX series_labels_%s ON prom_data_series.%I USING GIN (labels)', NEW.id, NEW.table_name);
-    EXECUTE format('CREATE INDEX  series_delete_epoch_id_%s ON prom_data_series.%I (delete_epoch, id) WHERE delete_epoch IS NOT NULL', NEW.id, NEW.table_name);
+    EXECUTE format('CREATE INDEX series_delete_epoch_id_%s ON prom_data_series.%I (delete_epoch, id) WHERE delete_epoch IS NOT NULL', NEW.id, NEW.table_name);
 
     EXECUTE format('ALTER TABLE prom_data_series.%1$I OWNER TO prom_admin', NEW.table_name);
     RETURN NEW;

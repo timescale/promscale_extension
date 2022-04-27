@@ -89,5 +89,47 @@ BEGIN
             EXECUTE _cmd;
         END LOOP;
     END IF;
+
+    FOR _cmd IN
+    (
+        SELECT format('ALTER INDEX IF EXISTS prom_data_series.%I RENAME TO series_delete_epoch_id_%s', f.indexname, m.id)
+        FROM pg_catalog.pg_inherits i
+        INNER JOIN pg_catalog.pg_class AS k ON (i.inhrelid=k.oid)
+        INNER JOIN pg_catalog.pg_class as p ON (i.inhparent=p.oid)
+        INNER JOIN pg_catalog.pg_namespace pn ON pn.oid = p.relnamespace
+        INNER JOIN pg_catalog.pg_namespace kn ON kn.oid = k.relnamespace
+        INNER JOIN pg_catalog.pg_index x on (k.oid = x.indrelid)
+        INNER JOIN pg_catalog.pg_class d on (x.indexrelid = d.oid)
+        INNER JOIN pg_catalog.pg_indexes f on (kn.nspname = f.schemaname AND d.relname = f.indexname)
+        INNER JOIN _prom_catalog.metric m ON (format('%I', m.table_name) = k.relname)
+        WHERE pn.nspname = '_prom_catalog'
+        AND p.relname = 'series'
+        AND kn.nspname = 'prom_data_series'
+        AND f.indexdef like '% USING btree (delete_epoch, id) WHERE (delete_epoch IS NOT NULL)'
+    )
+    LOOP
+        EXECUTE _cmd;
+    END LOOP;
+
+    FOR _cmd IN
+    (
+        SELECT format('ALTER INDEX IF EXISTS prom_data_series.%I RENAME TO series_labels_%s', f.indexname, m.id)
+        FROM pg_catalog.pg_inherits i
+        INNER JOIN pg_catalog.pg_class AS k ON (i.inhrelid=k.oid)
+        INNER JOIN pg_catalog.pg_class as p ON (i.inhparent=p.oid)
+        INNER JOIN pg_catalog.pg_namespace pn ON pn.oid = p.relnamespace
+        INNER JOIN pg_catalog.pg_namespace kn ON kn.oid = k.relnamespace
+        INNER JOIN pg_catalog.pg_index x on (k.oid = x.indrelid)
+        INNER JOIN pg_catalog.pg_class d on (x.indexrelid = d.oid)
+        INNER JOIN pg_catalog.pg_indexes f on (kn.nspname = f.schemaname AND d.relname = f.indexname)
+        INNER JOIN _prom_catalog.metric m ON (format('%I', m.table_name) = k.relname)
+        WHERE pn.nspname = '_prom_catalog'
+        AND p.relname = 'series'
+        AND kn.nspname = 'prom_data_series'
+        AND f.indexdef like '% USING gin (labels)'
+    )
+    LOOP
+        EXECUTE _cmd;
+    END LOOP;
 END;
 $block$;
