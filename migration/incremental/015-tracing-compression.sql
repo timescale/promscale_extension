@@ -450,8 +450,8 @@ ALTER DOMAIN ps_trace.tag_map_old
         SELECT ps_trace.jsonb_cat(pg_catalog.jsonb_build_object(t.key, t.value))
             FROM pg_catalog.jsonb_each(_map) f(k,v)
                 JOIN _ps_trace.tag t ON
-                        f.k::int8 = t.key_id
-                    AND f.v::int8 = t.id;
+                        f.k::int8 OPERATOR(pg_catalog.=) t.key_id
+                    AND f.v::int8 OPERATOR(pg_catalog.=) t.id;
     $fnc$;
 
 

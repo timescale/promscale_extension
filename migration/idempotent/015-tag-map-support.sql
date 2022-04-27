@@ -15,13 +15,14 @@ CREATE FUNCTION ps_trace.tag_v_eq(ps_trace.tag_v, pg_catalog.jsonb)
 CREATE FUNCTION _ps_trace.tag_v_eq_rewrite_helper(_tag_key pg_catalog.text, _value pg_catalog.jsonb)
     RETURNS pg_catalog.jsonb
     LANGUAGE sql STABLE
+    -- Note: no explicit `SET SCHEMA` because we want this function to be inlined
     PARALLEL SAFE AS
 $fnc$
     SELECT pg_catalog.jsonb_build_object(a.key_id, a.id)
     FROM _ps_trace.tag a
-    WHERE a.key = _tag_key
-    AND _prom_ext.jsonb_digest(a.value) = _prom_ext.jsonb_digest(_value)
-    AND a.value = _value
+    WHERE a.key OPERATOR(pg_catalog.=) _tag_key
+    AND _prom_ext.jsonb_digest(a.value) OPERATOR(pg_catalog.=) _prom_ext.jsonb_digest(_value)
+    AND a.value OPERATOR(pg_catalog.=) _value
     LIMIT 1
 $fnc$;
 
@@ -36,10 +37,11 @@ CREATE FUNCTION ps_trace.tag_v_ne(ps_trace.tag_v, pg_catalog.jsonb)
 CREATE FUNCTION _ps_trace.tag_v_ne_rewrite_helper(_tag_key pg_catalog.text, _value pg_catalog.jsonb)
     RETURNS pg_catalog.jsonb[]
     LANGUAGE sql STABLE
+    -- Note: no explicit `SET SCHEMA` because we want this function to be inlined
     PARALLEL SAFE AS
 $fnc$
     SELECT coalesce(pg_catalog.array_agg(pg_catalog.jsonb_build_object(a.key_id, a.id)), array[]::jsonb[])
     FROM _ps_trace.tag a
-    WHERE a.key = _tag_key
-    AND a.value != _value
+    WHERE a.key OPERATOR(pg_catalog.=) _tag_key
+    AND a.value OPERATOR(pg_catalog.<>) _value
 $fnc$;
