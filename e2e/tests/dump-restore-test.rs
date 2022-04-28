@@ -387,12 +387,12 @@ fn first_db(
 ///
 fn second_db(
     docker: &Cli,
-    postgres_image: String,
+    postgres_image: &str,
     volumes: Option<&Vec<(&str, &str)>>,
     dir: &Path,
     dump: &Path,
 ) -> String {
-    let container = run_postgres(docker, postgres_image.as_str(), "db", "postgres", volumes);
+    let container = run_postgres(docker, postgres_image, "db", "postgres", volumes);
     pre_restore(&container);
     restore_db(&container, "db", "postgres", dump);
     post_restore(&container);
@@ -446,7 +446,7 @@ fn dump_restore_test() {
     let snapshot0 = first_db(&docker, &postgres_image, Some(&volumes), dir, &dump);
 
     // create the second container, restore into it, snapshot it, add more data
-    let snapshot1 = second_db(&docker, postgres_image, Some(&volumes), dir, &dump);
+    let snapshot1 = second_db(&docker, &postgres_image, Some(&volumes), dir, &dump);
 
     // don't do `assert_eq!(snapshot0, snapshot1);`
     // it prints both entire snapshots and is impossible to read
