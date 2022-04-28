@@ -1,6 +1,13 @@
 \set ECHO all
 \set ON_ERROR_STOP 1
 
+/*
+This script creates the promscale extension in the database and then
+adds metric, exemplar, and trace data to the database so that the
+dump/restore process has more to work with than simply the empty
+data structures
+*/
+
 CREATE EXTENSION promscale;
 
 SELECT _prom_catalog.set_default_value('ha_lease_timeout'::text, '200 hours'::text);

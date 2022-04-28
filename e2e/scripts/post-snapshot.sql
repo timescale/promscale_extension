@@ -1,4 +1,14 @@
+\set ECHO all
 \set VERBOSITY verbose
+\set ON_ERROR_STOP 1
+
+/*
+this script is called after the database is restored and snapshotted
+we want to verify that the dump/restore process didn't break something in a way
+that would prevent the database's continued intended usage
+so, this script attempts to add new metric, exemplar, trace data
+as long as there are no errors, we assume it worked
+*/
 
 INSERT INTO prom_data.cpu_usage
 SELECT timestamptz '2030-01-02 02:03:04'+(interval '1s' * g), 100.1 + g, _prom_catalog.get_or_create_series_id('{"__name__": "cpu_usage", "namespace":"dev", "node": "brain"}')
