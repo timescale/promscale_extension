@@ -22,6 +22,8 @@ jobs:
         arch:
         - cpu: x86_64
           platform: amd64
+        - cpu: aarch64
+          platform: arm64
         os:
         - name: linux
           distro: debian
@@ -37,6 +39,17 @@ jobs:
         - version: "12"
         - version: "13"
         - version: "14"
+        exclude:
+          # centos 7 doesn't support arm64
+          - os:
+              name: linux
+              distro: centos
+              version: 7
+              pkg_cloud_tag: el/7
+              pkg_type: rpm
+            arch:
+              cpu: aarch64
+              platform: arm64
 
     steps:
     - name: Install PackageCloud
@@ -99,10 +112,10 @@ jobs:
 
     - name: Extract Package
       env:
-        PLATFORM: ${{ matrix.os.name }}/${{ matrix.arch.platform }}
+        DOCKER_PLATFORM: ${{ matrix.os.name }}/${{ matrix.arch.platform }}
       run: |
         mkdir -p artifacts
-        container="$(docker create --platform "${PLATFORM}" "${{ steps.metadata.outputs.image }}")"
+        container="$(docker create --platform "${DOCKER_PLATFORM}" "${{ steps.metadata.outputs.image }}")"
         docker cp ${container}:/dist/${{ steps.metadata.outputs.filename }} artifacts/${{ steps.metadata.outputs.outfile }}
         docker rm -f "${container}"
         ls -la artifacts/*
@@ -128,13 +141,9 @@ jobs:
 
     - name: Test Package
       env:
-        PROMSCALE_VERSION: "0.8.0"
-        SERVER_NAME: pg${{ matrix.postgres.version }}-${{ matrix.os.distro }}${{ matrix.os.version }}
-      run: |
-        set -e
-        docker run --rm --name "${SERVER_NAME}" -e POSTGRES_PASSWORD=postgres --platform "${PLATFORM}" -dt "${{ steps.metadata.outputs.image }}-test";
-        docker run --rm --link "${SERVER_NAME}" --platform "${PLATFORM}" -t timescale/promscale:${PROMSCALE_VERSION} -db.uri "postgres://postgres:postgres@${SERVER_NAME}:5432/postgres?sslmode=disable" -startup.only;
-        docker rm -f "${SERVER_NAME}"
+        EXTENSION_DOCKER_IMAGE: ${{ steps.metadata.outputs.image }}-test
+        CONNECTOR_DOCKER_IMAGE: "timescale/promscale:0.11.0-alpha"
+      run: ./tools/smoke-test "${EXTENSION_DOCKER_IMAGE}" "${CONNECTOR_DOCKER_IMAGE}" "${DOCKER_PLATFORM}"
 
     - name: Upload Artifact for Job
       uses: actions/upload-artifact@v2

@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# This script smoke tests the promscale connector against the promscale extension.
+# It leverages docker containers for both connector and extension.
+
+# It takes three positional arguments:
+EXTENSION_DOCKER_IMAGE=$1 # e.g. ghcr.io/timescale/promscale_dev_extension:develop-ts2-pg14
+CONNECTOR_DOCKER_IMAGE=$2 # e.g. timescale/promscale:0.11.0
+DOCKER_PLATFORM=$3 # e.g. linux/amd64
+
+TESTER_NAME=$(echo "${EXTENSION_DOCKER_IMAGE}" | sed 's/[:]/-/')
+
+docker run --rm --name "${TESTER_NAME}" --platform="${DOCKER_PLATFORM}" -e POSTGRES_PASSWORD=postgres -dt "${EXTENSION_DOCKER_IMAGE}";
+
+for i in $(seq 10) ; do
+  if docker exec -ti "${TESTER_NAME}" pg_isready -h 0.0.0.0 -p 5432 1>/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+
+if ! docker run --rm --link "${TESTER_NAME}" --platform="${DOCKER_PLATFORM}" -i "${CONNECTOR_DOCKER_IMAGE}" -db.uri "postgres://postgres:postgres@${TESTER_NAME}:5432/postgres?sslmode=allow" -startup.only -startup.upgrade-prerelease-extensions; then
+    echo "Encountered error while testing image ${EXTENSION_DOCKER_IMAGE}";
+    docker rm -f "${TESTER_NAME}"
+    exit 1
+fi;
+
+docker rm -f "${TESTER_NAME}"
