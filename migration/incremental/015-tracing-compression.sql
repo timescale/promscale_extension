@@ -405,11 +405,7 @@ ALTER DOMAIN ps_trace.tag_map_old
     GRANT USAGE ON TYPE ps_trace.tag_map TO prom_reader;
     GRANT USAGE ON TYPE _ps_trace.tag_v TO prom_reader;
 
-    /* XXX
-    * _ps_trace.span table is now used indirectly, thus its name has changed
-    */
-
-    CREATE TABLE _ps_trace._span
+    CREATE TABLE _ps_trace.span
     (
         trace_id ps_trace.trace_id NOT NULL,
         span_id bigint NOT NULL, /* not allowed to be 0 */
@@ -433,16 +429,10 @@ ALTER DOMAIN ps_trace.tag_map_old
         PRIMARY KEY (span_id, trace_id, start_time)
     );
 
-    /* Define a view that would provide the same interface
-    * as _ps_trace.span used to have.
-    * Also define everything else we need for the view to function properly.
-    */
-
-
     /* NOTE: This function cannot be inlined since it's used in a scalar
-    * context and uses an aggregate
-    */
-    CREATE FUNCTION ps_trace.tag_map_denormalize(_map ps_trace.tag_map)
+     * context and uses an aggregate
+     */
+    CREATE FUNCTION _ps_trace.tag_map_denormalize(_map ps_trace.tag_map)
         RETURNS ps_trace.tag_map
         LANGUAGE sql STABLE
         PARALLEL SAFE AS
@@ -454,39 +444,12 @@ ALTER DOMAIN ps_trace.tag_map_old
                     AND f.v::int8 OPERATOR(pg_catalog.=) t.id;
     $fnc$;
 
-
-    CREATE VIEW _ps_trace.span AS
-    SELECT
-            trace_id,
-            span_id,
-            parent_span_id,
-            operation_id,
-            start_time,
-            end_time,
-            duration_ms,
-            instrumentation_lib_id,
-            resource_schema_url_id,
-            event_time,
-            dropped_tags_count,
-            dropped_events_count,
-            dropped_link_count,
-            resource_dropped_tags_count,
-            status_code,
-            trace_state,
-            ps_trace.tag_map_denormalize(span_tags) AS span_tags,
-            status_message,
-            ps_trace.tag_map_denormalize(resource_tags) AS resource_tags
-        FROM _ps_trace._span
-    ;
-    GRANT SELECT ON _ps_trace.span TO prom_reader;
-
-CREATE INDEX ON _ps_trace._span USING BTREE (trace_id, parent_span_id) INCLUDE (span_id); -- used for recursive CTEs for trace tree queries
-CREATE INDEX ON _ps_trace._span USING GIN (span_tags jsonb_path_ops); -- supports tag filters. faster ingest than json_ops
-CREATE INDEX ON _ps_trace._span USING BTREE (operation_id); -- supports filters/joins to operation table
---CREATE INDEX ON _ps_trace._span USING GIN (jsonb_object_keys(span_tags) array_ops); -- possible way to index key exists
-CREATE INDEX ON _ps_trace._span USING GIN (resource_tags jsonb_path_ops); -- supports tag filters. faster ingest than json_ops
-GRANT SELECT ON TABLE _ps_trace._span TO prom_reader;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace._span TO prom_writer;
+CREATE INDEX ON _ps_trace.span USING BTREE (trace_id, parent_span_id) INCLUDE (span_id); -- used for recursive CTEs for trace tree queries
+CREATE INDEX ON _ps_trace.span USING GIN (span_tags jsonb_path_ops); -- supports tag filters. faster ingest than json_ops
+CREATE INDEX ON _ps_trace.span USING BTREE (operation_id); -- supports filters/joins to operation table
+CREATE INDEX ON _ps_trace.span USING GIN (resource_tags jsonb_path_ops); -- supports tag filters. faster ingest than json_ops
+GRANT SELECT ON TABLE _ps_trace.span TO prom_reader;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.span TO prom_writer;
 
 CREATE TABLE _ps_trace.event
 (
@@ -522,7 +485,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.link TO prom_writer;
 
 /* Recreate previously dropped ps_trace.span view*/
 
-CREATE OR REPLACE VIEW ps_trace.span AS
+CREATE VIEW ps_trace.span AS
 SELECT
     s.trace_id,
     s.span_id,
@@ -536,7 +499,7 @@ SELECT
     s.end_time,
     tstzrange(s.start_time, s.end_time, '[]') as time_range,
     s.duration_ms,
-    s.span_tags,
+    _ps_trace.tag_map_denormalize(s.span_tags) as span_tags,
     s.dropped_tags_count,
     s.event_time,
     s.dropped_events_count,
@@ -546,7 +509,7 @@ SELECT
     il.name as instrumentation_lib_name,
     il.version as instrumentation_lib_version,
     u1.url as instrumentation_lib_schema_url,
-    s.resource_tags,
+    _ps_trace.tag_map_denormalize(s.resource_tags) as resource_tags,
     s.resource_dropped_tags_count,
     u2.url as resource_schema_url
 FROM _ps_trace.span s

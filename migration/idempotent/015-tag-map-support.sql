@@ -96,6 +96,8 @@ $fnc$
 $fnc$;
 GRANT EXECUTE ON FUNCTION _ps_trace.tag_v_ne_rewrite_helper(_tag_key pg_catalog.text, _value pg_catalog.jsonb) TO prom_reader;
 
+/* NOTE: Shall we check the owner of the operator? */
+
 DO $do$
 BEGIN
 	CREATE OPERATOR ps_trace.<> (

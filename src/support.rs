@@ -450,8 +450,8 @@ mod tests {
         let init_plan_result = Spi::get_one::<Json>(
             r#"
                 EXPLAIN (ANALYZE, COSTS OFF, FORMAT JSON)
-                    SELECT * FROM gfs_test_table 
-                    WHERE tag_v_eq(ps_trace.tag_map_denormalize(tm)->'a', 0::text::jsonb);
+                    SELECT * FROM gfs_test_table
+                    WHERE tag_v_eq(tag_map_denormalize(tm)->'a', 0::text::jsonb);
             "#,
         )
         .expect("SQL query failed");
@@ -482,22 +482,22 @@ mod tests {
         let no_init_plan_result = Spi::get_one::<Json>(
             r#"
                 EXPLAIN (ANALYZE, COSTS OFF, FORMAT JSON)
-                    SELECT * FROM gfs_test_table 
-                    WHERE tag_v_eq(ps_trace.tag_map_denormalize(tm)->'a', v::text::jsonb);
+                    SELECT * FROM gfs_test_table
+                    WHERE tag_v_eq(tag_map_denormalize(tm)->'a', v::text::jsonb);
             "#,
         )
         .expect("SQL query failed");
 
         assert_eq!(
             no_init_plan_result.0[0]["Plan"]["Filter"],
-            "(tm @> _ps_trace.tag_v_eq_rewrite_helper('a'::text, ((v)::text)::jsonb))"
+            "(tm @> tag_v_eq_rewrite_helper('a'::text, ((v)::text)::jsonb))"
         );
 
         let neg_result = Spi::get_one::<Json>(
             r#"
                 EXPLAIN (ANALYZE, COSTS OFF, FORMAT JSON)
-                    SELECT * FROM gfs_test_table 
-                    WHERE tag_v_ne(ps_trace.tag_map_denormalize(tm)->'a', 0::text::jsonb);
+                    SELECT * FROM gfs_test_table
+                    WHERE tag_v_ne(tag_map_denormalize(tm)->'a', 0::text::jsonb);
             "#,
         )
         .expect("SQL query failed");
@@ -507,15 +507,15 @@ mod tests {
         let no_init_plan_neg_result = Spi::get_one::<Json>(
             r#"
                 EXPLAIN (ANALYZE, COSTS OFF, FORMAT JSON)
-                    SELECT * FROM gfs_test_table 
-                    WHERE tag_v_ne(ps_trace.tag_map_denormalize(tm)->'a', v::text::jsonb);
+                    SELECT * FROM gfs_test_table
+                    WHERE tag_v_ne(tag_map_denormalize(tm)->'a', v::text::jsonb);
             "#,
         )
         .expect("SQL query failed");
 
         assert_eq!(
             no_init_plan_neg_result.0[0]["Plan"]["Filter"],
-            "(tm @> ANY (_ps_trace.tag_v_ne_rewrite_helper('a'::text, ((v)::text)::jsonb)))"
+            "(tm @> ANY (tag_v_ne_rewrite_helper('a'::text, ((v)::text)::jsonb)))"
         );
     }
 }
