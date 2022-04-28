@@ -59,7 +59,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.label_value_contains(labels prom_api.la
 RETURNS BOOLEAN
 -- Note: no explicit search_path because we want inlining
 AS $func$
-    SELECT labels OPERATOR(prom_api.@>) ARRAY[label_value]::TEXT[]
+    SELECT labels OPERATOR(prom_api.@>) ARRAY[label_value]::pg_catalog.text[]
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION _prom_catalog.label_value_contains(prom_api.label_value_array, TEXT) TO prom_reader;

@@ -6,7 +6,7 @@ CREATE OR REPLACE FUNCTION _ps_trace.get_tag_id(_tag_map ps_trace.tag_map, _key 
     RETURNS bigint
     -- Note: no explicit `SET SCHEMA` because we want this function to be inlined
 AS $func$
-    SELECT (_tag_map OPERATOR(pg_catalog.->) (SELECT k.id::text from _ps_trace.tag_key k WHERE k.key OPERATOR(pg_catalog.=) _key LIMIT 1))::bigint
+    SELECT (_tag_map OPERATOR(pg_catalog.->) (SELECT k.id::pg_catalog.text from _ps_trace.tag_key k WHERE k.key OPERATOR(pg_catalog.=) _key LIMIT 1))::bigint
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION _ps_trace.get_tag_id(ps_trace.tag_map, ps_trace.tag_k) TO prom_reader;
