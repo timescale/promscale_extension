@@ -231,7 +231,7 @@ fi
 echo "Building.."
 cd "${ROOT_DIR}"
 
-PATH="${pg_config_dir}:${PATH}" cargo pgx package
+PATH="${pg_config_dir}:${PATH}" make package
 
 echo "Post-processing build.."
 cargo run --manifest-path tools/post-install/Cargo.toml -- --dir "target/release/promscale-pg${pg_version}"
