@@ -47,7 +47,6 @@ ifeq ($(OS_NAME),fedora)
 endif
 RELEASE_IMAGE_NAME = promscale-extension-pkg:$(EXT_VERSION)-$(OS_NAME)$(OS_VERSION)-pg$(PG_RELEASE_VERSION)
 RELEASE_FILE_NAME = promscale_extension-$(EXT_VERSION).pg$(PG_RELEASE_VERSION).$(OS_NAME)$(OS_VERSION).$(ARCH).$(PKG_TYPE)
-TESTER_NAME = pg$(PG_RELEASE_VERSION)-$(OS_NAME)$(OS_VERSION)
 
 .PHONY: help
 help:
@@ -144,11 +143,7 @@ endif
 
 .PHONY: release-test
 release-test: release-tester ## Test the currently selected release package
-	docker run --rm --name "$(TESTER_NAME)" -e POSTGRES_PASSWORD=postgres -dt "$(RELEASE_IMAGE_NAME)-test"; \
-	if ! docker run --rm --link "$(TESTER_NAME)" -it timescale/promscale:latest -db.uri "postgres://postgres:postgres@$(TESTER_NAME):5432/postgres?sslmode=allow" -startup.only; then \
-		echo "Encountered error while testing package $(RELEASE_FILE_NAME)"; \
-	fi; \
-	docker rm -f "$(TESTER_NAME)"
+	./tools/smoke-test "$(RELEASE_IMAGE_NAME)-test" "timescale/promscale:0.11.0-alpha" $(DOCKER_PLATFORM)
 
 .PHONY: docker-image-build-12 docker-image-build-13 docker-image-build-14
 docker-image-build-12 docker-image-build-13 docker-image-build-14: alpine.Dockerfile $(SQL_FILES) $(SRCS) Cargo.toml Cargo.lock $(RUST_SRCS)
