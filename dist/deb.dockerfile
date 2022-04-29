@@ -52,6 +52,13 @@ mv jq-linux64 /usr/local/bin/jq
 chmod +x /usr/local/bin/jq
 EOF
 
+RUN <<EOF
+    curl -L "https://github.com/mozilla/sccache/releases/download/v0.2.15/sccache-v0.2.15-x86_64-unknown-linux-musl.tar.gz" | tar zxf -
+    chmod +x sccache-*/sccache
+    mv sccache-*/sccache /usr/local/bin/sccache
+    sccache --show-stats
+EOF
+
 # Setup postgres separately from the base image for better caching
 FROM base AS base-postgres
 ARG PG_VERSION
@@ -69,7 +76,7 @@ apt-get install -y \
     postgresql-${PG_VERSION}
 
 # User with which package builds will run
-useradd -m -d /home/builder -s /bin/bash builder
+useradd --uid 1000 -m -d /home/builder -s /bin/bash builder
 
 # Create directory in which output artifacts can be dropped
 mkdir -p /dist
@@ -94,10 +101,17 @@ rustc --version
 cargo --version
 EOF
 
+ENV RUSTC_WRAPPER=sccache
+ENV SCCACHE_BUCKET=promscale-extension-sccache
+
 # Initialize PGX
-RUN <<EOF
+RUN --mount=type=secret,uid=1000,id=AWS_ACCESS_KEY_ID --mount=type=secret,uid=1000,id=AWS_SECRET_ACCESS_KEY <<EOF
+[ -f "/run/secrets/AWS_ACCESS_KEY_ID" ] && export AWS_ACCESS_KEY_ID="$(cat /run/secrets/AWS_ACCESS_KEY_ID)"
+[ -f "/run/secrets/AWS_SECRET_ACCESS_KEY" ] && export AWS_SECRET_ACCESS_KEY="$(cat /run/secrets/AWS_SECRET_ACCESS_KEY)"
+sccache --show-stats
 cargo install cargo-pgx --git https://github.com/timescale/pgx --branch promscale-staging
 cargo pgx init --pg${PG_VERSION} /usr/lib/postgresql/${PG_VERSION}/bin/pg_config
+sccache --show-stats
 EOF
 
 FROM builder AS packager
@@ -107,8 +121,12 @@ ARG RELEASE_FILE_NAME
 COPY --chown=builder . .
 
 # Build extension
-RUN <<EOF
+RUN --mount=type=secret,uid=1000,id=AWS_ACCESS_KEY_ID --mount=type=secret,uid=1000,id=AWS_SECRET_ACCESS_KEY <<EOF
+[ -f "/run/secrets/AWS_ACCESS_KEY_ID" ] && export AWS_ACCESS_KEY_ID="$(cat /run/secrets/AWS_ACCESS_KEY_ID)"
+[ -f "/run/secrets/AWS_SECRET_ACCESS_KEY" ] && export AWS_SECRET_ACCESS_KEY="$(cat /run/secrets/AWS_SECRET_ACCESS_KEY)"
+sccache --show-stats
 tools/package --lint --pg-version ${PG_VERSION} --out-dir /dist --package-name "${RELEASE_FILE_NAME}"
+sccache --show-stats
 
 # Clean up build artifacts
 rm -rf target/

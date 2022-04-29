@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.3-labs
 ARG PG_VERSION=14
 ARG TIMESCALEDB_VERSION_FULL=2.6.1
 ARG PREVIOUS_IMAGE=timescaledev/promscale-extension:latest-ts2-pg${PG_VERSION}
@@ -20,6 +21,16 @@ RUN \
         linux-headers \
         openssl-dev
 
+RUN <<EOF
+    curl -L "https://github.com/mozilla/sccache/releases/download/v0.2.15/sccache-v0.2.15-x86_64-unknown-linux-musl.tar.gz" | tar zxf -
+    chmod +x sccache-*/sccache
+    mv sccache-*/sccache /usr/local/bin/sccache
+    sccache --show-stats
+EOF
+
+ENV RUSTC_WRAPPER=sccache
+ENV SCCACHE_BUCKET=promscale-extension-sccache
+
 WORKDIR /home/promscale
 
 ENV HOME=/home/promscale \
@@ -39,8 +50,13 @@ RUN \
 # Remove crt-static feature on musl target to allow building cdylibs
 ENV RUSTFLAGS="-C target-feature=-crt-static"
 RUN --mount=type=cache,uid=70,gid=70,target=/build/promscale/.cargo/registry \
+    --mount=type=secret,uid=70,gid=70,id=AWS_ACCESS_KEY_ID --mount=type=secret,uid=70,gid=70,id=AWS_SECRET_ACCESS_KEY \
+    [ -f "/run/secrets/AWS_ACCESS_KEY_ID" ] && export AWS_ACCESS_KEY_ID="$(cat /run/secrets/AWS_ACCESS_KEY_ID)" ; \
+    [ -f "/run/secrets/AWS_SECRET_ACCESS_KEY" ] && export AWS_SECRET_ACCESS_KEY="$(cat /run/secrets/AWS_SECRET_ACCESS_KEY)" ; \
+    sccache --show-stats && \
     cargo install cargo-pgx --git https://github.com/timescale/pgx --branch promscale-staging --rev ee52db6b && \
-    cargo pgx init --pg${PG_VERSION} $(which pg_config)
+    cargo pgx init --pg${PG_VERSION} $(which pg_config) && \
+    sccache --show-stats
 
 USER root
 WORKDIR /build/promscale
@@ -51,8 +67,13 @@ USER postgres
 RUN cd ../ && cargo pgx new promscale && cd promscale
 COPY Cargo.* Makefile /build/promscale/
 COPY e2e /build/promscale/e2e
-RUN --mount=type=cache,uid=70,gid=70,target=/build/promscale/.cargo/registry \
-    make dependencies
+RUN --mount=type=secret,uid=70,gid=70,id=AWS_ACCESS_KEY_ID --mount=type=secret,uid=70,gid=70,id=AWS_SECRET_ACCESS_KEY \
+    --mount=type=cache,uid=70,gid=70,target=/build/promscale/.cargo/registry \
+    [ -f "/run/secrets/AWS_ACCESS_KEY_ID" ] && export AWS_ACCESS_KEY_ID="$(cat /run/secrets/AWS_ACCESS_KEY_ID)" ; \
+    [ -f "/run/secrets/AWS_SECRET_ACCESS_KEY" ] && export AWS_SECRET_ACCESS_KEY="$(cat /run/secrets/AWS_SECRET_ACCESS_KEY)" ; \
+    sccache --show-stats && \
+    make dependencies && \
+    sccache --show-stats
 
 # Build extension
 COPY --chown=postgres:postgres Cargo.* /build/promscale/
@@ -64,8 +85,16 @@ COPY --chown=postgres:postgres sql/*.sql /build/promscale/sql/
 COPY --chown=postgres:postgres migration/ /build/promscale/migration
 COPY --chown=postgres:postgres templates/ /build/promscale/templates/
 
-RUN --mount=type=cache,uid=70,gid=70,target=/build/promscale/.cargo/registry \
-    make package
+RUN --mount=type=secret,uid=70,gid=70,id=AWS_ACCESS_KEY_ID --mount=type=secret,uid=70,gid=70,id=AWS_SECRET_ACCESS_KEY \
+    --mount=type=cache,uid=70,gid=70,target=/build/promscale/.cargo/registry \
+    [ -f "/run/secrets/AWS_ACCESS_KEY_ID" ] && export AWS_ACCESS_KEY_ID="$(cat /run/secrets/AWS_ACCESS_KEY_ID)" ; \
+    [ -f "/run/secrets/AWS_SECRET_ACCESS_KEY" ] && export AWS_SECRET_ACCESS_KEY="$(cat /run/secrets/AWS_SECRET_ACCESS_KEY)" ; \
+    sccache --show-stats && \
+    make package && \
+    sccache --show-stats
+
+RUN env
+RUN sccache --show-stats
 
 FROM timescale/timescaledb:${TIMESCALEDB_VERSION_FULL}-pg${PG_VERSION} as pgextwlist-builder
 

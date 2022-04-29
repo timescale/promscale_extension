@@ -1,0 +1,52 @@
+name: ci-nocache
+on:
+  pull_request:
+    paths-ignore:
+    - '.github/workflows/release.yaml'
+    - '*.md'
+    - 'dist/*'
+    - 'tools/package'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        postgres:
+        - version: "14"
+        - version: "13"
+        - version: "12"
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install latest nightly
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
+
+      - name: Install cargo-pgx
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cargo-pgx --git https://github.com/timescale/pgx --branch promscale-staging
+
+      - name: Cache pgx
+        id: cache-pgx
+        uses: actions/cache@v2
+        with:
+          path: ~/.pgx
+          key: dot-pgx-${{ matrix.postgres.version }}-cargo-${{ hashFiles('**/Cargo.*') }}
+
+      - name: Initialize pgx
+        if: ${{ steps.cache-pgx.outputs.cache-hit != 'true' }}
+        uses: actions-rs/cargo@v1
+        with:
+          command: pgx
+          args: init --pg${{ matrix.postgres.version }} download
+      
+      - name: Run cargo test
+        uses: actions-rs/cargo@v1
+        with:
+          command: pgx
+          args: test pg${{ matrix.postgres.version }}
+
