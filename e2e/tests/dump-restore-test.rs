@@ -320,7 +320,7 @@ fn post_restore(container: &PostgresContainer) {
     psql_file(
         &container,
         "db",
-        "postgres", // todo: use bob for this
+        "bob", // todo: use bob for this
         Path::new("/scripts/post-restore.sql"),
     );
 }
@@ -394,7 +394,7 @@ fn second_db(
 ) -> String {
     let container = run_postgres(docker, postgres_image, "db", "postgres", volumes);
     pre_restore(&container);
-    restore_db(&container, "db", "postgres", dump);
+    restore_db(&container, "db", "bob", dump);
     post_restore(&container);
     psql_cmd(&container, "db", "postgres", "grant prom_admin to bob;");
     let snapshot1 = snapshot_db(
