@@ -59,6 +59,9 @@ jobs:
             TIMESCALEDB_VERSION_FULL=${{ matrix.tsversion }}
             TIMESCALEDB_VERSION_MAJOR=${{ steps.metadata.outputs.tsmajor }}
             TIMESCALEDB_VERSION_MAJMIN=${{ steps.metadata.outputs.tsmajmin }}
+          secrets: |
+            "AWS_ACCESS_KEY_ID=${{ secrets.PROMSCALE_EXTENSION_SCCACHE_AWS_ACCESS_KEY_ID }}"
+            "AWS_SECRET_ACCESS_KEY=${{ secrets.PROMSCALE_EXTENSION_SCCACHE_AWS_SECRET_ACCESS_KEY }}"
           context: .
           file: ${{matrix.base}}.Dockerfile
           push: true
