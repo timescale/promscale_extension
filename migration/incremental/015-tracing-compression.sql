@@ -187,6 +187,9 @@ DEFAULT FOR TYPE ps_trace.trace_id USING hash AS
 
 GRANT USAGE ON TYPE ps_trace.trace_id TO prom_reader;
 
+-- ps_trace.trace_id and uuid are binary coercible
+CREATE CAST(ps_trace.trace_id as uuid) WITHOUT FUNCTION AS IMPLICIT;
+CREATE CAST(uuid AS ps_trace.trace_id) WITHOUT FUNCTION AS IMPLICIT;
 
 CREATE TABLE _ps_trace.span
 (
