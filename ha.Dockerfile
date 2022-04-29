@@ -17,6 +17,16 @@ RUN apt-get update
 
 RUN apt-get install -y postgresql-${PG_VERSION} postgresql-server-dev-${PG_VERSION}
 
+RUN <<EOF
+    curl -L "https://github.com/mozilla/sccache/releases/download/v0.2.15/sccache-v0.2.15-x86_64-unknown-linux-musl.tar.gz" | tar zxf -
+    chmod +x sccache-*/sccache
+    mv sccache-*/sccache /usr/local/bin/sccache
+    sccache --show-stats
+EOF
+
+ENV RUSTC_WRAPPER=sccache
+ENV SCCACHE_BUCKET=promscale-extension-sccache
+
 WORKDIR /home/promscale
 
 ENV HOME=/home/promscale \
@@ -34,7 +44,12 @@ RUN \
     rustc --version && \
     cargo --version
 
-RUN cargo install cargo-pgx --git https://github.com/timescale/pgx --branch promscale-staging --rev ee52db6b
+RUN --mount=type=secret,uid=1000,id=AWS_ACCESS_KEY_ID --mount=type=secret,uid=1000,id=AWS_SECRET_ACCESS_KEY \
+    [ -f "/run/secrets/AWS_ACCESS_KEY_ID" ] && export AWS_ACCESS_KEY_ID="$(cat /run/secrets/AWS_ACCESS_KEY_ID)" ; \
+    [ -f "/run/secrets/AWS_SECRET_ACCESS_KEY" ] && export AWS_SECRET_ACCESS_KEY="$(cat /run/secrets/AWS_SECRET_ACCESS_KEY)" ; \
+    sccache --show-stats && \
+    cargo install cargo-pgx --git https://github.com/timescale/pgx --branch promscale-staging --rev ee52db6b && \
+    sccache --show-stats
 
 RUN cargo pgx init --pg${PG_VERSION} /usr/lib/postgresql/${PG_VERSION}/bin/pg_config
 
@@ -52,7 +67,12 @@ COPY --chown=postgres:postgres sql/*.sql /build/promscale/sql/
 COPY --chown=postgres:postgres migration/ /build/promscale/migration
 COPY --chown=postgres:postgres templates/ /build/promscale/templates/
 
-RUN make package
+RUN --mount=type=secret,uid=1000,id=AWS_ACCESS_KEY_ID --mount=type=secret,uid=1000,id=AWS_SECRET_ACCESS_KEY \
+    [ -f "/run/secrets/AWS_ACCESS_KEY_ID" ] && export AWS_ACCESS_KEY_ID="$(cat /run/secrets/AWS_ACCESS_KEY_ID)" ; \
+    [ -f "/run/secrets/AWS_SECRET_ACCESS_KEY" ] && export AWS_SECRET_ACCESS_KEY="$(cat /run/secrets/AWS_SECRET_ACCESS_KEY)" ; \
+    sccache --show-stats && \
+    make package && \
+    sccache --show-stats
 
 # Yes, fixed pg14 image is intentional. The image ships with PG 12, 13 and 14 binaries
 # PATH environment variable below is used to specify runtime version.

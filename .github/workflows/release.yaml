@@ -92,6 +92,9 @@ jobs:
           PG_VERSION=${{ matrix.postgres.version }}
           RUST_VERSION=${{ env.RUST_VERSION }}
           RELEASE_FILE_NAME=${{ steps.metadata.outputs.filename }}
+        secrets: |
+          "AWS_ACCESS_KEY_ID=${{ secrets.PROMSCALE_EXTENSION_SCCACHE_AWS_ACCESS_KEY_ID }}"
+          "AWS_SECRET_ACCESS_KEY=${{ secrets.PROMSCALE_EXTENSION_SCCACHE_AWS_SECRET_ACCESS_KEY }}"
         tags: ${{ steps.metadata.outputs.image }}
 
     - name: Extract Package
@@ -118,6 +121,9 @@ jobs:
           PG_VERSION=${{ matrix.postgres.version }}
           RUST_VERSION=${{ env.RUST_VERSION }}
           RELEASE_FILE_NAME=${{ steps.metadata.outputs.filename }}
+        secrets: |
+          "AWS_ACCESS_KEY_ID=${{ secrets.PROMSCALE_EXTENSION_SCCACHE_AWS_ACCESS_KEY_ID }}"
+          "AWS_SECRET_ACCESS_KEY=${{ secrets.PROMSCALE_EXTENSION_SCCACHE_AWS_SECRET_ACCESS_KEY }}"
         tags: ${{ steps.metadata.outputs.image }}-test
 
     - name: Test Package
