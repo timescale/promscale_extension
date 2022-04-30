@@ -6,7 +6,7 @@ CREATE OR REPLACE FUNCTION _ps_trace.get_tag_id(_tag_map ps_trace.tag_map, _key 
     RETURNS bigint
     -- Note: no explicit `SET SCHEMA` because we want this function to be inlined
 AS $func$
-    SELECT (_tag_map OPERATOR(pg_catalog.->) (SELECT k.id::pg_catalog.text from _ps_trace.tag_key k WHERE k.key OPERATOR(pg_catalog.=) _key LIMIT 1))::bigint
+    SELECT (_tag_map OPERATOR(pg_catalog.->) (SELECT k.id::pg_catalog.text from _ps_trace.tag_key k WHERE k.key OPERATOR(pg_catalog.=) _key LIMIT 1))::pg_catalog.bigint
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION _ps_trace.get_tag_id(ps_trace.tag_map, ps_trace.tag_k) TO prom_reader;
@@ -32,7 +32,7 @@ CREATE OR REPLACE FUNCTION _ps_trace.eval_tags_by_key(_key ps_trace.tag_k)
     RETURNS jsonb[]
     SET search_path = pg_catalog, pg_temp
 AS $func$
-    SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::jsonb[])
+    SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::pg_catalog.jsonb[])
     FROM _ps_trace.tag a
     WHERE a.key = _key
 $func$
@@ -69,7 +69,7 @@ CREATE OR REPLACE FUNCTION _ps_trace.eval_jsonb_path_exists(_op ps_tag.tag_op_js
     RETURNS jsonb[]
     SET search_path = pg_catalog, pg_temp
 AS $func$
-    SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::jsonb[])
+    SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::pg_catalog.jsonb[])
     FROM _ps_trace.tag a
     WHERE a.key = _op.tag_key
     AND jsonb_path_exists(a.value, _op.value)
@@ -107,14 +107,14 @@ CREATE OR REPLACE FUNCTION _ps_trace.eval_regexp_matches(_op ps_tag.tag_op_regex
     RETURNS jsonb[]
     SET search_path = pg_catalog, pg_temp
 AS $func$
-    SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::jsonb[])
+    SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::pg_catalog.jsonb[])
     FROM _ps_trace.tag a
     WHERE a.key = _op.tag_key
     -- if the jsonb value is a string, apply the regex directly
     -- otherwise, convert the value to a text representation, back to a jsonb string, and then apply
     AND CASE jsonb_typeof(a.value)
-        WHEN 'string' THEN jsonb_path_exists(a.value, format('$?(@ like_regex "%s")', _op.value)::jsonpath)
-        ELSE jsonb_path_exists(to_jsonb(a.value #>> '{}'), format('$?(@ like_regex "%s")', _op.value)::jsonpath)
+        WHEN 'string' THEN jsonb_path_exists(a.value, format('$?(@ like_regex "%s")', _op.value)::pg_catalog.jsonpath)
+        ELSE jsonb_path_exists(to_jsonb(a.value #>> '{}'), format('$?(@ like_regex "%s")', _op.value)::pg_catalog.jsonpath)
     END
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE;
@@ -150,14 +150,14 @@ CREATE OR REPLACE FUNCTION _ps_trace.eval_regexp_not_matches(_op ps_tag.tag_op_r
     RETURNS jsonb[]
     SET search_path = pg_catalog, pg_temp
 AS $func$
-    SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::jsonb[])
+    SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::pg_catalog.jsonb[])
     FROM _ps_trace.tag a
     WHERE a.key = _op.tag_key
     -- if the jsonb value is a string, apply the regex directly
     -- otherwise, convert the value to a text representation, back to a jsonb string, and then apply
     AND CASE jsonb_typeof(a.value)
-        WHEN 'string' THEN jsonb_path_exists(a.value, format('$?(!(@ like_regex "%s"))', _op.value)::jsonpath)
-        ELSE jsonb_path_exists(to_jsonb(a.value #>> '{}'), format('$?(!(@ like_regex "%s"))', _op.value)::jsonpath)
+        WHEN 'string' THEN jsonb_path_exists(a.value, format('$?(!(@ like_regex "%s"))', _op.value)::pg_catalog.jsonpath)
+        ELSE jsonb_path_exists(to_jsonb(a.value #>> '{}'), format('$?(!(@ like_regex "%s"))', _op.value)::pg_catalog.jsonpath)
     END
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE;
@@ -233,7 +233,7 @@ CREATE OR REPLACE FUNCTION _ps_trace.eval_not_equals(_op ps_tag.tag_op_not_equal
     RETURNS jsonb[]
     SET search_path = pg_catalog, pg_temp
 AS $func$
-    SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::jsonb[])
+    SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::pg_catalog.jsonb[])
     FROM _ps_trace.tag a
     WHERE a.key = _op.tag_key
     AND a.value != _op.value
@@ -271,10 +271,10 @@ CREATE OR REPLACE FUNCTION _ps_trace.eval_less_than(_op ps_tag.tag_op_less_than)
     RETURNS jsonb[]
     SET search_path = pg_catalog, pg_temp
 AS $func$
-    SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::jsonb[])
+    SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::pg_catalog.jsonb[])
     FROM _ps_trace.tag a
     WHERE a.key = _op.tag_key
-    AND jsonb_path_exists(a.value, '$?(@ < $x)'::jsonpath, jsonb_build_object('x', _op.value))
+    AND jsonb_path_exists(a.value, '$?(@ < $x)'::pg_catalog.jsonpath, jsonb_build_object('x', _op.value))
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION _ps_trace.eval_less_than(ps_tag.tag_op_less_than) TO prom_reader;
@@ -309,10 +309,10 @@ CREATE OR REPLACE FUNCTION _ps_trace.eval_less_than_or_equal(_op ps_tag.tag_op_l
     RETURNS jsonb[]
     SET search_path = pg_catalog, pg_temp
 AS $func$
-    SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::jsonb[])
+    SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::pg_catalog.jsonb[])
     FROM _ps_trace.tag a
     WHERE a.key = _op.tag_key
-    AND jsonb_path_exists(a.value, '$?(@ <= $x)'::jsonpath, jsonb_build_object('x', _op.value))
+    AND jsonb_path_exists(a.value, '$?(@ <= $x)'::pg_catalog.jsonpath, jsonb_build_object('x', _op.value))
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION _ps_trace.eval_less_than_or_equal(ps_tag.tag_op_less_than_or_equal) TO prom_reader;
@@ -347,10 +347,10 @@ CREATE OR REPLACE FUNCTION _ps_trace.eval_greater_than(_op ps_tag.tag_op_greater
     RETURNS jsonb[]
     SET search_path = pg_catalog, pg_temp
 AS $func$
-    SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::jsonb[])
+    SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::pg_catalog.jsonb[])
     FROM _ps_trace.tag a
     WHERE a.key = _op.tag_key
-    AND jsonb_path_exists(a.value, '$?(@ > $x)'::jsonpath, jsonb_build_object('x', _op.value))
+    AND jsonb_path_exists(a.value, '$?(@ > $x)'::pg_catalog.jsonpath, jsonb_build_object('x', _op.value))
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION _ps_trace.eval_greater_than(ps_tag.tag_op_greater_than) TO prom_reader;
@@ -385,10 +385,10 @@ CREATE OR REPLACE FUNCTION _ps_trace.eval_greater_than_or_equal(_op ps_tag.tag_o
     RETURNS jsonb[]
     SET search_path = pg_catalog, pg_temp
 AS $func$
-    SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::jsonb[])
+    SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::pg_catalog.jsonb[])
     FROM _ps_trace.tag a
     WHERE a.key = _op.tag_key
-    AND jsonb_path_exists(a.value, '$?(@ >= $x)'::jsonpath, jsonb_build_object('x', _op.value))
+    AND jsonb_path_exists(a.value, '$?(@ >= $x)'::pg_catalog.jsonpath, jsonb_build_object('x', _op.value))
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION _ps_trace.eval_greater_than_or_equal(ps_tag.tag_op_greater_than_or_equal) TO prom_reader;
@@ -435,9 +435,9 @@ AS $func$
             a.key,
             a.value
         FROM _ps_trace.tag a
-        WHERE a.id = x.value::text::bigint
+        WHERE a.id = x.value::pg_catalog.text::pg_catalog.bigint
         -- filter on a.key to eliminate all but one partition of the tag table
-        AND a.key = (SELECT k.key from _ps_trace.tag_key k WHERE k.id = x.key::bigint)
+        AND a.key = (SELECT k.key from _ps_trace.tag_key k WHERE k.id = x.key::pg_catalog.bigint)
         LIMIT 1
     ) a on (true)
 $func$
@@ -464,7 +464,7 @@ AS $func$
             a.key,
             a.value
         FROM _ps_trace.tag a
-        WHERE a.id = x.value::text::bigint
+        WHERE a.id = x.value::pg_catalog.text::pg_catalog.bigint
         AND a.key = ANY(_keys) -- ANY works with partition elimination
     ) a on (true)
 $func$
@@ -481,7 +481,7 @@ AS $func$
     SELECT a.value
     FROM _ps_trace.tag a
     WHERE a.key = _key -- partition elimination
-    AND a.id = (_tag_map ->> (SELECT id::text FROM _ps_trace.tag_key WHERE key = _key))::bigint
+    AND a.id = (_tag_map ->> (SELECT id::pg_catalog.text FROM _ps_trace.tag_key WHERE key = _key))::pg_catalog.bigint
     LIMIT 1
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE STRICT;
@@ -497,7 +497,7 @@ AS $func$
     SELECT a.value #>> '{}'
     FROM _ps_trace.tag a
     WHERE a.key = _key -- partition elimination
-    AND a.id = (_tag_map ->> (SELECT id::text FROM _ps_trace.tag_key WHERE key = _key))::bigint
+    AND a.id = (_tag_map ->> (SELECT id::pg_catalog.text FROM _ps_trace.tag_key WHERE key = _key))::pg_catalog.bigint
     LIMIT 1
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE STRICT;
@@ -506,28 +506,20 @@ GRANT EXECUTE ON FUNCTION ps_trace.val_text(ps_trace.tag_map, ps_trace.tag_k) TO
 -------------------------------------------------------------------------------
 -- Tag_map related functions and operators
 -------------------------------------------------------------------------------
-CREATE OR REPLACE AGGREGATE _ps_trace.jsonb_cat(pg_catalog.jsonb)
--- A helper funciton for tag_map_denormalize
-(
-    SFUNC = pg_catalog.jsonb_concat,
-    STYPE = pg_catalog.jsonb
-);
-GRANT EXECUTE ON FUNCTION _ps_trace.jsonb_cat(pg_catalog.jsonb) TO prom_reader;
-
 
 CREATE FUNCTION _ps_trace.tag_map_denormalize(_map ps_trace.tag_map)
     RETURNS ps_trace.tag_map
     LANGUAGE sql STABLE
     PARALLEL SAFE AS
 /* NOTE: This function cannot be inlined since it's used in a scalar
- * context and uses an aggregate
+ * context and uses an aggregate. Yet we don't want to use `SET` clause
+ * for the search_path, thus it is important to make it completely
+ * search_path-agnostic.
  */
 $fnc$
-    SELECT _ps_trace.jsonb_cat(pg_catalog.jsonb_build_object(t.key, t.value))
+    SELECT jsonb_object_agg(t.key, t.value)
         FROM pg_catalog.jsonb_each(_map) f(k,v)
-            JOIN _ps_trace.tag t ON
-                    f.k::int8 OPERATOR(pg_catalog.=) t.key_id
-                AND f.v::int8 OPERATOR(pg_catalog.=) t.id;
+            JOIN _ps_trace.tag t ON f.v::pg_catalog.int8 OPERATOR(pg_catalog.=) t.id;
 $fnc$;
 
 GRANT EXECUTE ON FUNCTION _ps_trace.tag_map_denormalize(ps_trace.tag_map) TO prom_reader;
@@ -549,7 +541,7 @@ BEGIN
 	);
 EXCEPTION
     WHEN SQLSTATE '42723' THEN -- operator already exists
-        null;
+        EXECUTE format($q$ALTER OPERATOR ps_trace.->(ps_trace.tag_map, pg_catalog.text) OWNER TO %I$q$, current_user);
 END;
 $do$;
 
@@ -593,7 +585,7 @@ BEGIN
 	);
 EXCEPTION
     WHEN SQLSTATE '42723' THEN -- operator already exists
-        null;
+        EXECUTE format($q$ALTER OPERATOR ps_trace.=(_ps_trace.tag_v, pg_catalog.jsonb) OWNER TO %I$q$, current_user);
 END;
 $do$;
 
@@ -615,7 +607,7 @@ CREATE OR REPLACE FUNCTION _ps_trace.tag_v_ne_rewrite_helper(_tag_key pg_catalog
     -- Note: no explicit `SET SCHEMA` because we want this function to be inlined
     PARALLEL SAFE AS
 $fnc$
-    SELECT coalesce(pg_catalog.array_agg(pg_catalog.jsonb_build_object(a.key_id, a.id)), array[]::jsonb[])
+    SELECT coalesce(pg_catalog.array_agg(pg_catalog.jsonb_build_object(a.key_id, a.id)), array[]::pg_catalog.jsonb[])
     FROM _ps_trace.tag a
     WHERE a.key OPERATOR(pg_catalog.=) _tag_key
     AND a.value OPERATOR(pg_catalog.<>) _value

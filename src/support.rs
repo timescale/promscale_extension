@@ -177,11 +177,11 @@ mod _prom_ext {
             if !pgx::is_a(arrow_op_arg_left, pg_sys::NodeTag_T_FuncExpr) {
                 return Err(());
             }
-            // Validate the funciton is indeed tag_map_denormalize
+            // Validate the function is indeed tag_map_denormalize
             let denormalize_func = arrow_op_arg_left.cast::<pg_sys::FuncExpr>();
-            let denormalize_name = CString::new(DENORMALIZE_FUNC_NAME).unwrap();
+            let denormalize_name_const = CString::new(DENORMALIZE_FUNC_NAME).unwrap();
             PallocdString::from_ptr(pg_sys::get_func_name((*denormalize_func).funcid))
-                .filter(|fname| fname.as_c_str() == denormalize_name.as_c_str())
+                .filter(|fname| fname.as_c_str() == denormalize_name_const.as_c_str())
                 .ok_or(())?;
             // extract its argument
             let denormalize_args = PgList::<pg_sys::Node>::from_pg((*denormalize_func).args);
