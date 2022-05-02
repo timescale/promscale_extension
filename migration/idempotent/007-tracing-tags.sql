@@ -30,7 +30,7 @@ $do$;
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION _ps_trace.eval_tags_by_key(_key ps_trace.tag_k)
     RETURNS jsonb[]
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::jsonb[])
     FROM _ps_trace.tag a
@@ -67,7 +67,7 @@ $do$;
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION _ps_trace.eval_jsonb_path_exists(_op ps_tag.tag_op_jsonb_path_exists)
     RETURNS jsonb[]
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::jsonb[])
     FROM _ps_trace.tag a
@@ -105,7 +105,7 @@ $do$;
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION _ps_trace.eval_regexp_matches(_op ps_tag.tag_op_regexp_matches)
     RETURNS jsonb[]
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::jsonb[])
     FROM _ps_trace.tag a
@@ -148,7 +148,7 @@ $do$;
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION _ps_trace.eval_regexp_not_matches(_op ps_tag.tag_op_regexp_not_matches)
     RETURNS jsonb[]
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::jsonb[])
     FROM _ps_trace.tag a
@@ -191,7 +191,7 @@ $do$;
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION _ps_trace.eval_equals(_op ps_tag.tag_op_equals)
     RETURNS jsonb
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT jsonb_build_object(a.key_id, a.id)
     FROM _ps_trace.tag a
@@ -231,7 +231,7 @@ $do$;
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION _ps_trace.eval_not_equals(_op ps_tag.tag_op_not_equals)
     RETURNS jsonb[]
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::jsonb[])
     FROM _ps_trace.tag a
@@ -269,7 +269,7 @@ $do$;
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION _ps_trace.eval_less_than(_op ps_tag.tag_op_less_than)
     RETURNS jsonb[]
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::jsonb[])
     FROM _ps_trace.tag a
@@ -307,7 +307,7 @@ $do$;
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION _ps_trace.eval_less_than_or_equal(_op ps_tag.tag_op_less_than_or_equal)
     RETURNS jsonb[]
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::jsonb[])
     FROM _ps_trace.tag a
@@ -345,7 +345,7 @@ $do$;
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION _ps_trace.eval_greater_than(_op ps_tag.tag_op_greater_than)
     RETURNS jsonb[]
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::jsonb[])
     FROM _ps_trace.tag a
@@ -383,7 +383,7 @@ $do$;
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION _ps_trace.eval_greater_than_or_equal(_op ps_tag.tag_op_greater_than_or_equal)
     RETURNS jsonb[]
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT coalesce(array_agg(jsonb_build_object(a.key_id, a.id)), array[]::jsonb[])
     FROM _ps_trace.tag a
@@ -421,7 +421,7 @@ $do$;
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION ps_trace.jsonb(_tag_map ps_trace.tag_map)
     RETURNS jsonb
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     /*
     takes an tag_map which is a map of tag_key.id to tag.id
@@ -449,7 +449,7 @@ GRANT EXECUTE ON FUNCTION ps_trace.jsonb(ps_trace.tag_map) TO prom_reader;
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION ps_trace.jsonb(_tag_map ps_trace.tag_map, VARIADIC _keys ps_trace.tag_k[])
     RETURNS jsonb
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     /*
     takes an tag_map which is a map of tag_key.id to tag.id
@@ -476,7 +476,7 @@ GRANT EXECUTE ON FUNCTION ps_trace.jsonb(ps_trace.tag_map, ps_trace.tag_k[]) TO 
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION ps_trace.val(_tag_map ps_trace.tag_map, _key ps_trace.tag_k)
     RETURNS ps_trace.tag_v
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT a.value
     FROM _ps_trace.tag a
@@ -492,7 +492,7 @@ GRANT EXECUTE ON FUNCTION ps_trace.val(ps_trace.tag_map, ps_trace.tag_k) TO prom
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION ps_trace.val_text(_tag_map ps_trace.tag_map, _key ps_trace.tag_k)
     RETURNS text
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT a.value #>> '{}'
     FROM _ps_trace.tag a

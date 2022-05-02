@@ -2,7 +2,7 @@
 -- orderings in different statements
 CREATE OR REPLACE FUNCTION _prom_catalog.get_metrics_that_need_drop_chunk()
 RETURNS SETOF _prom_catalog.metric
-SET search_path = pg_catalog
+SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
         IF NOT _prom_catalog.is_timescaledb_installed() THEN
@@ -39,7 +39,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.drop_metric_chunk_data(
     --security definer to add jobs as the logged-in user
     SECURITY DEFINER
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
     metric_schema NAME;
@@ -105,7 +105,7 @@ DECLARE
 BEGIN
     -- Note: We cannot use SET in the procedure declaration because we do transaction control
     -- and we can _only_ use SET LOCAL in a procedure which _does_ transaction control
-    SET LOCAL search_path = pg_catalog;
+    SET LOCAL search_path = pg_catalog, pg_temp;
     SELECT id, table_schema, table_name, series_table, is_view
     INTO STRICT metric_id, metric_schema, metric_table, metric_series_table, is_metric_view
     FROM _prom_catalog.get_metric_table_name_if_exists(schema_name, metric_name);
@@ -148,7 +148,7 @@ BEGIN
             _prom_catalog.ids_epoch LIMIT 1;
     COMMIT;
     -- reset search path after transaction end
-    SET LOCAL search_path = pg_catalog;
+    SET LOCAL search_path = pg_catalog, pg_temp;
 
     IF older_than IS NULL THEN
         -- even though there are no new Ids in need of deletion,
@@ -172,7 +172,7 @@ BEGIN
         END IF;
     COMMIT;
     -- reset search path after transaction end
-    SET LOCAL search_path = pg_catalog;
+    SET LOCAL search_path = pg_catalog, pg_temp;
 
     -- transaction 3
         lastT := pg_catalog.clock_timestamp();
@@ -185,7 +185,7 @@ BEGIN
             _prom_catalog.ids_epoch LIMIT 1;
     COMMIT;
     -- reset search path after transaction end
-    SET LOCAL search_path = pg_catalog;
+    SET LOCAL search_path = pg_catalog, pg_temp;
 
 
     -- transaction 4
@@ -205,7 +205,7 @@ GRANT EXECUTE ON PROCEDURE _prom_catalog.drop_metric_chunks(text, text, timestam
 CREATE OR REPLACE PROCEDURE _ps_trace.drop_span_chunks(_older_than timestamptz)
 --security definer to add jobs as the logged-in user
 SECURITY DEFINER
-SET search_path = pg_catalog
+SET search_path = pg_catalog, pg_temp
 AS $func$
 BEGIN
     IF _prom_catalog.is_timescaledb_installed() THEN
@@ -235,7 +235,7 @@ GRANT EXECUTE ON PROCEDURE _ps_trace.drop_span_chunks(timestamptz) TO prom_maint
 CREATE OR REPLACE PROCEDURE _ps_trace.drop_link_chunks(_older_than timestamptz)
 --security definer to add jobs as the logged-in user
 SECURITY DEFINER
-SET search_path = pg_catalog
+SET search_path = pg_catalog, pg_temp
 AS $func$
 BEGIN
     IF _prom_catalog.is_timescaledb_installed() THEN
@@ -265,7 +265,7 @@ GRANT EXECUTE ON PROCEDURE _ps_trace.drop_link_chunks(timestamptz) TO prom_maint
 CREATE OR REPLACE PROCEDURE _ps_trace.drop_event_chunks(_older_than timestamptz)
 --security definer to add jobs as the logged-in user
 SECURITY DEFINER
-SET search_path = pg_catalog
+SET search_path = pg_catalog, pg_temp
 AS $func$
 BEGIN
     IF _prom_catalog.is_timescaledb_installed() THEN
@@ -295,7 +295,7 @@ GRANT EXECUTE ON PROCEDURE _ps_trace.drop_event_chunks(timestamptz) TO prom_main
 CREATE OR REPLACE FUNCTION ps_trace.set_trace_retention_period(_trace_retention_period INTERVAL)
     RETURNS BOOLEAN
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
     SELECT _prom_catalog.set_default_value('trace_retention_period', _trace_retention_period::text);
     SELECT true;
@@ -307,7 +307,7 @@ GRANT EXECUTE ON FUNCTION ps_trace.set_trace_retention_period(INTERVAL) TO prom_
 
 CREATE OR REPLACE FUNCTION ps_trace.get_trace_retention_period()
 RETURNS INTERVAL
-SET search_path = pg_catalog
+SET search_path = pg_catalog, pg_temp
 AS $$
     SELECT _prom_catalog.get_default_value('trace_retention_period')::pg_catalog.interval;
 $$
@@ -329,7 +329,7 @@ DECLARE
 BEGIN
     -- Note: We cannot use SET in the procedure declaration because we do transaction control
     -- and we can _only_ use SET LOCAL in a procedure which _does_ transaction control
-    SET LOCAL search_path = pg_catalog;
+    SET LOCAL search_path = pg_catalog, pg_temp;
 
     _start := clock_timestamp();
 
@@ -373,7 +373,7 @@ BEGIN
     END;
     COMMIT;
     -- reset search path after transaction end
-    SET LOCAL search_path = pg_catalog;
+    SET LOCAL search_path = pg_catalog, pg_temp;
 
     _last := clock_timestamp();
     PERFORM _prom_catalog.set_app_name('promscale maintenance: data retention: tracing: deleting event data');
@@ -392,7 +392,7 @@ BEGIN
     END;
     COMMIT;
     -- reset search path after transaction end
-    SET LOCAL search_path = pg_catalog;
+    SET LOCAL search_path = pg_catalog, pg_temp;
 
     _last := clock_timestamp();
     PERFORM _prom_catalog.set_app_name('promscale maintenance: data retention: tracing: deleting span data');
@@ -411,7 +411,7 @@ BEGIN
     END;
     COMMIT;
     -- reset search path after transaction end
-    SET LOCAL search_path = pg_catalog;
+    SET LOCAL search_path = pg_catalog, pg_temp;
 
     IF log_verbose THEN
         RAISE LOG 'promscale maintenance: data retention: tracing: finished in %', clock_timestamp()-_start;
@@ -430,7 +430,7 @@ DECLARE
 BEGIN
     -- Note: We cannot use SET in the procedure declaration because we do transaction control
     -- and we can _only_ use SET LOCAL in a procedure which _does_ transaction control
-    SET LOCAL search_path = pg_catalog;
+    SET LOCAL search_path = pg_catalog, pg_temp;
 
     --Do one loop with metric that could be locked without waiting.
     --This allows you to do everything you can while avoiding lock contention.
@@ -450,7 +450,7 @@ BEGIN
 
         COMMIT;
         -- reset search path after transaction end
-        SET LOCAL search_path = pg_catalog;
+        SET LOCAL search_path = pg_catalog, pg_temp;
     END LOOP;
 
     IF log_verbose AND array_length(remaining_metrics, 1) > 0 THEN
@@ -468,7 +468,7 @@ BEGIN
 
         COMMIT;
         -- reset search path after transaction end
-        SET LOCAL search_path = pg_catalog;
+        SET LOCAL search_path = pg_catalog, pg_temp;
     END LOOP;
 END;
 $$ LANGUAGE PLPGSQL;
@@ -488,7 +488,7 @@ DECLARE
 BEGIN
     -- Note: We cannot use SET in the procedure declaration because we do transaction control
     -- and we can _only_ use SET LOCAL in a procedure which _does_ transaction control
-    SET LOCAL search_path = pg_catalog;
+    SET LOCAL search_path = pg_catalog, pg_temp;
 
     startT := clock_timestamp();
     IF log_verbose THEN
@@ -532,7 +532,7 @@ DECLARE
 BEGIN
     -- Note: We cannot use SET in the procedure declaration because we do transaction control
     -- and we can _only_ use SET LOCAL in a procedure which _does_ transaction control
-    SET LOCAL search_path = pg_catalog;
+    SET LOCAL search_path = pg_catalog, pg_temp;
     log_verbose := coalesce(config->>'log_verbose', 'false')::boolean;
 
     --if auto_explain enabled in config, turn it on in a best-effort way
@@ -563,7 +563,7 @@ CREATE OR REPLACE FUNCTION prom_api.config_maintenance_jobs(number_jobs int, new
     --security definer to add jobs as the logged-in user
     SECURITY DEFINER
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
   cnt int;
@@ -606,7 +606,7 @@ IS 'Configure the number of maintenance jobs run by the job scheduler, as well a
 CREATE OR REPLACE FUNCTION prom_api.promscale_post_restore()
 RETURNS void
 SECURITY DEFINER
-SET search_path = pg_catalog
+SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
     _sql text;

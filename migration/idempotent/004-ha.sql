@@ -2,7 +2,7 @@
 CREATE OR REPLACE FUNCTION _prom_catalog.ha_leases_audit_fn()
     RETURNS TRIGGER
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS
 $func$
 BEGIN
@@ -35,7 +35,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.update_lease(cluster TEXT, writer TEXT,
                                                        max_time TIMESTAMPTZ)
     RETURNS _prom_catalog.ha_leases
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS
 $func$
 DECLARE
@@ -105,7 +105,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.try_change_leader(cluster TEXT, new_lea
                                                             max_time TIMESTAMPTZ)
     RETURNS _prom_catalog.ha_leases
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS
 $func$
 DECLARE

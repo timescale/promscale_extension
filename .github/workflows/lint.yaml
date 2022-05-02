@@ -71,7 +71,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: 'timescale/pgspot'
-          ref: '0.1.0'
+          ref: '0.2.0'
           path: 'pgspot'
 
       - name: Install pgspot dependencies
@@ -101,4 +101,4 @@ jobs:
           args: schema pg14 --out /tmp/schema.sql
 
       - name: Run pgspot
-        run: ./pgspot/pgspot --sql-accepting=execute_everywhere --sql-accepting=distributed_exec --ignore PS005 /tmp/schema.sql
+        run: ./pgspot/pgspot --sql-accepting=execute_everywhere --sql-accepting=distributed_exec --ignore PS005 /tmp/schema.sql ./sql/promscale--0.0.0.sql

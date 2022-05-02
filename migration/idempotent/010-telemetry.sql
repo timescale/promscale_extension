@@ -8,7 +8,7 @@
 -- It returns TRUE if last run was beyond telemetry_sync_duration, otherwise FALSE.
 CREATE OR REPLACE FUNCTION _ps_catalog.promscale_telemetry_housekeeping(telemetry_sync_duration INTERVAL DEFAULT INTERVAL '1 HOUR')
 RETURNS BOOLEAN
-SET search_path = pg_catalog
+SET search_path = pg_catalog, pg_temp
 AS
 $$
     DECLARE
@@ -67,7 +67,7 @@ LANGUAGE PLPGSQL;
 GRANT EXECUTE ON FUNCTION _ps_catalog.promscale_telemetry_housekeeping(INTERVAL) TO prom_writer;
 
 CREATE OR REPLACE FUNCTION _ps_catalog.promscale_sql_telemetry() RETURNS VOID
-SET search_path = pg_catalog
+SET search_path = pg_catalog, pg_temp
 AS
 $$
     DECLARE result TEXT;
@@ -139,7 +139,7 @@ CREATE OR REPLACE FUNCTION _prom_ext.update_tsprom_metadata(meta_key text, meta_
     RETURNS VOID
     SECURITY DEFINER
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     INSERT INTO _timescaledb_catalog.metadata(key, value, include_in_telemetry)
     VALUES ('promscale_' || meta_key,meta_value, send_telemetry)
@@ -151,7 +151,7 @@ GRANT EXECUTE ON FUNCTION _prom_ext.update_tsprom_metadata(TEXT, TEXT, BOOLEAN) 
 
 CREATE OR REPLACE FUNCTION _ps_catalog.apply_telemetry(telemetry_name TEXT, telemetry_value TEXT)
 RETURNS VOID
-SET search_path = pg_catalog
+SET search_path = pg_catalog, pg_temp
 AS
 $$
     BEGIN

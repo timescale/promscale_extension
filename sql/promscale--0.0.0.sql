@@ -1,4 +1,4 @@
-SET LOCAL search_path = pg_catalog;
+SET LOCAL search_path = pg_catalog, pg_temp;
 DROP TABLE public.prom_schema_migrations;
 
 REVOKE EXECUTE ON FUNCTION ps_trace.delete_all_traces() FROM prom_writer;

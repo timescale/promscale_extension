@@ -18,7 +18,7 @@ GRANT SELECT ON _prom_catalog.initial_default TO prom_reader;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.get_default_value(_key text)
     RETURNS TEXT
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     -- if there is a user-supplied default value, take it
     -- otherwise take the initial default value
@@ -32,7 +32,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_default_value(text) TO prom_reader;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.set_default_value(_key text, _value text)
     RETURNS VOID
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     INSERT INTO _prom_catalog.default (key, value)
     VALUES (_key, _value)
@@ -45,7 +45,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.set_default_value(text, text) TO prom_ad
 
 CREATE OR REPLACE FUNCTION _prom_catalog.is_restore_in_progress()
 RETURNS BOOLEAN
-SET search_path = pg_catalog
+SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT coalesce((SELECT setting::boolean from pg_catalog.pg_settings where name = 'timescaledb.restoring'), false)
 $func$
@@ -53,7 +53,7 @@ LANGUAGE sql STABLE;
 GRANT EXECUTE ON FUNCTION _prom_catalog.is_restore_in_progress() TO prom_reader;
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.execute_everywhere(command_key text, command TEXT, transactional BOOLEAN = true)
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 BEGIN
     IF command_key IS NOT NULL THEN
@@ -83,7 +83,7 @@ $func$ LANGUAGE PLPGSQL;
 GRANT EXECUTE ON PROCEDURE _prom_catalog.execute_everywhere(text, text, boolean) TO prom_admin;
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.update_execute_everywhere_entry(command_key text, command TEXT, transactional BOOLEAN = true)
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 BEGIN
     UPDATE _prom_catalog.remote_commands
@@ -97,7 +97,7 @@ GRANT EXECUTE ON PROCEDURE _prom_catalog.update_execute_everywhere_entry(text, t
 
 CREATE OR REPLACE FUNCTION _prom_catalog.get_default_chunk_interval()
     RETURNS INTERVAL
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT _prom_catalog.get_default_value('chunk_interval')::pg_catalog.interval;
 $func$
@@ -106,7 +106,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_default_chunk_interval() TO prom_rea
 
 CREATE OR REPLACE FUNCTION _prom_catalog.get_timescale_major_version()
     RETURNS INT
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT split_part(extversion, '.', 1)::INT FROM pg_catalog.pg_extension WHERE extname='timescaledb' LIMIT 1;
 $func$
@@ -115,7 +115,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_timescale_major_version() TO prom_re
 
 CREATE OR REPLACE FUNCTION _prom_catalog.get_timescale_minor_version()
     RETURNS INT
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT split_part(extversion, '.', 2)::INT FROM pg_catalog.pg_extension WHERE extname='timescaledb' LIMIT 1;
 $func$
@@ -124,7 +124,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_timescale_minor_version() TO prom_re
 
 CREATE OR REPLACE FUNCTION _prom_catalog.get_default_retention_period()
     RETURNS INTERVAL
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT _prom_catalog.get_default_value('retention_period')::pg_catalog.interval;
 $func$
@@ -133,7 +133,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_default_retention_period() TO prom_r
 
 CREATE OR REPLACE FUNCTION _prom_catalog.is_timescaledb_installed()
     RETURNS BOOLEAN
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT count(*) > 0 FROM pg_extension WHERE extname='timescaledb';
 $func$
@@ -142,7 +142,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.is_timescaledb_installed() TO prom_reade
 
 CREATE OR REPLACE FUNCTION _prom_catalog.is_timescaledb_oss()
     RETURNS BOOLEAN
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
     IF _prom_catalog.is_timescaledb_installed() THEN
@@ -156,7 +156,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.is_timescaledb_oss() TO prom_reader;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.is_multinode()
     RETURNS BOOLEAN
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT count(*) > 0 FROM timescaledb_information.data_nodes
 $func$
@@ -165,7 +165,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.is_multinode() TO prom_reader;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.get_default_compression_setting()
     RETURNS BOOLEAN
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT _prom_catalog.get_default_value('metric_compression')::boolean;
 $func$
@@ -176,7 +176,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_default_compression_setting() TO pro
 CREATE OR REPLACE FUNCTION _prom_catalog.get_staggered_chunk_interval(chunk_interval INTERVAL)
     RETURNS INTERVAL
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT chunk_interval * (1.0+((random()*0.01)-0.005));
 $func$
@@ -186,7 +186,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_staggered_chunk_interval(INTERVAL) T
 
 CREATE OR REPLACE FUNCTION _prom_catalog.get_advisory_lock_prefix_job()
     RETURNS INTEGER
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 SELECT 12377;
 $func$
@@ -195,7 +195,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_advisory_lock_prefix_job() TO prom_w
 
 CREATE OR REPLACE FUNCTION _prom_catalog.get_advisory_lock_prefix_maintenance()
     RETURNS INTEGER
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
    SELECT 12378;
 $func$
@@ -205,7 +205,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_advisory_lock_prefix_maintenance() T
 CREATE OR REPLACE FUNCTION _prom_catalog.lock_metric_for_maintenance(metric_id int, wait boolean = true)
     RETURNS BOOLEAN
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
     res BOOLEAN;
@@ -227,7 +227,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.lock_metric_for_maintenance(int, boolean
 CREATE OR REPLACE FUNCTION _prom_catalog.unlock_metric_for_maintenance(metric_id int)
     RETURNS VOID
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
 BEGIN
@@ -240,7 +240,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.unlock_metric_for_maintenance(int) TO pr
 CREATE OR REPLACE FUNCTION _prom_catalog.attach_series_partition(metric_record _prom_catalog.metric)
     RETURNS VOID
     SECURITY DEFINER
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $proc$
 DECLARE
 BEGIN
@@ -290,7 +290,7 @@ DECLARE
 BEGIN
     -- Note: We cannot use SET in the procedure declaration because we do transaction control
     -- and we can _only_ use SET LOCAL in a procedure which _does_ transaction control
-    SET LOCAL search_path = pg_catalog;
+    SET LOCAL search_path = pg_catalog, pg_temp;
     FOR r IN
         SELECT *
         FROM _prom_catalog.metric
@@ -307,7 +307,7 @@ BEGIN
             --release row lock
             COMMIT;
             -- reset search path after transaction end
-            SET LOCAL search_path = pg_catalog;
+            SET LOCAL search_path = pg_catalog, pg_temp;
             CONTINUE;
         END IF;
 
@@ -319,7 +319,7 @@ BEGIN
             --release row lock
             COMMIT;
             -- reset search path after transaction end
-            SET LOCAL search_path = pg_catalog;
+            SET LOCAL search_path = pg_catalog, pg_temp;
             CONTINUE;
         END IF;
 
@@ -334,7 +334,7 @@ BEGIN
 
         COMMIT;
         -- reset search path after transaction end
-        SET LOCAL search_path = pg_catalog;
+        SET LOCAL search_path = pg_catalog, pg_temp;
     END LOOP;
 END;
 $proc$ LANGUAGE PLPGSQL;
@@ -354,7 +354,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.make_metric_table()
     RETURNS trigger
     SECURITY DEFINER
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
   label_id INT;
@@ -458,7 +458,7 @@ CREATE TRIGGER make_metric_table_trigger
 -- name size will always be exactly 62 chars.
 CREATE OR REPLACE FUNCTION _prom_catalog.pg_name_with_suffix(full_name text, suffix text)
     RETURNS name
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT (substring(full_name for 62-(char_length(suffix)+1)) || '_' || suffix)::name
 $func$
@@ -478,7 +478,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.pg_name_with_suffix(text, text) TO prom_
 -- unique as well, so have to reserve a space for the underscore.
 CREATE OR REPLACE FUNCTION _prom_catalog.pg_name_unique(full_name_arg text, suffix text)
     RETURNS name
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT CASE
         WHEN char_length(full_name_arg) < 62 THEN
@@ -502,7 +502,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.pg_name_unique(text, text) TO prom_reade
 CREATE OR REPLACE FUNCTION _prom_catalog.create_metric_table(
         metric_name_arg text, OUT id int, OUT table_name name)
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
   new_id int;
@@ -543,7 +543,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.create_label_key(
         new_key TEXT, OUT id INT, OUT value_column_name NAME, OUT id_column_name NAME
 )
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
   new_id int;
@@ -578,7 +578,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.create_label_key(TEXT) TO prom_writer;
 CREATE OR REPLACE FUNCTION _prom_catalog.get_or_create_label_key(
         key TEXT, OUT id INT, OUT value_column_name NAME, OUT id_column_name NAME)
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
    SELECT id, value_column_name, id_column_name
    FROM _prom_catalog.label_key lk
@@ -600,7 +600,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.get_new_pos_for_key(
     RETURNS int[]
     --security definer needed to lock the series table
     SECURITY DEFINER
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
     position int;
@@ -725,7 +725,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_new_pos_for_key(text, name, text[], 
 --should only be called after a check that that the label doesn't exist
 CREATE OR REPLACE FUNCTION _prom_catalog.get_new_label_id(key_name text, value_name text, OUT id INT)
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 BEGIN
 LOOP
@@ -777,7 +777,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.label_unnest(anyarray) to prom_reader;
 CREATE OR REPLACE FUNCTION _prom_catalog.safe_approximate_row_count(table_name_input REGCLASS)
     RETURNS BIGINT
     LANGUAGE PLPGSQL
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS
 $$
 BEGIN
@@ -803,7 +803,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.delete_series_catalog_row(
     series_ids bigint[]
 )
     RETURNS VOID
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS
 $$
 BEGIN
@@ -823,7 +823,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.delete_series_catalog_row(name, bigint[]
 
 CREATE OR REPLACE FUNCTION _prom_catalog.get_metric_table_name_if_exists(schema text, metric_name text)
     RETURNS TABLE (id int, table_name name, table_schema name, series_table name, is_view boolean)
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
     rows_found bigint;
@@ -868,7 +868,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_metric_table_name_if_exists(text, te
 CREATE OR REPLACE FUNCTION _prom_catalog.get_or_create_metric_table_name(
         metric_name text, OUT id int, OUT table_name name, OUT possibly_new BOOLEAN)
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
    SELECT id, table_name::name, false
    FROM _prom_catalog.metric m
@@ -887,7 +887,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.get_or_create_label_key_pos(
         metric_name text, key text)
     RETURNS INT
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
     --only executes the more expensive PLPGSQL function if the label doesn't exist
     SELECT
@@ -913,7 +913,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_or_create_label_key_pos(text, text) 
 CREATE OR REPLACE FUNCTION prom_api.label_cardinality(label_id INT)
     RETURNS INT
     LANGUAGE SQL
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS
 $$
     SELECT count(*)::INT FROM _prom_catalog.series s WHERE s.labels @> array[label_id];
@@ -925,7 +925,7 @@ GRANT EXECUTE ON FUNCTION prom_api.label_cardinality(int) to prom_reader;
 CREATE OR REPLACE FUNCTION prom_api.label_key_position(
         metric_name text, key text)
     RETURNS INT
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
     SELECT
         pos
@@ -941,7 +941,7 @@ GRANT EXECUTE ON FUNCTION prom_api.label_key_position(text, text) to prom_reader
 
 -- drop_metric deletes a metric and related series hypertable from the database along with the related series, views and unreferenced labels.
 CREATE OR REPLACE FUNCTION prom_api.drop_metric(metric_name_to_be_dropped text) RETURNS VOID
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS
 $$
     DECLARE
@@ -976,7 +976,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.get_or_create_label_id(
         key_name text, value_name text)
     RETURNS INT
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
     --first select to prevent sequence from being used up
     --unnecessarily
@@ -1003,7 +1003,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_or_create_label_id(text, text) to pr
 CREATE OR REPLACE FUNCTION _prom_catalog.get_or_create_label_array(js jsonb)
     RETURNS prom_api.label_array
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
     WITH idx_val AS (
         SELECT
@@ -1043,7 +1043,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_or_create_label_array(jsonb) TO prom
 CREATE OR REPLACE FUNCTION _prom_catalog.get_or_create_label_array(metric_name TEXT, label_keys text[], label_values text[])
     RETURNS prom_api.label_array
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
     WITH idx_val AS (
         SELECT
@@ -1082,7 +1082,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_or_create_label_array(TEXT, text[], 
 CREATE OR REPLACE FUNCTION _prom_catalog.get_or_create_label_ids(metric_name TEXT, metric_table NAME, label_keys text[], label_values text[])
     RETURNS TABLE(pos int[], id int[], label_key text[], label_value text[])
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
         WITH cte as (
         SELECT
@@ -1123,7 +1123,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_or_create_label_ids(TEXT, NAME, text
 -- the order may not be the same as the original labels
 -- This function needs to be optimized for performance
 CREATE OR REPLACE FUNCTION prom_api.labels_info(INOUT labels INT[], OUT keys text[], OUT vals text[])
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
     SELECT
         array_agg(l.id), array_agg(l.key), array_agg(l.value)
@@ -1137,7 +1137,7 @@ IS 'converts an array of label ids to three arrays: one for ids, one for keys an
 GRANT EXECUTE ON FUNCTION prom_api.labels_info(INT[]) TO prom_reader;
 
 CREATE OR REPLACE FUNCTION prom_api.key_value_array(labels prom_api.label_array, OUT keys text[], OUT vals text[])
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
     SELECT keys, vals FROM prom_api.labels_info(labels)
 $$
@@ -1149,7 +1149,7 @@ GRANT EXECUTE ON FUNCTION prom_api.key_value_array(prom_api.label_array) TO prom
 --Returns the jsonb for a series defined by a label_array
 CREATE OR REPLACE FUNCTION prom_api.jsonb(labels prom_api.label_array)
     RETURNS jsonb
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
     SELECT
         jsonb_object(keys, vals)
@@ -1164,7 +1164,7 @@ GRANT EXECUTE ON FUNCTION prom_api.jsonb(prom_api.label_array) TO prom_reader;
 --Returns the label_array given a series_id
 CREATE OR REPLACE FUNCTION prom_api.labels(series_id BIGINT)
     RETURNS prom_api.label_array
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
     SELECT
         labels
@@ -1184,7 +1184,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.create_series(
         label_array prom_api.label_array,
         OUT series_id BIGINT)
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
    new_series_id bigint;
@@ -1222,7 +1222,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.resurrect_series_ids(metric_table name,
     --security definer to add jobs as the logged-in user
     SECURITY DEFINER
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 BEGIN
     EXECUTE FORMAT($query$
@@ -1245,7 +1245,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.resurrect_series_ids(name, bigint) TO pr
 CREATE OR REPLACE  FUNCTION _prom_catalog.get_or_create_series_id(label jsonb)
     RETURNS BIGINT
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
   series_id bigint;
@@ -1288,7 +1288,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_or_create_series_id(jsonb) TO prom_w
 
 CREATE OR REPLACE FUNCTION _prom_catalog.get_or_create_series_id_for_kv_array(metric_name TEXT, label_keys text[], label_values text[], OUT table_name NAME, OUT series_id BIGINT)
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
   metric_id int;
@@ -1332,7 +1332,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_or_create_series_id_for_kv_array(TEX
 
 CREATE OR REPLACE FUNCTION _prom_catalog.get_or_create_series_id_for_label_array(metric_id INT, table_name NAME, larray prom_api.label_array, OUT series_id BIGINT)
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 BEGIN
    EXECUTE format($query$
@@ -1367,7 +1367,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.set_chunk_interval_on_metric_table(metr
     RETURNS void
     VOLATILE
     SECURITY DEFINER
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 BEGIN
     IF NOT _prom_catalog.is_timescaledb_installed() THEN
@@ -1388,7 +1388,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.set_chunk_interval_on_metric_table(TEXT,
 CREATE OR REPLACE FUNCTION prom_api.set_default_chunk_interval(chunk_interval INTERVAL)
     RETURNS BOOLEAN
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
     SELECT _prom_catalog.set_default_value('chunk_interval', chunk_interval::pg_catalog.text);
 
@@ -1406,7 +1406,7 @@ GRANT EXECUTE ON FUNCTION prom_api.set_default_chunk_interval(INTERVAL) TO prom_
 CREATE OR REPLACE FUNCTION prom_api.set_metric_chunk_interval(metric_name TEXT, chunk_interval INTERVAL)
     RETURNS BOOLEAN
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     --use get_or_create_metric_table_name because we want to be able to set /before/ any data is ingested
     --needs to run before update so row exists before update.
@@ -1427,7 +1427,7 @@ GRANT EXECUTE ON FUNCTION prom_api.set_metric_chunk_interval(TEXT, INTERVAL) TO 
 CREATE OR REPLACE FUNCTION prom_api.reset_metric_chunk_interval(metric_name TEXT)
     RETURNS BOOLEAN
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     UPDATE _prom_catalog.metric SET default_chunk_interval = true
     WHERE id = (SELECT id FROM _prom_catalog.get_metric_table_name_if_exists('prom_data', metric_name));
@@ -1444,7 +1444,7 @@ GRANT EXECUTE ON FUNCTION prom_api.reset_metric_chunk_interval(TEXT) TO prom_adm
 
 CREATE OR REPLACE FUNCTION _prom_catalog.get_metric_retention_period(schema_name TEXT, metric_name TEXT)
     RETURNS INTERVAL
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
     SELECT COALESCE(m.retention_period, _prom_catalog.get_default_retention_period())
     FROM _prom_catalog.metric m
@@ -1460,7 +1460,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_metric_retention_period(TEXT, TEXT) 
 -- without the need to specify the schema
 CREATE OR REPLACE FUNCTION _prom_catalog.get_metric_retention_period(metric_name TEXT)
     RETURNS INTERVAL
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
     SELECT *
     FROM _prom_catalog.get_metric_retention_period('prom_data', metric_name)
@@ -1471,7 +1471,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_metric_retention_period(TEXT) TO pro
 CREATE OR REPLACE FUNCTION prom_api.set_default_retention_period(retention_period INTERVAL)
     RETURNS BOOLEAN
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
     SELECT _prom_catalog.set_default_value('retention_period', retention_period::text);
     SELECT true;
@@ -1484,7 +1484,7 @@ GRANT EXECUTE ON FUNCTION prom_api.set_default_retention_period(INTERVAL) TO pro
 CREATE OR REPLACE FUNCTION prom_api.set_metric_retention_period(schema_name TEXT, metric_name TEXT, new_retention_period INTERVAL)
     RETURNS BOOLEAN
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
     r _prom_catalog.metric;
@@ -1540,7 +1540,7 @@ GRANT EXECUTE ON FUNCTION prom_api.set_metric_retention_period(TEXT, TEXT, INTER
 CREATE OR REPLACE FUNCTION prom_api.set_metric_retention_period(metric_name TEXT, new_retention_period INTERVAL)
     RETURNS BOOLEAN
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT prom_api.set_metric_retention_period('prom_data', metric_name, new_retention_period);
 $func$
@@ -1552,7 +1552,7 @@ GRANT EXECUTE ON FUNCTION prom_api.set_metric_retention_period(TEXT, INTERVAL)TO
 CREATE OR REPLACE FUNCTION prom_api.reset_metric_retention_period(schema_name TEXT, metric_name TEXT)
     RETURNS BOOLEAN
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
     r _prom_catalog.metric;
@@ -1603,7 +1603,7 @@ GRANT EXECUTE ON FUNCTION prom_api.reset_metric_retention_period(TEXT, TEXT) TO 
 CREATE OR REPLACE FUNCTION prom_api.reset_metric_retention_period(metric_name TEXT)
     RETURNS BOOLEAN
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     SELECT prom_api.reset_metric_retention_period('prom_data', metric_name);
 $func$
@@ -1614,7 +1614,7 @@ GRANT EXECUTE ON FUNCTION prom_api.reset_metric_retention_period(TEXT) TO prom_a
 
 CREATE OR REPLACE FUNCTION _prom_catalog.get_metric_compression_setting(metric_name TEXT)
     RETURNS BOOLEAN
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
     can_compress boolean;
@@ -1655,7 +1655,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_metric_compression_setting(TEXT) TO 
 CREATE OR REPLACE FUNCTION prom_api.set_default_compression_setting(compression_setting BOOLEAN)
     RETURNS BOOLEAN
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
     can_compress BOOLEAN;
@@ -1687,7 +1687,7 @@ GRANT EXECUTE ON FUNCTION prom_api.set_default_compression_setting(BOOLEAN) TO p
 CREATE OR REPLACE FUNCTION prom_api.set_metric_compression_setting(metric_name TEXT, new_compression_setting BOOLEAN)
     RETURNS BOOLEAN
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
     can_compress boolean;
@@ -1730,7 +1730,7 @@ CREATE OR REPLACE FUNCTION prom_api.set_compression_on_metric_table(metric_table
     RETURNS void
     SECURITY DEFINER
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
 BEGIN
@@ -1789,7 +1789,7 @@ GRANT EXECUTE ON FUNCTION prom_api.set_compression_on_metric_table(TEXT, BOOLEAN
 CREATE OR REPLACE FUNCTION prom_api.reset_metric_compression_setting(metric_name TEXT)
     RETURNS BOOLEAN
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
     metric_table_name text;
@@ -1814,7 +1814,7 @@ GRANT EXECUTE ON FUNCTION prom_api.reset_metric_compression_setting(TEXT) TO pro
 CREATE OR REPLACE FUNCTION _prom_catalog.epoch_abort(user_epoch BIGINT)
     RETURNS VOID
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE db_epoch BIGINT;
 BEGIN
@@ -1833,7 +1833,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.get_confirmed_unused_series(
     metric_schema NAME, metric_table NAME, series_table NAME, potential_series_ids BIGINT[], check_time TIMESTAMPTZ
 )
     RETURNS BIGINT[]
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
     r RECORD;
@@ -1885,7 +1885,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.mark_unused_series(
     --security definer to add jobs as the logged-in user
     SECURITY DEFINER
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
 BEGIN
@@ -1925,7 +1925,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.delete_expired_series(
     --security definer to add jobs as the logged-in user
     SECURITY DEFINER
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
     label_array int[];
@@ -2026,7 +2026,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.delete_expired_series(text, text, text, 
 CREATE OR REPLACE FUNCTION _prom_catalog.set_app_name(full_name text)
     RETURNS VOID
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
     --setting a name that's too long create surpurflous NOTICE messages in the log
     SELECT set_config('application_name', substring(full_name for 63), false);
@@ -2039,7 +2039,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.set_app_name(text) TO prom_maintenance;
 -- no rows
 CREATE OR REPLACE FUNCTION _prom_catalog.get_storage_hypertable_info(metric_schema_name text, metric_table_name text, is_view boolean)
     RETURNS TABLE (id int, hypertable_relation text)
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
     agg_schema name;
@@ -2082,7 +2082,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.get_first_level_view_on_metric(metric_s
     RETURNS TABLE (view_schema name, view_name name, metric_table_name name)
     --security definer to add jobs as the logged-in user
     SECURITY DEFINER
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
     --RAISE WARNING 'checking view: % %', metric_schema, metric_table;
@@ -2119,7 +2119,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.get_cagg_info(
     metric_schema text, metric_table text,
     OUT is_cagg BOOLEAN, OUT cagg_schema name, OUT cagg_name name, OUT metric_table_name name,
     OUT materialized_hypertable_id INT, OUT storage_hypertable_relation TEXT)
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
     is_cagg := FALSE;
@@ -2191,7 +2191,7 @@ GRANT EXECUTE ON FUNCTION prom_api.is_normal_nan(double precision) TO prom_reade
 CREATE OR REPLACE FUNCTION prom_api.val(
         label_id INT)
     RETURNS TEXT
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
     SELECT
         value
@@ -2207,7 +2207,7 @@ GRANT EXECUTE ON FUNCTION prom_api.val(INT) TO prom_reader;
 CREATE OR REPLACE FUNCTION _prom_catalog.get_label_key_column_name_for_view(label_key text, id BOOLEAN)
     RETURNS NAME
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
   is_reserved boolean;
@@ -2234,7 +2234,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.create_series_view(
     RETURNS BOOLEAN
     SECURITY DEFINER
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
    label_value_cols text;
@@ -2290,7 +2290,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.create_metric_view(
     RETURNS BOOLEAN
     SECURITY DEFINER
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
    label_value_cols text;
@@ -2348,7 +2348,7 @@ CREATE OR REPLACE FUNCTION prom_api.register_metric_view(schema_name name, view_
     RETURNS BOOLEAN
     SECURITY DEFINER
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
    agg_schema name;
@@ -2427,7 +2427,7 @@ CREATE OR REPLACE FUNCTION prom_api.unregister_metric_view(schema_name name, vie
     RETURNS BOOLEAN
     SECURITY DEFINER
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
    metric_table_name name;
@@ -2459,7 +2459,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.delete_series_from_metric(name text, se
     RETURNS BIGINT
     SECURITY DEFINER
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS
 $$
 DECLARE
@@ -2507,7 +2507,7 @@ BEGIN
         CREATE OR REPLACE FUNCTION _prom_catalog.hypertable_local_size(schema_name_in name)
         RETURNS TABLE(hypertable_name name, table_bytes bigint, index_bytes bigint, toast_bytes bigint, total_bytes bigint)
         SECURITY DEFINER
-        SET search_path = pg_catalog
+        SET search_path = pg_catalog, pg_temp
         AS $function$
         BEGIN
             IF _prom_catalog.get_timescale_minor_version() < 3 THEN
@@ -2575,7 +2575,7 @@ BEGIN
         CREATE OR REPLACE FUNCTION _prom_catalog.hypertable_node_up(schema_name_in name)
         RETURNS TABLE(hypertable_name name, node_name name, node_up boolean)
         SECURITY DEFINER
-        SET search_path = pg_catalog
+        SET search_path = pg_catalog, pg_temp
         AS $function$
             -- list of distributed hypertables and whether or not the associated data node is up
             -- only ping each distinct data node once and no more
@@ -2618,7 +2618,7 @@ BEGIN
         CREATE OR REPLACE FUNCTION _prom_catalog.hypertable_remote_size(schema_name_in name)
         RETURNS TABLE(hypertable_name name, table_bytes bigint, index_bytes bigint, toast_bytes bigint, total_bytes bigint)
         SECURITY DEFINER
-        SET search_path = pg_catalog
+        SET search_path = pg_catalog, pg_temp
         AS $function$
             SELECT
                 dht.hypertable_name,
@@ -2649,7 +2649,7 @@ BEGIN
         RETURNS TABLE(hypertable_name name, total_chunks bigint, number_compressed_chunks bigint, before_compression_total_bytes bigint, after_compression_total_bytes bigint)
         SECURITY DEFINER
 
-        SET search_path = pg_catalog
+        SET search_path = pg_catalog, pg_temp
         AS $function$
             SELECT
                 x.hypertable_name,
@@ -2721,7 +2721,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.metric_view()
               total_size_bytes bigint, total_size text, compression_ratio numeric,
               total_chunks bigint, compressed_chunks bigint)
     SECURITY DEFINER
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 BEGIN
         IF NOT _prom_catalog.is_timescaledb_installed() THEN
@@ -2923,7 +2923,7 @@ GRANT SELECT ON prom_info.metric_stats TO prom_reader;
 CREATE OR REPLACE FUNCTION _prom_catalog.delay_compression_job(ht_table name, new_start timestamptz)
     RETURNS VOID
     SECURITY DEFINER
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
     bgw_job_id int;
@@ -2959,7 +2959,7 @@ BEGIN
     CREATE OR REPLACE FUNCTION _prom_catalog.decompress_chunk_for_metric(metric_table TEXT, chunk_schema_name name, chunk_table_name name)
     RETURNS VOID
     SECURITY DEFINER
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
     AS $$
     DECLARE
         chunk_full_name text;
@@ -3040,7 +3040,7 @@ BEGIN
             IF NOT transactional THEN
               COMMIT;
               -- reset search path after transaction end. This is ok to do iff we are in transactional mode.
-              SET LOCAL search_path = pg_catalog;
+              SET LOCAL search_path = pg_catalog, pg_temp;
             END IF;
         END LOOP;
     END;
@@ -3083,7 +3083,7 @@ BEGIN
     CREATE OR REPLACE FUNCTION _prom_catalog.compress_chunk_for_metric(metric_table TEXT, chunk_schema_name name, chunk_table_name name)
     RETURNS VOID
     SECURITY DEFINER
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
     AS $$
     DECLARE
         chunk_full_name text;
@@ -3115,7 +3115,7 @@ BEGIN
     BEGIN
         -- Note: We cannot use SET in the procedure declaration because we do transaction control
         -- and we can _only_ use SET LOCAL in a procedure which _does_ transaction control
-        SET LOCAL search_path = pg_catalog;
+        SET LOCAL search_path = pg_catalog, pg_temp;
 
         FOR chunk_schema_name, chunk_table_name, chunk_range_end, chunk_num IN
             SELECT
@@ -3138,7 +3138,7 @@ BEGIN
             PERFORM _prom_catalog.compress_chunk_for_metric(metric_table, chunk_schema_name, chunk_table_name);
             COMMIT;
             -- reset search path after transaction end
-            SET LOCAL search_path = pg_catalog;
+            SET LOCAL search_path = pg_catalog, pg_temp;
         END LOOP;
     END;
     $$ LANGUAGE PLPGSQL;
@@ -3154,7 +3154,7 @@ DECLARE
 BEGIN
     -- Note: We cannot use SET in the procedure declaration because we do transaction control
     -- and we can _only_ use SET LOCAL in a procedure which _does_ transaction control
-    SET LOCAL search_path = pg_catalog;
+    SET LOCAL search_path = pg_catalog, pg_temp;
 
     SELECT table_name
     INTO STRICT metric_table
@@ -3178,7 +3178,7 @@ GRANT EXECUTE ON PROCEDURE _prom_catalog.compress_metric_chunks(text) TO prom_ma
 -- orderings in different statements
 CREATE OR REPLACE FUNCTION _prom_catalog.get_metrics_that_need_compression()
     RETURNS SETOF _prom_catalog.metric
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
 BEGIN
@@ -3207,7 +3207,7 @@ DECLARE
 BEGIN
     -- Note: We cannot use SET in the procedure declaration because we do transaction control
     -- and we can _only_ use SET LOCAL in a procedure which _does_ transaction control
-    SET LOCAL search_path = pg_catalog;
+    SET LOCAL search_path = pg_catalog, pg_temp;
 
     --Do one loop with metric that could be locked without waiting.
     --This allows you to do everything you can while avoiding lock contention.
@@ -3235,7 +3235,7 @@ BEGIN
 
         COMMIT;
         -- reset search path after transaction end
-        SET LOCAL search_path = pg_catalog;
+        SET LOCAL search_path = pg_catalog, pg_temp;
     END LOOP;
 
     FOR r IN
@@ -3261,7 +3261,7 @@ BEGIN
 
         COMMIT;
         -- reset search path after transaction end
-        SET LOCAL search_path = pg_catalog;
+        SET LOCAL search_path = pg_catalog, pg_temp;
     END LOOP;
 END;
 $$ LANGUAGE PLPGSQL;
@@ -3270,7 +3270,7 @@ IS 'compress data according to the policy. This procedure should be run regularl
 GRANT EXECUTE ON PROCEDURE _prom_catalog.execute_compression_policy(boolean) TO prom_maintenance;
 
 CREATE OR REPLACE PROCEDURE prom_api.add_prom_node(node_name TEXT, attach_to_existing_metrics BOOLEAN = true)
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
     command_row record;
@@ -3298,7 +3298,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.insert_metric_row(
     series_id_array bigint[]
 )
     RETURNS BIGINT
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS
 $$
 DECLARE
