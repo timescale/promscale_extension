@@ -3,13 +3,14 @@ DROP TABLE _ps_trace.link CASCADE;
 DROP TABLE _ps_trace.event CASCADE;
 DROP TABLE _ps_trace.span CASCADE;
 DROP TABLE _ps_trace.tag CASCADE;
+--need to drop because of enum redefinition
+DROP TABLE _ps_trace.operation;
 
 DELETE FROM _ps_trace.tag_key WHERE id >= 1000;
 ANALYZE _ps_trace.tag_key;
 REINDEX TABLE _ps_trace.tag_key;
 PERFORM setval('_ps_trace.tag_key_id_seq', 1000);
-TRUNCATE TABLE _ps_trace.operation;
-ANALYZE _ps_trace.operation;
+
 TRUNCATE TABLE _ps_trace.instrumentation_lib CASCADE;
 ANALYZE _ps_trace.instrumentation_lib;
 TRUNCATE TABLE _ps_trace.schema_url CASCADE;
@@ -25,6 +26,41 @@ CREATE TABLE _ps_trace.tag (
 CREATE UNIQUE INDEX tag_key_value_id_key_id_key_idx ON _ps_trace.tag (key, _prom_ext.jsonb_digest(value)) INCLUDE (id, key_id);
 GRANT SELECT ON TABLE _ps_trace.tag TO prom_reader;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.tag TO prom_writer;
+
+--redefine enums to be more user friendly
+DROP TYPE ps_trace.span_kind CASCADE;
+CREATE TYPE ps_trace.span_kind AS ENUM
+(
+    'unspecified',
+    'internal',
+    'server',
+    'client',
+    'producer',
+    'consumer'
+);
+GRANT USAGE ON TYPE ps_trace.span_kind TO prom_reader;
+
+DROP TYPE ps_trace.status_code CASCADE;
+CREATE TYPE ps_trace.status_code AS ENUM
+(
+    'unset',
+    'ok',
+    'error'
+);
+GRANT USAGE ON TYPE ps_trace.status_code TO prom_reader;
+
+CREATE TABLE IF NOT EXISTS _ps_trace.operation
+(
+    id bigint NOT NULL GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    service_name_id bigint not null, -- references id column of tag table for the service.name tag value
+    span_kind ps_trace.span_kind not null,
+    span_name text NOT NULL CHECK (span_name != ''),
+    UNIQUE (service_name_id, span_name, span_kind)
+);
+GRANT SELECT ON TABLE _ps_trace.operation TO prom_reader;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.operation TO prom_writer;
+GRANT USAGE ON SEQUENCE _ps_trace.operation_id_seq TO prom_writer;
+
 
 -- We are replacing domain with custom type
 DROP DOMAIN ps_trace.trace_id CASCADE;

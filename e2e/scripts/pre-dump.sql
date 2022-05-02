@@ -46,7 +46,7 @@ select ps_trace.put_tag_key('test-tag-1', ps_trace.span_tag_type());
 select ps_trace.put_tag('test-tag-0', to_jsonb(0), ps_trace.span_tag_type());
 select ps_trace.put_tag('test-tag-1', to_jsonb(1), ps_trace.span_tag_type());
 select ps_trace.put_instrumentation_lib('test-inst-lib-0', '9.9.9', ps_trace.put_schema_url('foo.bar.baz'));
-select ps_trace.put_operation('test-service-0', 'endpoint-0', 'SPAN_KIND_SERVER'::ps_trace.span_kind);
+select ps_trace.put_operation('test-service-0', 'endpoint-0', 'server'::ps_trace.span_kind);
 
 insert into _ps_trace.span
 ( trace_id
@@ -82,7 +82,7 @@ insert into _ps_trace.span
 , tstzrange('2030-01-06 01:02'::timestamptz, '2030-01-06 01:03'::timestamptz, '[)')
 , 2
 , 3
-, 'STATUS_CODE_OK'::ps_trace.status_code
+, 'ok'::ps_trace.status_code
 , 'OK'
 , 1
 , ps_trace.get_tag_map(jsonb_build_object('test-tag-1', to_jsonb(1)))
@@ -102,7 +102,7 @@ insert into _ps_trace.span
 , tstzrange('2030-01-06 01:02'::timestamptz, '2030-01-06 01:03'::timestamptz, '[)')
 , 2
 , 3
-, 'STATUS_CODE_OK'::ps_trace.status_code
+, 'ok'::ps_trace.status_code
 , 'OK'
 , 1
 , ps_trace.get_tag_map(jsonb_build_object('test-tag-1', to_jsonb(1)))
