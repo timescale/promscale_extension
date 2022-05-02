@@ -152,7 +152,7 @@ release-test: release-tester ## Test the currently selected release package
 
 .PHONY: docker-image-build-12 docker-image-build-13 docker-image-build-14
 docker-image-build-12 docker-image-build-13 docker-image-build-14: alpine.Dockerfile $(SQL_FILES) $(SRCS) Cargo.toml Cargo.lock $(RUST_SRCS)
-	docker buildx build $(if $(PUSH),--push,--load) \
+	docker buildx build --progress=plain $(if $(PUSH),--push,--load) \
 		--build-arg TIMESCALEDB_VERSION_FULL=$(TIMESCALEDB_VERSION_FULL) \
 		--build-arg TIMESCALEDB_VERSION_MAJOR=$(TIMESCALEDB_VERSION_MAJOR) \
 		--build-arg TIMESCALEDB_VERSION_MAJMIN=$(TIMESCALEDB_VERSION_MAJMIN) \
@@ -161,6 +161,8 @@ docker-image-build-12 docker-image-build-13 docker-image-build-14: alpine.Docker
 		-t $(IMAGE_NAME):$(EXT_VERSION)-ts$(TIMESCALEDB_VERSION_FULL)-pg$(PG_BUILD_VERSION) \
 		-t $(IMAGE_NAME):$(EXT_VERSION)-ts$(TIMESCALEDB_VERSION_MAJOR)-pg$(PG_BUILD_VERSION) \
 		-t $(IMAGE_NAME):latest-ts$(TIMESCALEDB_VERSION_MAJOR)-pg$(PG_BUILD_VERSION) \
+		--secret id=AWS_ACCESS_KEY_ID,env=AWS_ACCESS_KEY_ID \
+		--secret id=AWS_SECRET_ACCESS_KEY,env=AWS_SECRET_ACCESS_KEY \
         -f alpine.Dockerfile \
 		.
 

@@ -115,7 +115,7 @@ For bare-metal installations, the full instructions for setting up PostgreSQL, T
     ```
 1) Install the PGX framework
     ```bash
-    cargo install cargo-pgx --git https://github.com/timescale/pgx --branch promscale-staging
+    cargo install cargo-pgx --version 0.4.4
     ```
 1) Initialize the PGX framework using the PostgreSQL 14 installation
     ```bash

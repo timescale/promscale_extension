@@ -1,7 +1,8 @@
 # promscale extension
 comment = 'tables, types and functions supporting Promscale'
 default_version = '@CARGO_VERSION@'
-module_pathname = '$libdir/promscale'
+# we do not set module_pathname in order to activate pgx's "versioned .so" mode
+# module_pathname = '$libdir/promscale'
 relocatable = false
 schema = public
 superuser = true

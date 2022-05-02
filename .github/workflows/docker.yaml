@@ -51,6 +51,9 @@ jobs:
           echo "::set-output name=branch_name::${branch_name}"
           echo "::set-output name=build_type_suffix::${build_type_suffix}"
 
+      - name: Pull fresh images
+        run: docker pull timescaledev/promscale-extension:latest-ts2-pg${{ matrix.pgversion }}
+
       - name: Build and push
         uses: docker/build-push-action@v2
         with:
