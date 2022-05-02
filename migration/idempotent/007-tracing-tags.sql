@@ -517,7 +517,7 @@ CREATE FUNCTION _ps_trace.tag_map_denormalize(_map ps_trace.tag_map)
  * search_path-agnostic.
  */
 $fnc$
-    SELECT jsonb_object_agg(t.key, t.value)
+    SELECT pg_catalog.jsonb_object_agg(t.key, t.value)
         FROM pg_catalog.jsonb_each(_map) f(k,v)
             JOIN _ps_trace.tag t ON f.v::pg_catalog.int8 OPERATOR(pg_catalog.=) t.id;
 $fnc$;
@@ -557,7 +557,7 @@ CREATE OR REPLACE FUNCTION ps_trace.tag_v_eq(_ps_trace.tag_v, pg_catalog.jsonb)
     AS 'jsonb_eq';
 GRANT EXECUTE ON FUNCTION ps_trace.tag_v_eq(_ps_trace.tag_v, pg_catalog.jsonb) TO prom_reader;
 
-CREATE OR REPLACE FUNCTION _ps_trace.tag_v_eq_rewrite_helper(_tag_key pg_catalog.text, _value pg_catalog.jsonb)
+CREATE OR REPLACE FUNCTION _ps_trace.tag_v_eq_matching_tags(_tag_key pg_catalog.text, _value pg_catalog.jsonb)
     RETURNS pg_catalog.jsonb
     LANGUAGE sql STABLE
     -- Note: no explicit `SET SCHEMA` because we want this function to be inlined
@@ -570,7 +570,7 @@ $fnc$
     AND a.value OPERATOR(pg_catalog.=) _value
     LIMIT 1
 $fnc$;
-GRANT EXECUTE ON FUNCTION _ps_trace.tag_v_eq_rewrite_helper(_tag_key pg_catalog.text, _value pg_catalog.jsonb) TO prom_reader;
+GRANT EXECUTE ON FUNCTION _ps_trace.tag_v_eq_matching_tags(_tag_key pg_catalog.text, _value pg_catalog.jsonb) TO prom_reader;
 
 DO $do$
 BEGIN
@@ -601,7 +601,7 @@ CREATE OR REPLACE FUNCTION ps_trace.tag_v_ne(_ps_trace.tag_v, pg_catalog.jsonb)
     AS 'jsonb_ne';
 GRANT EXECUTE ON FUNCTION ps_trace.tag_v_ne(_ps_trace.tag_v, pg_catalog.jsonb) TO prom_reader;
 
-CREATE OR REPLACE FUNCTION _ps_trace.tag_v_ne_rewrite_helper(_tag_key pg_catalog.text, _value pg_catalog.jsonb)
+CREATE OR REPLACE FUNCTION _ps_trace.tag_v_ne_matching_tags(_tag_key pg_catalog.text, _value pg_catalog.jsonb)
     RETURNS pg_catalog.jsonb[]
     LANGUAGE sql STABLE
     -- Note: no explicit `SET SCHEMA` because we want this function to be inlined
@@ -612,7 +612,7 @@ $fnc$
     WHERE a.key OPERATOR(pg_catalog.=) _tag_key
     AND a.value OPERATOR(pg_catalog.<>) _value
 $fnc$;
-GRANT EXECUTE ON FUNCTION _ps_trace.tag_v_ne_rewrite_helper(_tag_key pg_catalog.text, _value pg_catalog.jsonb) TO prom_reader;
+GRANT EXECUTE ON FUNCTION _ps_trace.tag_v_ne_matching_tags(_tag_key pg_catalog.text, _value pg_catalog.jsonb) TO prom_reader;
 
 
 DO $do$

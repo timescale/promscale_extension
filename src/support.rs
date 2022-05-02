@@ -5,7 +5,7 @@ mod _prom_ext {
     use crate::palloc::{PallocdString, ToInternal};
     use crate::pg_imports::*;
     use crate::*;
-    use std::ffi::CString;
+    use std::ffi::{CStr, CString};
     use std::ptr;
 
     /// This [support function] optimizes calls to the supported function if it's
@@ -108,8 +108,8 @@ mod _prom_ext {
 
     const DENORMALIZE_FUNC_NAME: &str = "tag_map_denormalize";
     const ARROW_OP_NAME: &str = "->";
-    const HELPER_FUNC_SCHEMA: &str = "_ps_trace";
-    const CONTAINS_OP_PATH: [&str; 2] = ["pg_catalog", "@>"];
+    const HELPER_FUNC_SCHEMA: &'static [u8] = b"_ps_trace\0";
+    const CONTAINS_OP_PATH: [&'static [u8]; 2] = [b"pg_catalog\0", b"@>\0"];
     /// This support function expects an expression in the following form:
     /// ```sql
     /// SELECT * FROM some_table
@@ -117,33 +117,33 @@ mod _prom_ext {
     /// ```
     /// where `OP` could be any binary operator this function is attached to.
     /// For a given operator `OP` the name of its underlying function is used
-    /// to locate a corresponding helper function: `_ps_trace.OP_FUNC_rewrite_helper`.
+    /// to locate a corresponding helper function: `_ps_trace.OP_FUNC_matching_tags`.
     /// E.g. for operator `=` backed by function `tag_v_eq` the helper function
-    /// will be `_ps_trace.tag_v_eq_rewrite_helper`.
+    /// will be `_ps_trace.tag_v_eq_matching_tags`.
     ///
     /// If input expression matches the expected form, it will be rewritten as:
     /// ```sql
     /// SELECT * FROM some_table
-    /// WHERE map_attribute @> _ps_trace.OP_rewrite_helper(key, value)
+    /// WHERE map_attribute @> _ps_trace.OP_matching_tags(key, value)
     /// ```
     ///
     /// For helper functions that return `jsonb[]` ANY is inserted automatically:
     /// ```sql
-    /// WHERE map_attribute @> ANY (_ps_trace.OP_rewrite_helper(key, value))
+    /// WHERE map_attribute @> ANY (_ps_trace.OP_matching_tags(key, value))
     /// ```
     ///
     /// Furthermore, if both `key` and `value` are constant expressions,
     /// [`rewrite_fn_call_to_subquery`] will be used on the rhs to further optimize it:
     /// ```sql
     /// SELECT * FROM some_table
-    /// WHERE map_attribute @> (SELECT _ps_trace.OP_rewrite_helper(key, value))
+    /// WHERE map_attribute @> (SELECT _ps_trace.OP_matching_tags(key, value))
     /// ```
     #[pg_extern(immutable, strict)]
     pub unsafe fn tag_map_rewrite(input: Internal) -> Internal {
-        // Wrapping core logic into a funciton, that returns a Result,
-        // thus enabling .ok_or(...)? shorthand for dealing with optionals.
-        unsafe fn inner(input: Internal) -> Result<Internal, ()> {
-            let req = extract_simplify_request(input).ok_or(())?;
+        // Wrapping core logic into a function, that returns a Result,
+        // thus enabling ? shorthand for dealing with optionals.
+        unsafe fn inner(input: Internal) -> Option<Internal> {
+            let req = extract_simplify_request(input)?;
 
             // Deconstructing the top level operator:
             // tag_map_denormalize(any_tag_map_attribute) -> key OP const_value
@@ -152,75 +152,80 @@ mod _prom_ext {
             let original_args = PgList::<pg_sys::Node>::from_pg((*op_func_expr).args);
             // when -> is a regular operator (as opposed to our own special one),
             // there might be a domain coercion node.
-            let op_arg_left = strip_type_coercion(original_args.head().ok_or(())?);
-            let op_arg_right = original_args.tail().ok_or(())?;
+            let op_arg_left = strip_type_coercion(original_args.head()?);
+            let op_arg_right = original_args.tail()?;
 
             // Deconstructing the -> operator
             // tag_map_denormalize(any_tag_map_attribute) -> key
             // ^- arrow_op_arg_left                          ^- arrow_op_arg_right
             if !pgx::is_a(op_arg_left, pg_sys::NodeTag_T_OpExpr) {
-                return Err(());
+                return None;
             }
             // the operator is indeed ->
             let arrow_op = op_arg_left.cast::<pg_sys::OpExpr>();
             let arrow_op_name_const = CString::new(ARROW_OP_NAME).unwrap();
             PallocdString::from_ptr(pg_sys::get_opname((*arrow_op).opno))
-                .filter(|op_name| op_name.as_c_str() == arrow_op_name_const.as_c_str())
-                .ok_or(())?;
+                .filter(|op_name| op_name.as_c_str() == arrow_op_name_const.as_c_str())?;
             // extract operator's args
             let arrow_args = PgList::<pg_sys::Node>::from_pg((*arrow_op).args);
-            let arrow_op_arg_left = strip_type_coercion(arrow_args.head().ok_or(())?);
-            let arrow_op_arg_right = arrow_args.tail().ok_or(())?;
+            let arrow_op_arg_left = strip_type_coercion(arrow_args.head()?);
+            let arrow_op_arg_right = arrow_args.tail()?;
 
             // Deconstructing the func call to tag_map_denormalize
             // and extracting its argument.
             if !pgx::is_a(arrow_op_arg_left, pg_sys::NodeTag_T_FuncExpr) {
-                return Err(());
+                return None;
             }
             // Validate the function is indeed tag_map_denormalize
             let denormalize_func = arrow_op_arg_left.cast::<pg_sys::FuncExpr>();
             let denormalize_name_const = CString::new(DENORMALIZE_FUNC_NAME).unwrap();
             PallocdString::from_ptr(pg_sys::get_func_name((*denormalize_func).funcid))
-                .filter(|fname| fname.as_c_str() == denormalize_name_const.as_c_str())
-                .ok_or(())?;
+                .filter(|fname| fname.as_c_str() == denormalize_name_const.as_c_str())?;
             // extract its argument
             let denormalize_args = PgList::<pg_sys::Node>::from_pg((*denormalize_func).args);
-            let denormalize_arg = denormalize_args.head().ok_or(())?;
+            let denormalize_arg = denormalize_args.head()?;
 
             // Locate the helper function
             let top_level_func_name_box =
-                PallocdString::from_ptr(pg_sys::get_func_name((*op_func_expr).funcid)).ok_or(())?;
+                PallocdString::from_ptr(pg_sys::get_func_name((*op_func_expr).funcid))?;
             let top_level_func_name = top_level_func_name_box
                 .as_c_str()
                 .to_str()
                 .expect("Non-UTF8 function name");
-            let helper_func_name = format!("{}_rewrite_helper", top_level_func_name);
+            let helper_func_name =
+                CString::new(format!("{}_matching_tags", top_level_func_name)).unwrap();
             let helper_func_detail = func_get_detail(
-                [HELPER_FUNC_SCHEMA, &helper_func_name],
+                [HELPER_FUNC_SCHEMA, helper_func_name.as_bytes()],
                 &mut [pg_sys::TEXTOID, pg_sys::JSONBOID],
             );
             if helper_func_detail.code == pg_sys::FuncDetailCode_FUNCDETAIL_NOTFOUND {
                 pgx::warning!(
                     "Couldn't find helper function: {}.{}",
-                    HELPER_FUNC_SCHEMA,
-                    helper_func_name
+                    CStr::from_bytes_with_nul(HELPER_FUNC_SCHEMA)
+                        .unwrap()
+                        .to_str()
+                        .unwrap(),
+                    helper_func_name.to_str().unwrap()
                 );
-                return Err(());
+                return None;
             }
             if helper_func_detail.code != pg_sys::FuncDetailCode_FUNCDETAIL_NORMAL {
                 pgx::error!(
                     "Expected helper function {}.{} to be a regular function",
-                    HELPER_FUNC_SCHEMA,
-                    helper_func_name
+                    CStr::from_bytes_with_nul(HELPER_FUNC_SCHEMA)
+                        .unwrap()
+                        .to_str()
+                        .unwrap(),
+                    helper_func_name.to_str().unwrap()
                 );
             }
             let helper_func_returns_array = pg_sys::type_is_array(helper_func_detail.ret_type_oid);
 
             // Locate @> jsonb operator
-            let jsonb_contains_fully_qualified_name = build_pg_list_of_strings(CONTAINS_OP_PATH);
+            let jsonb_contains_fully_qualified_name = build_pg_list_of_cstrings(CONTAINS_OP_PATH);
             let jsonb_contains_op_oid = LookupOperName(
                 std::ptr::null_mut(),
-                jsonb_contains_fully_qualified_name.into_pg(),
+                jsonb_contains_fully_qualified_name.as_ptr(),
                 pg_sys::JSONBOID,
                 pg_sys::JSONBOID,
                 false, // Raises an error if the operator is not found
@@ -247,14 +252,10 @@ mod _prom_ext {
                 root: (*req).root,
                 fcall: helper_func_expr,
             };
-            let helper_expr_init_plan = fcinfo::direct_pg_extern_function_call_as_datum(
-                rewrite_fn_call_to_subquery_wrapper,
-                vec![
-                    (&mut sub_simplify_req as *mut pg_sys::SupportRequestSimplify)
-                        .internal()
-                        .into_datum(),
-                ],
+            let helper_expr_init_plan = rewrite_fn_call_to_subquery(
+                (&mut sub_simplify_req as *mut pg_sys::SupportRequestSimplify).internal(),
             )
+            .into_datum()
             .map(|datum: pg_sys::Datum| datum as *mut pg_sys::FuncExpr)
             .filter(|&expr| !expr.is_null())
             .unwrap_or(helper_func_expr);
@@ -290,13 +291,10 @@ mod _prom_ext {
                 .cast::<pg_sys::Node>()
             };
 
-            Ok(contains_op_expr.internal())
+            Some(contains_op_expr.internal())
         }
 
-        match inner(input) {
-            Ok(res) => res,
-            Err(_) => ptr::null_mut::<pg_sys::Node>().internal(),
-        }
+        inner(input).unwrap_or_else(|| ptr::null_mut::<pg_sys::Node>().internal())
     }
 
     /// Returns a sub-node if passed argument is a type coercing or a relabel node,
@@ -315,7 +313,7 @@ mod _prom_ext {
         }
     }
 
-    /// Ensures that passed argument is ineed a valid [`pg_sys::SupportRequestSimplify`].
+    /// Ensures that passed argument is indeed a valid [`pg_sys::SupportRequestSimplify`].
     /// Should only be called when input is an argument of a support function.
     #[inline]
     unsafe fn extract_simplify_request(
@@ -490,7 +488,7 @@ mod tests {
 
         assert_eq!(
             no_init_plan_result.0[0]["Plan"]["Filter"],
-            "(tm @> tag_v_eq_rewrite_helper('a'::text, ((v)::text)::jsonb))"
+            "(tm @> tag_v_eq_matching_tags('a'::text, ((v)::text)::jsonb))"
         );
 
         let neg_result = Spi::get_one::<Json>(
@@ -515,7 +513,7 @@ mod tests {
 
         assert_eq!(
             no_init_plan_neg_result.0[0]["Plan"]["Filter"],
-            "(tm @> ANY (tag_v_ne_rewrite_helper('a'::text, ((v)::text)::jsonb)))"
+            "(tm @> ANY (tag_v_ne_matching_tags('a'::text, ((v)::text)::jsonb)))"
         );
     }
 }

@@ -18,15 +18,15 @@ pub struct FuncDetail {
 #[inline]
 pub fn func_get_detail<'a, I>(func_path: I, types: &mut [pg_sys::Oid]) -> FuncDetail
 where
-    I: IntoIterator<Item = &'a str>,
+    I: IntoIterator<Item = &'a [u8]>,
 {
     let arg_cnt = types.len() as i32;
-    let fully_qualified_name = crate::build_pg_list_of_strings(func_path);
+    let fully_qualified_name = crate::build_pg_list_of_cstrings(func_path);
     let mut true_typeoids: *mut pg_sys::Oid = std::ptr::null_mut();
     let mut fd_struct: FuncDetail = Default::default();
     fd_struct.code = unsafe {
         pg_sys::func_get_detail(
-            fully_qualified_name.into_pg(),
+            fully_qualified_name.as_ptr(),
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             arg_cnt,
@@ -51,15 +51,15 @@ where
 #[inline]
 pub fn func_get_detail<'a, I>(func_path: I, types: &mut [pg_sys::Oid]) -> FuncDetail
 where
-    I: IntoIterator<Item = &'a str>,
+    I: IntoIterator<Item = &'a [u8]>,
 {
     let arg_cnt = types.len() as i32;
-    let fully_qualified_name = crate::build_pg_list_of_strings(func_path);
+    let fully_qualified_name = crate::build_pg_list_of_cstrings(func_path);
     let mut true_typeoids: *mut pg_sys::Oid = std::ptr::null_mut();
     let mut fd_struct: FuncDetail = Default::default();
     fd_struct.code = unsafe {
         pg_sys::func_get_detail(
-            fully_qualified_name.into_pg(),
+            fully_qualified_name.as_ptr(),
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             arg_cnt,
@@ -98,6 +98,7 @@ pub fn set_sa_hashfuncid(
 
 // pg_guard doesn't compile, so we have to do without it for now.
 // TODO maybe suggest adding "parser/parse_oper.h" to PGX's pg_sys
+// See https://github.com/tcdi/pgx/pull/549
 extern "C" {
     pub fn LookupOperName(
         pstate: *mut pg_sys::ParseState,

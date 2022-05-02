@@ -14,14 +14,13 @@ mod util;
 
 pg_module_magic!();
 
-pub fn build_pg_list_of_strings<'a, I>(parts: I) -> PgList<pg_sys::Value>
+pub fn build_pg_list_of_cstrings<'a, I>(parts: I) -> PgList<pg_sys::Value>
 where
-    I: IntoIterator<Item = &'a str>,
+    I: IntoIterator<Item = &'a [u8]>,
 {
     let mut res = PgList::new();
     for p in parts {
-        let cstr = ::std::ffi::CString::new(p).unwrap().into_raw();
-        res.push(unsafe { pg_sys::makeString(cstr) });
+        res.push(unsafe { pg_sys::makeString(p.as_ptr() as _) });
     }
     res
 }

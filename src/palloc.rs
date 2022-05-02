@@ -22,12 +22,14 @@ pub struct PallocdString {
 }
 
 impl PallocdString {
-    pub fn from_ptr(ptr: *mut c_char) -> Option<Self> {
+    /// SAFETY: the pointer passed into this function must be a NULL-terminated string
+    /// and conform to the requirements of [`std::ffi::CStr`]
+    pub unsafe fn from_ptr(ptr: *mut c_char) -> Option<Self> {
         if ptr.is_null() {
             None
         } else {
             Some(PallocdString {
-                pg_box: unsafe { PgBox::<_, AllocatedByRust>::from_rust(ptr) },
+                pg_box: PgBox::<_, AllocatedByRust>::from_rust(ptr),
             })
         }
     }
