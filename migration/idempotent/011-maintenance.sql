@@ -648,6 +648,80 @@ BEGIN
             EXECUTE _sql;
         END LOOP
         ;
+
+        -- when restoring from backup, the user running the restore script ends up owning many of the objects
+        -- the following code addresses this by adjusting ownership and privileges to make them match what
+        -- they would have been had the database been created anew rather than restored
+
+
+        --compressed hypertables
+        FOR _sql IN
+        (
+            WITH x AS
+            (
+                SELECT
+                  h2.schema_name
+                , h2.table_name
+                FROM _timescaledb_catalog.hypertable h1
+                INNER JOIN _timescaledb_catalog.hypertable h2
+                ON (h1.schema_name = ANY(ARRAY['prom_data', '_ps_trace'])
+                AND h1.compressed_hypertable_id = h2.id)
+            )
+            SELECT format('GRANT ALL PRIVILEGES ON TABLE %I.%I TO prom_admin', x.schema_name, x.table_name)
+            FROM x
+            UNION ALL
+            SELECT format('ALTER TABLE %I.%I OWNER TO prom_admin', x.schema_name, x.table_name)
+            FROM x
+        )
+        LOOP
+            EXECUTE _sql;
+        END LOOP
+        ;
+
+        -- compressed tables' chunks
+        FOR _sql IN
+        (
+            WITH x AS
+            (
+                SELECT k.schema_name, k.table_name
+                FROM _timescaledb_catalog.hypertable h1
+                INNER JOIN _timescaledb_catalog.hypertable h2
+                ON (h1.schema_name = ANY(ARRAY['prom_data', '_ps_trace'])
+                AND h1.compressed_hypertable_id = h2.id)
+                INNER JOIN _timescaledb_catalog.chunk k
+                ON (h2.id = k.hypertable_id)
+            )
+            SELECT format('ALTER TABLE %I.%I OWNER TO prom_admin', x.schema_name, x.table_name)
+            FROM x
+            UNION ALL
+            SELECT format('GRANT ALL PRIVILEGES ON TABLE %I.%I TO prom_admin', x.schema_name, x.table_name)
+            FROM x
+        )
+        LOOP
+            EXECUTE _sql;
+        END LOOP
+        ;
+
+        -- hypertable chunks
+        FOR _sql IN
+        (
+            WITH x AS
+            (
+                SELECT
+                  k.schema_name
+                , k.table_name
+                FROM _timescaledb_catalog.hypertable h
+                INNER JOIN _timescaledb_catalog.chunk k
+                ON (h.id = k.hypertable_id)
+                WHERE h.schema_name = ANY(ARRAY['prom_data', '_ps_trace'])
+            )
+            SELECT format('ALTER TABLE %I.%I OWNER TO prom_admin', x.schema_name, x.table_name)
+            FROM x
+        )
+        LOOP
+            EXECUTE _sql;
+        END LOOP
+        ;
     END IF;
 END
 $func$

@@ -1,4 +1,68 @@
+-- this script always runs last in the upgrade process
+-- it is intended for things that NEED to run last
 
+-- monkey with the remote_commands to ensure order
+DO $block$
+BEGIN
+    /*
+    Some remote commands are registered in the preinstall or upgrade scripts.
+
+    Two remote commands are registered in the idempotent scripts which get run
+    at the end of a fresh install and after every version upgrade. Thus, it's
+    difficult to know where in the sequence these two will show up.
+
+    This update will ensure a consistent ordering of our remote commands and
+    place any potential user defined remote commands after ours in
+    original order starting with seq number 1000.
+    */
+    WITH x(key, seq) AS
+    (
+        VALUES
+        ('create_prom_reader'                        ,  1),
+        ('create_prom_writer'                        ,  2),
+        ('create_prom_modifier'                      ,  3),
+        ('create_prom_admin'                         ,  4),
+        ('create_prom_maintenance'                   ,  5),
+        ('grant_prom_reader_prom_writer'             ,  6),
+        ('tracing_types'                             ,  7),
+        ('grant_all_roles_to_extowner'               ,  8),
+        ('_prom_catalog.do_decompress_chunks_after'  ,  9),
+        ('_prom_catalog.compress_old_chunks'         , 10)
+    )
+    UPDATE _prom_catalog.remote_commands u SET seq = z.seq
+    FROM
+    (
+        -- our remote commands from above
+        SELECT key, seq
+        FROM x
+        UNION
+        -- any other remote commands get listed afterwards starting with 1000
+        SELECT key, 999 + row_number() OVER (ORDER BY seq)
+        FROM _prom_catalog.remote_commands k
+        WHERE NOT EXISTS
+        (
+            SELECT 1
+            FROM x
+            WHERE x.key = k.key
+        )
+        ORDER BY seq
+    ) z
+    WHERE u.key = z.key
+    ;
+
+    /*
+    There are known entries listed above that are managed by this script.
+    Other entries in the table are inserted "dynamically" (e.g. when metrics are created).
+    The dynamic entries need to be dumped by pg_dump. We will start the sequence at a
+    minimum of 1000 so that we can identify them as such.
+    */
+    PERFORM setval('_prom_catalog.remote_commands_seq_seq'::regclass, greatest(1000, max(seq) + 1), false)
+    FROM _prom_catalog.remote_commands
+    ;
+END;
+$block$;
+
+-- security check on functions and procedures
 DO $block$
 DECLARE
     _rec record;
@@ -64,6 +128,7 @@ BEGIN
 END;
 $block$;
 
+-- make sure tables and sequences are pg_dump'ed properly
 DO $block$
 DECLARE
     _sql text;
@@ -104,17 +169,50 @@ BEGIN
 END;
 $block$;
 
--- TODO (james): possibly move these grants closer to their definitions? At
---  definition time, the roles which we grant here haven't been created yet.
-GRANT EXECUTE ON FUNCTION _prom_ext.num_cpus() TO prom_reader;
-GRANT EXECUTE ON FUNCTION _prom_ext.jsonb_digest(JSONB) TO prom_reader;
-GRANT EXECUTE ON FUNCTION _prom_ext.prom_delta(TIMESTAMPTZ, TIMESTAMPTZ, BIGINT, BIGINT, TIMESTAMPTZ, DOUBLE PRECISION) TO prom_reader;
-GRANT EXECUTE ON FUNCTION _prom_ext.prom_increase(TIMESTAMPTZ, TIMESTAMPTZ, BIGINT, BIGINT, TIMESTAMPTZ, DOUBLE PRECISION) TO prom_reader;
-GRANT EXECUTE ON FUNCTION _prom_ext.prom_rate(TIMESTAMPTZ, TIMESTAMPTZ, BIGINT, BIGINT, TIMESTAMPTZ, DOUBLE PRECISION) TO prom_reader;
-GRANT EXECUTE ON FUNCTION _prom_ext.vector_selector(TIMESTAMPTZ, TIMESTAMPTZ, BIGINT, BIGINT, TIMESTAMPTZ, DOUBLE PRECISION) TO prom_reader;
-GRANT EXECUTE ON FUNCTION _prom_ext.rewrite_fn_call_to_subquery(internal) TO prom_reader;
-GRANT EXECUTE ON PROCEDURE _prom_catalog.execute_everywhere(text, text, boolean) TO prom_admin;
-GRANT EXECUTE ON PROCEDURE _prom_catalog.update_execute_everywhere_entry(text, text, boolean) TO prom_admin;
-GRANT SELECT ON TABLE _prom_catalog.remote_commands TO prom_reader;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _prom_catalog.remote_commands TO prom_admin;
-GRANT SELECT ON TABLE _ps_catalog.migration TO prom_reader;
+-- make sure prom_admin can do a dump/restore
+DO $$
+DECLARE
+    _rec record;
+    _schema text;
+    _schemas text[] = ARRAY
+    [ '_prom_catalog'
+    , '_prom_ext'
+    , '_ps_catalog'
+    , '_ps_trace'
+    , 'prom_api'
+    , 'prom_data'
+    , 'prom_data_exemplar'
+    , 'prom_data_series'
+    , 'prom_info'
+    , 'prom_metric'
+    , 'prom_series'
+    , 'ps_tag'
+    , 'ps_trace'
+    ];
+BEGIN
+    -- grant schema privileges
+    FOREACH _schema IN ARRAY _schemas
+    LOOP
+        EXECUTE format('GRANT USAGE, CREATE ON SCHEMA %I TO prom_admin', _schema);
+    END LOOP;
+
+    -- grant table/sequence privileges
+    FOR _rec IN
+    (
+        SELECT
+            n.nspname,
+            k.relname,
+            case k.relkind
+                when 'S' then 'SEQUENCE'
+                else 'TABLE'
+            end as kind
+        FROM pg_catalog.pg_class k
+        INNER JOIN pg_namespace n ON (k.relnamespace = n.oid)
+        WHERE k.relkind IN ('r', 'p', 'S') -- tables AND sequences
+        AND n.nspname = ANY(_schemas)
+        ORDER BY k.relkind, n.nspname, k.relname
+    )
+    LOOP
+        EXECUTE format('GRANT ALL PRIVILEGES ON %s %I.%I TO prom_admin', _rec.kind, _rec.nspname, _rec.relname);
+    END LOOP;
+END$$;

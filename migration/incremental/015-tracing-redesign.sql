@@ -433,6 +433,7 @@ GRANT SELECT ON TABLE _ps_trace.span TO prom_reader;
 REVOKE ALL PRIVILEGES ON TABLE _ps_trace.span FROM prom_writer; -- prev migration granted too many privileges
 GRANT SELECT, INSERT ON TABLE _ps_trace.span TO prom_writer;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.span TO prom_modifier;
+ALTER TABLE _ps_trace.span OWNER TO prom_admin;
 
 CREATE TABLE _ps_trace.event
 (
@@ -450,6 +451,7 @@ GRANT SELECT ON TABLE _ps_trace.event TO prom_reader;
 REVOKE ALL PRIVILEGES ON TABLE _ps_trace.event FROM prom_writer; -- prev migration granted too many privileges
 GRANT SELECT, INSERT ON TABLE _ps_trace.event TO prom_writer;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.event TO prom_modifier;
+ALTER TABLE _ps_trace.event OWNER TO prom_admin;
 
 CREATE TABLE _ps_trace.link
 (
@@ -469,6 +471,7 @@ GRANT SELECT ON TABLE _ps_trace.link TO prom_reader;
 REVOKE ALL PRIVILEGES ON TABLE _ps_trace.link FROM prom_writer; -- prev migration granted too many privileges
 GRANT SELECT, INSERT ON TABLE _ps_trace.link TO prom_writer;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.link TO prom_modifier;
+ALTER TABLE _ps_trace.link OWNER TO prom_admin;
 
 /*
     If "vanilla" postgres is installed, do nothing.
@@ -575,7 +578,7 @@ BEGIN
             AND h.table_name IN ('span', 'link', 'event')
         )
         LOOP
-            EXECUTE format($sql$ALTER EXTENSION promscale DROP TABLE %I.%I;$sql$, _rec.schema_name, _rec.table_name);
+            EXECUTE format($sql$ALTER EXTENSION promscale DROP TABLE %I.%I$sql$, _rec.schema_name, _rec.table_name);
         END LOOP;
 
     END IF;

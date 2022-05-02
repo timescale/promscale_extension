@@ -48,7 +48,9 @@ on the partitions which causes issues with the dump/restore process.
 --    WHERE delete_epoch IS NOT NULL;
 GRANT SELECT ON TABLE _prom_catalog.series TO prom_reader;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _prom_catalog.series TO prom_writer;
-
+-- prom_admin needs to own the table so that it can attach child tables
+-- during the dump/restore process
+ALTER TABLE _prom_catalog.series OWNER TO prom_admin;
 
 CREATE SEQUENCE _prom_catalog.series_id;
 GRANT USAGE ON SEQUENCE _prom_catalog.series_id TO prom_writer;

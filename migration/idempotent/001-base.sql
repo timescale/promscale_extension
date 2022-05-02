@@ -408,6 +408,7 @@ BEGIN
         AND _prom_catalog.get_default_compression_setting() THEN
         PERFORM prom_api.set_compression_on_metric_table(NEW.table_name, TRUE);
     END IF;
+    EXECUTE format('GRANT ALL PRIVILEGES ON TABLE %I.%I TO prom_admin', NEW.table_schema, NEW.table_name);
 
     SELECT _prom_catalog.get_or_create_label_id('__name__', NEW.metric_name)
     INTO STRICT label_id;
@@ -434,6 +435,7 @@ BEGIN
     EXECUTE format('CREATE INDEX series_delete_epoch_id_%s ON prom_data_series.%I (delete_epoch, id) WHERE delete_epoch IS NOT NULL', NEW.id, NEW.table_name);
 
     EXECUTE format('ALTER TABLE prom_data_series.%1$I OWNER TO prom_admin', NEW.table_name);
+    EXECUTE format('GRANT ALL PRIVILEGES ON TABLE prom_data_series.%I TO prom_admin', NEW.table_name);
     RETURN NEW;
 END
 $func$

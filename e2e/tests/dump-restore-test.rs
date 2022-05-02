@@ -117,6 +117,7 @@ fn psql_script(container: &PostgresContainer, db: &str, username: &str, script: 
 /// * `db` - the database to connect psql to with the `-d` flag
 /// * `username` - the username to be used on the psql connection with the `-U` flag
 /// * `cmd` - the sql command to execute using the `-c` flag
+#[allow(dead_code)]
 fn psql_cmd(container: &PostgresContainer, db: &str, username: &str, cmd: &str) {
     println!("executing psql command: {}", cmd);
     let exit = Command::new("docker")
@@ -216,7 +217,7 @@ fn normalize_snapshot(path: &Path) -> String {
 /// * `container` - the docker container running postgres
 /// * `db` - the database to snapshot
 /// * `username` - the user to connect to the database with
-/// * `name` - the filename of the snapshot
+/// * `path` - the path on the host to which the snapshot should be written
 ///
 fn snapshot_db(container: &PostgresContainer, db: &str, username: &str, path: &Path) -> String {
     let snapshot = Path::new("/tmp/snapshot.txt");
@@ -231,6 +232,10 @@ fn snapshot_db(container: &PostgresContainer, db: &str, username: &str, path: &P
         .arg("--no-psqlrc")
         .arg("--no-readline")
         .arg("--echo-all")
+        // do not ON_ERROR_STOP=1. some meta commands will not find objects for some schemas
+        // and psql treats this as an error. this is expected, and we don't want the snapshot to
+        // fail because of it. eat the error and continue
+        //.args(["-v", "ON_ERROR_STOP=1"]) don't uncomment me!
         .args(["-o", snapshot.to_str().unwrap()])
         .args(["-f", "/scripts/snapshot.sql"])
         .spawn()
@@ -255,6 +260,7 @@ fn snapshot_db(container: &PostgresContainer, db: &str, username: &str, path: &P
 /// * `container` - the docker container running postgres
 /// * `db` - the database to backup
 /// * `username` - the user to run the backup
+/// * `path` - the path where the logical dump file should be written on the host
 ///
 fn dump_db(container: &PostgresContainer, db: &str, username: &str, path: &Path) {
     let dump = Path::new("/tmp/dump.sql");
@@ -288,19 +294,57 @@ fn dump_db(container: &PostgresContainer, db: &str, username: &str, path: &Path)
 /// * `container` - the docker container running postgres
 /// * `db` - the database to connect psql to with the `-d` flag to run the restore against
 /// * `username` - the user to run the restore script
+/// * `path` - the path to the logical dump file on the host
 ///
 fn restore_db(container: &PostgresContainer, db: &str, username: &str, path: &Path) {
     let dump = Path::new("/tmp/dump.sql");
     copy_in(container, path, dump);
-    psql_file(container, db, username, dump);
+    let exit = Command::new("docker")
+        .arg("exec")
+        .arg(container.id())
+        .arg("psql")
+        .args(["-U", username])
+        .args(["-d", db])
+        .arg("--no-password")
+        .arg("--no-psqlrc")
+        .arg("--no-readline")
+        .arg("--echo-all")
+        // do not ON_ERROR_STOP=1. some statements in the restore will fail. for example, setting
+        // the comment on the timescaledb extension. this is highly unfortunate, but seemingly
+        // unavoidable according to googling. eat the errors and continue. we will rely on the
+        // snapshot to determine whether the restore was successful
+        //.args(["-v", "ON_ERROR_STOP=1"]) don't uncomment me!
+        .args(["-v", "VERBOSITY=verbose"])
+        .args(["-f", dump.to_str().unwrap()])
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap();
+    assert!(
+        exit.success(),
+        "executing psql script {} failed: {}",
+        path.display(),
+        exit
+    );
+}
+
+/// Runs the after-create sql script in the container
+fn after_create(container: &PostgresContainer) {
+    psql_file(
+        container,
+        "db",
+        "postgres",
+        Path::new("/scripts/after-create.sql"),
+    );
 }
 
 /// Runs the pre-dump sql script in the container
 fn pre_dump(container: &PostgresContainer) {
+    // run as postgres, create tsdbadmin user, and then set user tsdbadmin
     psql_file(
-        &container,
+        container,
         "db",
-        "postgres",
+        "tsdbadmin",
         Path::new("/scripts/pre-dump.sql"),
     );
 }
@@ -308,9 +352,9 @@ fn pre_dump(container: &PostgresContainer) {
 /// Runs the pre-restore sql script in the container
 fn pre_restore(container: &PostgresContainer) {
     psql_file(
-        &container,
+        container,
         "db",
-        "postgres",
+        "tsdbadmin",
         Path::new("/scripts/pre-restore.sql"),
     );
 }
@@ -318,9 +362,9 @@ fn pre_restore(container: &PostgresContainer) {
 /// Runs the post-restore sql script in the container
 fn post_restore(container: &PostgresContainer) {
     psql_file(
-        &container,
+        container,
         "db",
-        "postgres", // todo: use bob for this
+        "tsdbadmin",
         Path::new("/scripts/post-restore.sql"),
     );
 }
@@ -328,9 +372,9 @@ fn post_restore(container: &PostgresContainer) {
 /// Runs the post-snapshot sql script in the container
 fn post_snapshot(container: &PostgresContainer) {
     psql_file(
-        &container,
+        container,
         "db",
-        "bob",
+        "tsdbadmin",
         Path::new("/scripts/post-snapshot.sql"),
     );
 }
@@ -361,14 +405,15 @@ fn first_db(
     dump: &Path,
 ) -> String {
     let container = run_postgres(docker, postgres_image, "db", "postgres", volumes);
+    after_create(&container);
     pre_dump(&container);
     let snapshot0 = snapshot_db(
         &container,
         "db",
-        "bob",
+        "postgres",
         dir.join("snapshot-0.txt").as_path(),
     );
-    dump_db(&container, "db", "postgres", dump); // todo: dump using bob user
+    dump_db(&container, "db", "tsdbadmin", dump);
     container.stop();
     container.rm();
     snapshot0
@@ -393,14 +438,14 @@ fn second_db(
     dump: &Path,
 ) -> String {
     let container = run_postgres(docker, postgres_image, "db", "postgres", volumes);
+    after_create(&container);
     pre_restore(&container);
-    restore_db(&container, "db", "postgres", dump);
+    restore_db(&container, "db", "tsdbadmin", dump);
     post_restore(&container);
-    psql_cmd(&container, "db", "postgres", "grant prom_admin to bob;");
     let snapshot1 = snapshot_db(
         &container,
         "db",
-        "bob",
+        "postgres",
         dir.join("snapshot-1.txt").as_path(),
     );
     post_snapshot(&container);
