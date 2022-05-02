@@ -56,10 +56,20 @@ jobs:
           tag="$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[0].version')"; \
           version="${tag}-snapshot"; \
         fi;
+        # a dash indicates a pre-release version in semver
+        if [[ "$version" =~ '-' ]]; then \
+          repo='timescale/timescaledb-exp'; \
+          ghopts='--prerelease --draft'; \
+        else \
+          repo='timescale/timescaledb'; \
+          ghopts=''; \
+        fi;
         echo "::set-output name=version::${version}"
         echo "::set-output name=tag::${tag}"
         echo "::set-output name=filename::promscale_extension-${tag}.pg${{ matrix.postgres.version }}.${{ matrix.os.distro }}${{ matrix.os.version }}.${{ matrix.arch.cpu }}.${{ matrix.os.pkg_type }}"
         echo "::set-output name=outfile::promscale_extension-${version}.pg${{ matrix.postgres.version }}.${{ matrix.os.distro }}${{ matrix.os.version }}.${{ matrix.arch.cpu }}.${{ matrix.os.pkg_type }}"
+        echo "::set-output name=repo::${repo}"
+        echo "::set-output name=ghopts::${ghopts}"
         echo "::set-output name=image::promscale_extension:${tag}.pg${{ matrix.postgres.version }}.${{ matrix.os.distro }}${{ matrix.os.version }}"
 
     - name: Setup QEMU
@@ -132,11 +142,12 @@ jobs:
       env:
         PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
       run: |
-        package_cloud push timescale/timescaledb/${{ matrix.os.distro }}/${{ matrix.os.codename }} artifacts/${{ steps.metadata.outputs.outfile }}
+        package_cloud push ${{ steps.metadata.outputs.repo }}/${{ matrix.os.distro }}/${{ matrix.os.codename }} artifacts/${{ steps.metadata.outputs.outfile }}
 
     outputs:
       tag: ${{ steps.metadata.outputs.tag }}
       version: ${{ steps.metadata.outputs.version }}
+      ghopts: ${{ steps.metadata.outputs.ghopts }}
 
   release:
     runs-on: ubuntu-latest
@@ -169,4 +180,4 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        gh release create -R timescale/promscale_extension --target ${GITHUB_SHA} --notes-file dist/RELEASE_NOTES.md ${{ needs.package.outputs.version }} artifacts/*
+        gh release create -R timescale/promscale_extension --target ${GITHUB_SHA} ${{ needs.package.outputs.ghopts }} --notes-file dist/RELEASE_NOTES.md ${{ needs.package.outputs.version }} artifacts/*
