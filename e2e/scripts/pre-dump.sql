@@ -1,6 +1,3 @@
-\set ECHO all
-\set ON_ERROR_STOP 1
-
 /*
 This script creates the promscale extension in the database and then
 adds metric, exemplar, and trace data to the database so that the
@@ -8,7 +5,7 @@ dump/restore process has more to work with than simply the empty
 data structures
 */
 
-CREATE EXTENSION promscale;
+create extension promscale;
 
 SELECT _prom_catalog.set_default_value('ha_lease_timeout'::text, '200 hours'::text);
 
@@ -149,6 +146,3 @@ INSERT INTO _ps_trace.link
 , ps_trace.get_tag_map(jsonb_build_object('test-tag-0', to_jsonb(0), 'test-tag-1', to_jsonb(1)))
 , 0
 );
-
-create user bob;
-grant prom_admin, postgres to bob; -- todo: bob should not need postgres role

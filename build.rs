@@ -128,23 +128,32 @@ fn dir_for_type(sql_type: &SqlType) -> String {
 }
 
 fn render_file(path: PathBuf, sql_type: &SqlType) -> Result<String, Error> {
+    let sql_type_str = match sql_type {
+        SqlType::Incremental => "incremental",
+        SqlType::Idempotent => "idempotent",
+    };
     let mut result = String::new();
     let mut paths: Vec<PathBuf> = fs::read_dir(path)?.map(|f| f.unwrap().path()).collect();
     paths.sort();
     let mut prev = 0;
     paths.into_iter().for_each(|path| {
         let curr = numeric_prefix(&path);
-        // assert that the numeric prefixes are in order with no gaps or duplicates
-        assert_eq!(
-            curr,
-            prev + 1,
-            "there must be no gaps nor duplicates in the ordering of {} files: {}",
-            match sql_type {
-                SqlType::Incremental => "incremental",
-                SqlType::Idempotent => "idempotent",
-            },
-            path.to_str().unwrap()
-        );
+        // 999 prefix is special for a single script we want to always be last in idempotent
+        if matches!(sql_type, SqlType::Incremental)
+            || (matches!(sql_type, SqlType::Idempotent) && curr != 999)
+        {
+            // assert that the numeric prefixes are in order with no gaps or duplicates
+            assert_eq!(
+                curr,
+                prev + 1,
+                "there must be no gaps nor duplicates in the ordering of {} files: {}",
+                sql_type_str,
+                path.to_str().unwrap()
+            );
+        }
+        if matches!(sql_type, SqlType::Idempotent) {
+            assert_ne!(curr, 1000, "no scripts allowed with prefix > 999");
+        }
         prev = curr;
         result += wrap(&path, sql_type).as_str();
     });
