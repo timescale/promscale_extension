@@ -40,7 +40,7 @@ mod tests {
         let (res_id, res_val) = Spi::get_two_with_args::<i64, String>(
             r#"
                 SELECT id, value::text
-                FROM _ps_trace.tag 
+                FROM _ps_trace.tag
                 WHERE id = $1
                 "#,
             vec![(PgBuiltInOids::INT8OID.oid(), tag_id.into_datum())],
@@ -95,10 +95,9 @@ mod tests {
 
     #[pg_test]
     fn test_tag_funs() {
-        let op_tag_id = Spi::get_one::<i64>(
-            r#"SELECT put_operation('myservice', 'test', 'SPAN_KIND_UNSPECIFIED');"#,
-        )
-        .expect("SQL query failed");
+        let op_tag_id =
+            Spi::get_one::<i64>(r#"SELECT put_operation('myservice', 'test', 'unspecified');"#)
+                .expect("SQL query failed");
 
         let srvc_tag_id = Spi::get_one::<i64>(
             r#"SELECT put_tag('service.name', '"myservice"'::jsonb, resource_tag_type())"#,
@@ -110,8 +109,8 @@ mod tests {
             SELECT id
             FROM _ps_trace.operation
             WHERE service_name_id = $1
-            AND span_kind = 'SPAN_KIND_UNSPECIFIED'
-            AND span_name = 'test'; 
+            AND span_kind = 'unspecified'
+            AND span_name = 'test';
             "#,
             vec![(PgBuiltInOids::INT8OID.oid(), srvc_tag_id.into_datum())],
         )
