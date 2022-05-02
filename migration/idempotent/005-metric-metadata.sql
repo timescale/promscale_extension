@@ -1,6 +1,6 @@
 CREATE OR REPLACE FUNCTION _prom_catalog.insert_metric_metadatas(t TIMESTAMPTZ[], metric_family_name TEXT[], metric_type TEXT[], metric_unit TEXT[], metric_help TEXT[])
 RETURNS BIGINT
-SET search_path = pg_catalog
+SET search_path = pg_catalog, pg_temp
 AS
 $$
     DECLARE
@@ -19,7 +19,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.insert_metric_metadatas(TIMESTAMPTZ[], T
 
 CREATE OR REPLACE FUNCTION prom_api.get_metric_metadata(metric_family_name TEXT)
 RETURNS TABLE (metric_family TEXT, type TEXT, unit TEXT, help TEXT)
-SET search_path = pg_catalog
+SET search_path = pg_catalog, pg_temp
 AS
 $$
     SELECT metric_family, type, unit, help FROM _prom_catalog.metadata WHERE metric_family = metric_family_name ORDER BY last_seen DESC
@@ -29,7 +29,7 @@ GRANT EXECUTE ON FUNCTION prom_api.get_metric_metadata(TEXT) TO prom_reader;
 -- metric_families should have unique elements, otherwise there will be duplicate rows in the returned table.
 CREATE OR REPLACE FUNCTION prom_api.get_multiple_metric_metadata(metric_families TEXT[])
 RETURNS TABLE (metric_family TEXT, type TEXT, unit TEXT, help TEXT)
-SET search_path = pg_catalog
+SET search_path = pg_catalog, pg_temp
 AS
 $$
     SELECT info.*

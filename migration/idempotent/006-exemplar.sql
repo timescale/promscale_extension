@@ -1,6 +1,6 @@
 CREATE OR REPLACE FUNCTION _prom_catalog.get_exemplar_label_key_positions(metric_name TEXT)
 RETURNS JSON
-SET search_path = pg_catalog
+SET search_path = pg_catalog, pg_temp
 AS
 $$
     SELECT json_object_agg(row.key, row.position)
@@ -24,7 +24,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.create_exemplar_table_if_not_exists(met
     --need sec definer to assign ownership to prom_admin
     SECURITY DEFINER
     VOLATILE
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS
 $$
 DECLARE
@@ -80,7 +80,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.insert_exemplar_row(
     value_array DOUBLE PRECISION[]
 )
 RETURNS BIGINT
-SET search_path = pg_catalog
+SET search_path = pg_catalog, pg_temp
 AS
 $$
 DECLARE

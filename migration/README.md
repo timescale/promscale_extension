@@ -70,11 +70,11 @@ The Promscale extension's approach to securing its SQL consists of the following
 
 1. `CREATE` all schemas which will contain objects (without `IF NOT EXISTS`)
 2. Use `CREATE OR REPLACE` or `CREATE ... IF NOT EXISTS` in those schemas
-3. Use `SET search_path = pg_catalog` on functions and procedures where possible
-4. Explicitly schema-qualify all objects and operators in functions without `SET search_path = pg_catalog`
-5. Use `SET LOCAL search_path = pg_catalog;` on procedures which perform transaction control
+3. Use `SET search_path = pg_catalog, pg_temp` on functions and procedures where possible
+4. Explicitly schema-qualify all objects and operators in functions without `SET search_path = pg_catalog, pg_temp`
+5. Use `SET LOCAL search_path = pg_catalog, pg_temp;` on procedures which perform transaction control
 6. Explicitly `REVOKE ALL ... FROM PUBLIC` for `SECURITY DEFINER` functions and procedures
-7. Use `SET LOCAL search_path = pg_catalog;` at the beginning of the installation script
+7. Use `SET LOCAL search_path = pg_catalog, pg_temp;` at the beginning of the installation script
 
 Step 1. ensures that the bootstrap superuser (on Postgres 13 and 14) or the
 installing superuser (on postgres 12) is the owner of all schemas. If a schema

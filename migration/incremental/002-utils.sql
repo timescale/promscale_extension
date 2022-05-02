@@ -11,7 +11,7 @@ CREATE TABLE _prom_catalog.remote_commands(
 GRANT ALL ON SEQUENCE _prom_catalog.remote_commands_seq_seq TO current_user;
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.execute_everywhere(command_key text, command TEXT, transactional BOOLEAN = true)
-    SET search_path = pg_catalog
+    SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
     _is_restore_in_progress boolean = false;
@@ -44,7 +44,7 @@ $func$ LANGUAGE PLPGSQL;
 REVOKE ALL ON PROCEDURE _prom_catalog.execute_everywhere(text, text, boolean) FROM PUBLIC;
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.update_execute_everywhere_entry(command_key text, command TEXT, transactional BOOLEAN = true)
-SET search_path = pg_catalog
+SET search_path = pg_catalog, pg_temp
 AS $func$
 BEGIN
     UPDATE _prom_catalog.remote_commands

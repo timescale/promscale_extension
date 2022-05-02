@@ -1,5 +1,5 @@
 -- 000-migration-table.sql
-SET LOCAL search_path = pg_catalog;
+SET LOCAL search_path = pg_catalog, pg_temp;
 DO
 $migration_table$
     DECLARE
