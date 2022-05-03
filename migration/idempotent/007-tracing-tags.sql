@@ -630,6 +630,6 @@ BEGIN
 	);
 EXCEPTION
     WHEN SQLSTATE '42723' THEN -- operator already exists
-        null;
+        EXECUTE format($q$ALTER OPERATOR ps_trace.=(_ps_trace.tag_v, pg_catalog.jsonb) OWNER TO %I$q$, current_user);
 END;
 $do$;
