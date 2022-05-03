@@ -108,8 +108,8 @@ mod _prom_ext {
 
     const DENORMALIZE_FUNC_NAME: &str = "tag_map_denormalize";
     const ARROW_OP_NAME: &str = "->";
-    const HELPER_FUNC_SCHEMA: &'static [u8] = b"_ps_trace\0";
-    const CONTAINS_OP_PATH: [&'static [u8]; 2] = [b"pg_catalog\0", b"@>\0"];
+    const HELPER_FUNC_SCHEMA: &[u8] = b"_ps_trace\0";
+    const CONTAINS_OP_PATH: [&[u8]; 2] = [b"pg_catalog\0", b"@>\0"];
     /// This support function expects an expression in the following form:
     /// ```sql
     /// SELECT * FROM some_table
