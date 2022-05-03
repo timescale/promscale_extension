@@ -18,11 +18,10 @@ pub struct FuncDetail {
 #[inline]
 pub fn func_get_detail<'a, I>(func_path: I, types: &mut [pg_sys::Oid]) -> FuncDetail
 where
-    I: IntoIterator<Item = &'a [u8]>,
+    I: IntoIterator<Item = &'a str>,
 {
     let arg_cnt = types.len() as i32;
-    // Safety note: `func_path` definitely outlives `fully_qualified_name`
-    let fully_qualified_name = unsafe { crate::build_pg_list_of_cstrings(func_path) };
+    let fully_qualified_name = crate::build_pg_list_of_cstrings(func_path);
     let mut true_typeoids: *mut pg_sys::Oid = std::ptr::null_mut();
     let mut fd_struct: FuncDetail = Default::default();
     fd_struct.code = unsafe {
@@ -52,11 +51,10 @@ where
 #[inline]
 pub fn func_get_detail<'a, I>(func_path: I, types: &mut [pg_sys::Oid]) -> FuncDetail
 where
-    I: IntoIterator<Item = &'a [u8]>,
+    I: IntoIterator<Item = &'a str>,
 {
     let arg_cnt = types.len() as i32;
-    // Safety note: `func_path` definitely outlives `fully_qualified_name`
-    let fully_qualified_name = unsafe { crate::build_pg_list_of_cstrings(func_path) };
+    let fully_qualified_name = crate::build_pg_list_of_cstrings(func_path);
     let mut true_typeoids: *mut pg_sys::Oid = std::ptr::null_mut();
     let mut fd_struct: FuncDetail = Default::default();
     fd_struct.code = unsafe {

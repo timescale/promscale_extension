@@ -1,3 +1,4 @@
+use pgx::pg_sys::AsPgCStr;
 use pgx::*;
 
 mod aggregate_utils;
@@ -17,17 +18,16 @@ pg_module_magic!();
 /// A helper function for building [`pgx::PgList`] out of
 /// iterable collection of binary, C-compatible strings.
 ///
-/// ## Safety
-/// Every object passed as an argument to this function
-/// must outlive the resulting [`pgx::PgList`] which holds
-/// raw pointers to its arguments.
-pub unsafe fn build_pg_list_of_cstrings<'a, I>(parts: I) -> PgList<pg_sys::Value>
+/// For safety reasons it p-allocates and copies its arguemnts
+/// every time. Which is OK for our current once-per-query usage,
+/// but don't attempt it on per-row basis.
+pub fn build_pg_list_of_cstrings<'a, I>(parts: I) -> PgList<pg_sys::Value>
 where
-    I: IntoIterator<Item = &'a [u8]>,
+    I: IntoIterator<Item = &'a str>,
 {
     let mut res = PgList::new();
     for p in parts {
-        res.push(pg_sys::makeString(p.as_ptr() as _));
+        res.push(unsafe { pg_sys::makeString(p.as_pg_cstr() as _) });
     }
     res
 }

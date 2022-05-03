@@ -5,7 +5,7 @@ mod _prom_ext {
     use crate::palloc::{PallocdString, ToInternal};
     use crate::pg_imports::*;
     use crate::*;
-    use std::ffi::{CStr, CString};
+    use std::ffi::CString;
     use std::ptr;
 
     /// This [support function] optimizes calls to the supported function if it's
@@ -108,8 +108,8 @@ mod _prom_ext {
 
     const DENORMALIZE_FUNC_NAME: &str = "tag_map_denormalize";
     const ARROW_OP_NAME: &str = "->";
-    const HELPER_FUNC_SCHEMA: &[u8] = b"_ps_trace\0";
-    const CONTAINS_OP_PATH: [&[u8]; 2] = [b"pg_catalog\0", b"@>\0"];
+    const HELPER_FUNC_SCHEMA: &str = "_ps_trace";
+    const CONTAINS_OP_PATH: [&str; 2] = ["pg_catalog", "@>"];
     /// This support function expects an expression in the following form:
     /// ```sql
     /// SELECT * FROM some_table
@@ -192,31 +192,24 @@ mod _prom_ext {
                 .as_c_str()
                 .to_str()
                 .expect("Non-UTF8 function name");
-            let helper_func_name =
-                CString::new(format!("{}_matching_tags", top_level_func_name)).unwrap();
+            let helper_func_name = format!("{}_matching_tags", top_level_func_name);
             let helper_func_detail = func_get_detail(
-                [HELPER_FUNC_SCHEMA, helper_func_name.as_bytes()],
+                [HELPER_FUNC_SCHEMA, helper_func_name.as_str()],
                 &mut [pg_sys::TEXTOID, pg_sys::JSONBOID],
             );
             if helper_func_detail.code == pg_sys::FuncDetailCode_FUNCDETAIL_NOTFOUND {
                 pgx::warning!(
                     "Couldn't find helper function: {}.{}",
-                    CStr::from_bytes_with_nul(HELPER_FUNC_SCHEMA)
-                        .unwrap()
-                        .to_str()
-                        .unwrap(),
-                    helper_func_name.to_str().unwrap()
+                    HELPER_FUNC_SCHEMA,
+                    helper_func_name,
                 );
                 return None;
             }
             if helper_func_detail.code != pg_sys::FuncDetailCode_FUNCDETAIL_NORMAL {
                 pgx::error!(
                     "Expected helper function {}.{} to be a regular function",
-                    CStr::from_bytes_with_nul(HELPER_FUNC_SCHEMA)
-                        .unwrap()
-                        .to_str()
-                        .unwrap(),
-                    helper_func_name.to_str().unwrap()
+                    HELPER_FUNC_SCHEMA,
+                    helper_func_name,
                 );
             }
             let helper_func_returns_array = pg_sys::type_is_array(helper_func_detail.ret_type_oid);
