@@ -241,11 +241,19 @@ GRANT USAGE ON TYPE ps_trace.trace_id TO prom_reader;
 -- ps_trace.trace_id and uuid are binary coercible
 CREATE CAST(ps_trace.trace_id as uuid) WITHOUT FUNCTION AS IMPLICIT;
 CREATE CAST(uuid AS ps_trace.trace_id) WITHOUT FUNCTION AS IMPLICIT;
-/* Move the old tag_map type out of the way */
-ALTER DOMAIN ps_trace.tag_map
-    RENAME TO tag_map_old;
-ALTER DOMAIN ps_trace.tag_map_old
-    SET SCHEMA _ps_trace;
+/* Drop the old tag_map type */
+DROP DOMAIN ps_trace.tag_map CASCADE;
+
+DROP FUNCTION IF EXISTS _ps_trace.eval_tags_by_key(ps_trace.tag_k);
+DROP FUNCTION IF EXISTS _ps_trace.eval_jsonb_path_exists(ps_tag.tag_op_jsonb_path_exists);
+DROP FUNCTION IF EXISTS _ps_trace.eval_regexp_matches(ps_tag.tag_op_regexp_matches);
+DROP FUNCTION IF EXISTS _ps_trace.eval_regexp_not_matches(ps_tag.tag_op_regexp_not_matches);
+DROP FUNCTION IF EXISTS _ps_trace.eval_equals(ps_tag.tag_op_equals);
+DROP FUNCTION IF EXISTS _ps_trace.eval_not_equals(ps_tag.tag_op_not_equals);
+DROP FUNCTION IF EXISTS _ps_trace.eval_less_than(ps_tag.tag_op_less_than);
+DROP FUNCTION IF EXISTS _ps_trace.eval_less_than_or_equal(ps_tag.tag_op_less_than_or_equal);
+DROP FUNCTION IF EXISTS _ps_trace.eval_greater_than(ps_tag.tag_op_greater_than);
+DROP FUNCTION IF EXISTS _ps_trace.eval_greater_than_or_equal(ps_tag.tag_op_greater_than_or_equal);
 
 /* Define custom tag_map and tag_v json aliases
  * NOTE: We need to keep an eye on upstream jsonb type
