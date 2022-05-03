@@ -64,3 +64,8 @@ SELECT
     x::text LIKE '%InitPlan%',
     x::text LIKE '% @> %' 
 FROM explain_jsonb('EXECUTE eq_test') AS f(x);
+
+/* Functions, underpinning tag_map operators handle NULL arguments correctly */
+SELECT ps_trace.tag_v_eq(NULL, NULL);
+SELECT ps_trace.tag_v_ne(NULL, NULL);
+SELECT ps_trace.tag_map_object_field(NULL, NULL);

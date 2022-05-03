@@ -529,6 +529,7 @@ GRANT EXECUTE ON FUNCTION _ps_trace.tag_map_denormalize(ps_trace.tag_map) TO pro
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION ps_trace.tag_map_object_field(ps_trace.tag_map, pg_catalog.text)
     RETURNS _ps_trace.tag_v
+    STRICT
     LANGUAGE internal AS 'jsonb_object_field';
 GRANT EXECUTE ON FUNCTION ps_trace.tag_map_object_field(ps_trace.tag_map, pg_catalog.text) TO prom_reader;
 
@@ -552,6 +553,7 @@ CREATE OR REPLACE FUNCTION ps_trace.tag_v_eq(_ps_trace.tag_v, pg_catalog.jsonb)
     RETURNS pg_catalog.bool
     LANGUAGE internal
         IMMUTABLE
+        STRICT
         PARALLEL SAFE
         SUPPORT _prom_ext.tag_map_rewrite
     AS 'jsonb_eq';
@@ -596,6 +598,7 @@ CREATE OR REPLACE FUNCTION ps_trace.tag_v_ne(_ps_trace.tag_v, pg_catalog.jsonb)
     RETURNS pg_catalog.bool
     LANGUAGE internal
         IMMUTABLE
+        STRICT
         PARALLEL SAFE
         SUPPORT _prom_ext.tag_map_rewrite
     AS 'jsonb_ne';

@@ -98,4 +98,23 @@ FROM explain_jsonb('EXECUTE eq_test') AS f(x);
  t        | t
 (1 row)
 
+/* Functions, underpinning tag_map operators handle NULL arguments correctly */
+SELECT ps_trace.tag_v_eq(NULL, NULL);
+ tag_v_eq 
+----------
+ 
+(1 row)
+
+SELECT ps_trace.tag_v_ne(NULL, NULL);
+ tag_v_ne 
+----------
+ 
+(1 row)
+
+SELECT ps_trace.tag_map_object_field(NULL, NULL);
+ tag_map_object_field 
+----------------------
+ 
+(1 row)
+
 

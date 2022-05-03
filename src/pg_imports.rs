@@ -21,7 +21,8 @@ where
     I: IntoIterator<Item = &'a [u8]>,
 {
     let arg_cnt = types.len() as i32;
-    let fully_qualified_name = crate::build_pg_list_of_cstrings(func_path);
+    // Safety note: `func_path` definitely outlives `fully_qualified_name`
+    let fully_qualified_name = unsafe { crate::build_pg_list_of_cstrings(func_path) };
     let mut true_typeoids: *mut pg_sys::Oid = std::ptr::null_mut();
     let mut fd_struct: FuncDetail = Default::default();
     fd_struct.code = unsafe {
@@ -54,7 +55,8 @@ where
     I: IntoIterator<Item = &'a [u8]>,
 {
     let arg_cnt = types.len() as i32;
-    let fully_qualified_name = crate::build_pg_list_of_cstrings(func_path);
+    // Safety note: `func_path` definitely outlives `fully_qualified_name`
+    let fully_qualified_name = unsafe { crate::build_pg_list_of_cstrings(func_path) };
     let mut true_typeoids: *mut pg_sys::Oid = std::ptr::null_mut();
     let mut fd_struct: FuncDetail = Default::default();
     fd_struct.code = unsafe {

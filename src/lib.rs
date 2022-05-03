@@ -14,13 +14,20 @@ mod util;
 
 pg_module_magic!();
 
-pub fn build_pg_list_of_cstrings<'a, I>(parts: I) -> PgList<pg_sys::Value>
+/// A helper function for building [`pgx::PgList`] out of
+/// iterable collection of binary, C-compatible strings.
+///
+/// ## Safety
+/// Every object passed as an argument to this function
+/// must outlive the resulting [`pgx::PgList`] which holds
+/// raw pointers to its arguments.
+pub unsafe fn build_pg_list_of_cstrings<'a, I>(parts: I) -> PgList<pg_sys::Value>
 where
     I: IntoIterator<Item = &'a [u8]>,
 {
     let mut res = PgList::new();
     for p in parts {
-        res.push(unsafe { pg_sys::makeString(p.as_ptr() as _) });
+        res.push(pg_sys::makeString(p.as_ptr() as _));
     }
     res
 }
