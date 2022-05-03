@@ -5,6 +5,13 @@ DROP TABLE _ps_trace.span CASCADE;
 DROP TABLE _ps_trace.tag CASCADE;
 --need to drop because of enum redefinition
 DROP TABLE _ps_trace.operation;
+/* XXX We drop these views because they depend on some changes ahead
+ * Although they should be dropped by now due to commands above, it's
+ * better to be explicit here.
+ */
+DROP VIEW IF EXISTS ps_trace.event CASCADE;
+DROP VIEW IF EXISTS ps_trace.link CASCADE;
+DROP VIEW IF EXISTS ps_trace.span CASCADE;
 
 DELETE FROM _ps_trace.tag_key WHERE id >= 1000;
 ANALYZE _ps_trace.tag_key;
@@ -234,6 +241,167 @@ GRANT USAGE ON TYPE ps_trace.trace_id TO prom_reader;
 -- ps_trace.trace_id and uuid are binary coercible
 CREATE CAST(ps_trace.trace_id as uuid) WITHOUT FUNCTION AS IMPLICIT;
 CREATE CAST(uuid AS ps_trace.trace_id) WITHOUT FUNCTION AS IMPLICIT;
+/* Move the old tag_map type out of the way */
+ALTER DOMAIN ps_trace.tag_map
+    RENAME TO tag_map_old;
+ALTER DOMAIN ps_trace.tag_map_old
+    SET SCHEMA _ps_trace;
+
+/* Define custom tag_map and tag_v json aliases
+ * NOTE: We need to keep an eye on upstream jsonb type
+ * and keep these up-to-date.
+ */
+
+CREATE TYPE ps_trace.tag_map;
+CREATE TYPE _ps_trace.tag_v;
+
+CREATE OR REPLACE FUNCTION ps_trace.tag_map_in(cstring)
+RETURNS ps_trace.tag_map
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$jsonb_in$function$
+;
+
+CREATE OR REPLACE FUNCTION ps_trace.tag_map_out(ps_trace.tag_map)
+RETURNS cstring
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$jsonb_out$function$
+;
+
+CREATE OR REPLACE FUNCTION ps_trace.tag_map_send(ps_trace.tag_map)
+RETURNS bytea
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$jsonb_send$function$
+;
+
+CREATE OR REPLACE FUNCTION ps_trace.tag_map_recv(internal)
+RETURNS ps_trace.tag_map
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$jsonb_recv$function$
+;
+
+DO
+$do$
+
+/* Create subscript_handler function for pg v14+ and the type accordingly.
+ * For pg v13 jsonb type doesn't have a subscript_handler function so it shall
+ * be omitted.
+ */
+DECLARE
+    _pg_version int4 := current_setting('server_version_num')::int4;
+BEGIN
+    IF (_pg_version >= 140000) THEN
+        EXECUTE
+            'CREATE OR REPLACE FUNCTION ps_trace.tag_map_subscript_handler(internal) ' ||
+                'RETURNS internal '                 ||
+                'LANGUAGE internal '                ||
+                'IMMUTABLE PARALLEL SAFE STRICT '   ||
+                'AS $f$jsonb_subscript_handler$f$;'
+            ;
+
+        EXECUTE
+            'CREATE TYPE ps_trace.tag_map ( '       ||
+                'INPUT = ps_trace.tag_map_in, '     ||
+                'OUTPUT = ps_trace.tag_map_out, '   ||
+                'SEND = ps_trace.tag_map_send, '    ||
+                'RECEIVE = ps_trace.tag_map_recv, ' ||
+                'SUBSCRIPT = ps_trace.tag_map_subscript_handler);'
+            ;
+
+    ELSE
+        EXECUTE
+            'CREATE TYPE ps_trace.tag_map ( '       ||
+                'INPUT = ps_trace.tag_map_in, '     ||
+                'OUTPUT = ps_trace.tag_map_out, '   ||
+                'SEND = ps_trace.tag_map_send, '    ||
+                'RECEIVE = ps_trace.tag_map_recv);'
+            ;
+
+    END IF;
+END
+$do$;
+
+
+CREATE CAST (jsonb AS ps_trace.tag_map) WITHOUT FUNCTION AS IMPLICIT;
+CREATE CAST (ps_trace.tag_map AS jsonb) WITHOUT FUNCTION AS IMPLICIT;
+
+CREATE CAST (json AS ps_trace.tag_map) WITH INOUT AS ASSIGNMENT;
+CREATE CAST (ps_trace.tag_map AS json) WITH INOUT AS ASSIGNMENT;
+
+CREATE OR REPLACE FUNCTION _ps_trace.tag_v_in(cstring)
+RETURNS _ps_trace.tag_v
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$jsonb_in$function$
+;
+
+CREATE OR REPLACE FUNCTION _ps_trace.tag_v_out(_ps_trace.tag_v)
+RETURNS cstring
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$jsonb_out$function$
+;
+
+CREATE OR REPLACE FUNCTION _ps_trace.tag_v_send(_ps_trace.tag_v)
+RETURNS bytea
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$jsonb_send$function$
+;
+
+CREATE OR REPLACE FUNCTION _ps_trace.tag_v_recv(internal)
+RETURNS _ps_trace.tag_v
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$jsonb_recv$function$
+;
+
+DO
+$do$
+
+/* Create subscript_handler function for pg v14+ and the type accordingly.
+ * For pg v13 jsonb type doesn't have a subscript_handler function so it shall
+ * be omitted.
+ */
+DECLARE
+    _pg_version int4 := pg_catalog.current_setting('server_version_num')::int4;
+BEGIN
+    IF (_pg_version >= 140000) THEN
+        EXECUTE
+            'CREATE OR REPLACE FUNCTION _ps_trace.tag_v_subscript_handler(internal) ' ||
+                'RETURNS internal '                 ||
+                'LANGUAGE internal '                ||
+                'IMMUTABLE PARALLEL SAFE STRICT '   ||
+                'AS $f$jsonb_subscript_handler$f$;'
+            ;
+
+        EXECUTE
+            'CREATE TYPE _ps_trace.tag_v ( '       ||
+                'INPUT = _ps_trace.tag_v_in, '     ||
+                'OUTPUT = _ps_trace.tag_v_out, '   ||
+                'SEND = _ps_trace.tag_v_send, '    ||
+                'RECEIVE = _ps_trace.tag_v_recv, ' ||
+                'SUBSCRIPT = _ps_trace.tag_v_subscript_handler);'
+            ;
+
+    ELSE
+        EXECUTE
+            'CREATE TYPE _ps_trace.tag_v ( '       ||
+                'INPUT = _ps_trace.tag_v_in, '     ||
+                'OUTPUT = _ps_trace.tag_v_out, '   ||
+                'SEND = _ps_trace.tag_v_send, '    ||
+                'RECEIVE = _ps_trace.tag_v_recv);'
+            ;
+
+    END IF;
+END
+$do$;
+
+GRANT USAGE ON TYPE ps_trace.tag_map TO prom_reader;
+GRANT USAGE ON TYPE _ps_trace.tag_v TO prom_reader;
 
 CREATE TABLE _ps_trace.span
 (
@@ -258,10 +426,10 @@ CREATE TABLE _ps_trace.span
     resource_tags ps_trace.tag_map NOT NULL,
     PRIMARY KEY (span_id, trace_id, start_time)
 );
+
 CREATE INDEX ON _ps_trace.span USING BTREE (trace_id, parent_span_id) INCLUDE (span_id); -- used for recursive CTEs for trace tree queries
 CREATE INDEX ON _ps_trace.span USING GIN (span_tags jsonb_path_ops); -- supports tag filters. faster ingest than json_ops
 CREATE INDEX ON _ps_trace.span USING BTREE (operation_id); -- supports filters/joins to operation table
---CREATE INDEX ON _ps_trace.span USING GIN (jsonb_object_keys(span_tags) array_ops); -- possible way to index key exists
 CREATE INDEX ON _ps_trace.span USING GIN (resource_tags jsonb_path_ops); -- supports tag filters. faster ingest than json_ops
 GRANT SELECT ON TABLE _ps_trace.span TO prom_reader;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.span TO prom_writer;

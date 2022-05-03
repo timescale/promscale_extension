@@ -1,5 +1,4 @@
-
-CREATE OR REPLACE VIEW ps_trace.span AS
+CREATE VIEW ps_trace.span AS
 SELECT
     s.trace_id,
     s.span_id,
@@ -13,7 +12,7 @@ SELECT
     s.end_time,
     tstzrange(s.start_time, s.end_time, '[]') as time_range,
     s.duration_ms,
-    s.span_tags,
+    _ps_trace.tag_map_denormalize(s.span_tags) as span_tags,
     s.dropped_tags_count,
     s.event_time,
     s.dropped_events_count,
@@ -23,7 +22,7 @@ SELECT
     il.name as instrumentation_lib_name,
     il.version as instrumentation_lib_version,
     u1.url as instrumentation_lib_schema_url,
-    s.resource_tags,
+    _ps_trace.tag_map_denormalize(s.resource_tags) as resource_tags,
     s.resource_dropped_tags_count,
     u2.url as resource_schema_url
 FROM _ps_trace.span s
