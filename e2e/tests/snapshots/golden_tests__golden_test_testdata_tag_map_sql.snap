@@ -46,98 +46,56 @@ SELECT span_tags, resource_tags FROM ps_trace.span;
  {"pwlen": 18} | {"service.name": "generator", "telemetry.sdk.name": "opentelemetry", "telemetry.sdk.version": "1.8.0", "telemetry.sdk.language": "python"}
 (2 rows)
 
+CREATE FUNCTION explain_jsonb(_query pg_catalog.text, OUT _result pg_catalog.jsonb)
+    RETURNS pg_catalog.jsonb
+    LANGUAGE plpgsql VOLATILE AS
+$fnc$
+BEGIN
+    EXECUTE 'explain (format json) ' || _query INTO _result;
+    RETURN;
+END;
+$fnc$;
+CREATE FUNCTION
 /* Not equals operator returns correct result */
+PREPARE neq_test AS
 SELECT trace_id
     FROM ps_trace.span
     WHERE
             span_tags -> 'pwlen' != '25'::jsonb
         AND resource_tags -> 'service.name' = '"generator"';
+PREPARE
+EXECUTE neq_test;
                trace_id               
 --------------------------------------
  05a8be0f-bb79-c052-223e-48608580efce
 (1 row)
 
 /* Not equals uses support function and produces correct plan */
-EXPLAIN (costs off) SELECT *
-    FROM ps_trace.span
-    WHERE
-            span_tags -> 'pwlen' != '25'::jsonb
-        AND resource_tags -> 'service.name' = '"generator"';
-                                               QUERY PLAN                                               
---------------------------------------------------------------------------------------------------------
- Nested Loop Left Join
-   Join Filter: (il.schema_url_id = u2.id)
-   InitPlan 1 (returns $0)
-     ->  Result
-   InitPlan 2 (returns $1)
-     ->  Result
-   ->  Nested Loop Left Join
-         Join Filter: (il.schema_url_id = u1.id)
-         ->  Nested Loop Left Join
-               Join Filter: (s.instrumentation_lib_id = il.id)
-               ->  Nested Loop Left Join
-                     ->  Nested Loop Left Join
-                           Join Filter: (s.operation_id = o.id)
-                           ->  Custom Scan (ChunkAppend) on span s
-                                 ->  Bitmap Heap Scan on _hyper_7_1_chunk s_1
-                                       Recheck Cond: (resource_tags @> $1)
-                                       Filter: (span_tags @> ANY ($0))
-                                       ->  Bitmap Index Scan on _hyper_7_1_chunk_span_resource_tags_idx
-                                             Index Cond: (resource_tags @> $1)
-                           ->  Seq Scan on operation o
-                     ->  Index Scan using tag_26_pkey on tag_26 t
-                           Index Cond: (id = o.service_name_id)
-                           Filter: ((key)::text = 'service.name'::text)
-               ->  Seq Scan on instrumentation_lib il
-         ->  Seq Scan on schema_url u1
-   ->  Seq Scan on schema_url u2
-(26 rows)
+SELECT 
+    x::text LIKE '%InitPlan%',
+    x::text LIKE '% @> ANY%' 
+FROM explain_jsonb('EXECUTE neq_test') AS f(x);
+ ?column? | ?column? 
+----------+----------
+ t        | t
+(1 row)
 
 /* Equals operator returns correct result */
+PREPARE eq_test AS
 SELECT trace_id
     FROM ps_trace.span
     WHERE
             span_tags -> 'pwlen' = '25'::jsonb
         AND resource_tags -> 'service.name' = '"generator"';
-               trace_id               
---------------------------------------
- 78dd078e-8c69-e10a-d2fe-9e9f47de7728
-(1 row)
-
+PREPARE
 /* Equals uses support function and produces correct plan */
-EXPLAIN (costs off) SELECT *
-    FROM ps_trace.span
-    WHERE
-            span_tags -> 'pwlen' = '25'::jsonb
-        AND resource_tags -> 'service.name' = '"generator"';
-                                               QUERY PLAN                                               
---------------------------------------------------------------------------------------------------------
- Nested Loop Left Join
-   Join Filter: (il.schema_url_id = u2.id)
-   InitPlan 1 (returns $0)
-     ->  Result
-   InitPlan 2 (returns $1)
-     ->  Result
-   ->  Nested Loop Left Join
-         Join Filter: (il.schema_url_id = u1.id)
-         ->  Nested Loop Left Join
-               Join Filter: (s.instrumentation_lib_id = il.id)
-               ->  Nested Loop Left Join
-                     ->  Nested Loop Left Join
-                           Join Filter: (s.operation_id = o.id)
-                           ->  Custom Scan (ChunkAppend) on span s
-                                 ->  Bitmap Heap Scan on _hyper_7_1_chunk s_1
-                                       Recheck Cond: (resource_tags @> $1)
-                                       Filter: (span_tags @> $0)
-                                       ->  Bitmap Index Scan on _hyper_7_1_chunk_span_resource_tags_idx
-                                             Index Cond: (resource_tags @> $1)
-                           ->  Seq Scan on operation o
-                     ->  Index Scan using tag_26_pkey on tag_26 t
-                           Index Cond: (id = o.service_name_id)
-                           Filter: ((key)::text = 'service.name'::text)
-               ->  Seq Scan on instrumentation_lib il
-         ->  Seq Scan on schema_url u1
-   ->  Seq Scan on schema_url u2
-(26 rows)
+SELECT 
+    x::text LIKE '%InitPlan%',
+    x::text LIKE '% @> %' 
+FROM explain_jsonb('EXECUTE eq_test') AS f(x);
+ ?column? | ?column? 
+----------+----------
+ t        | t
+(1 row)
 
 

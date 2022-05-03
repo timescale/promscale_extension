@@ -21,24 +21,38 @@ INSERT INTO _ps_trace.span(trace_id,span_id,parent_span_id,operation_id,start_ti
     VALUES
         (E'78dd078e-8c69-e10a-d2fe-9e9f47de7728',-2771219554170079234,NULL,19,E'2022-04-26 11:44:55.185139+00',E'2022-04-26 11:44:55.38517+00',200.031,NULL,E'{"1003": 247}',0,E'["2022-04-26 11:44:55.185659+00","2022-04-26 11:44:55.385148+00")',0,0,E'STATUS_CODE_ERROR',E'Exception: FAILED to fetch a lower char',5,E'{"1": 114, "5": 94, "6": 93, "7": 95}',0,NULL),
         (E'05a8be0f-bb79-c052-223e-48608580efce',2625299614982951051,NULL,19,E'2022-04-26 11:44:55.185962+00',E'2022-04-26 11:44:55.288812+00',102.85,NULL,E'{"1003": 242}',0,E'["2022-04-26 11:44:55.185999+00","2022-04-26 11:44:55.288781+00")',0,0,E'STATUS_CODE_ERROR',E'Exception: FAILED to fetch a lower char',5,E'{"1": 114, "5": 94, "6": 93, "7": 95}',0,NULL);
+
 /* tag_map_denormalize function is actually called */
 SELECT span_tags, resource_tags FROM ps_trace.span;
 
+CREATE FUNCTION explain_jsonb(_query pg_catalog.text, OUT _result pg_catalog.jsonb)
+    RETURNS pg_catalog.jsonb
+    LANGUAGE plpgsql VOLATILE AS
+$fnc$
+BEGIN
+    EXECUTE 'explain (format json) ' || _query INTO _result;
+    RETURN;
+END;
+$fnc$;
+
 /* Not equals operator returns correct result */
+PREPARE neq_test AS
 SELECT trace_id
     FROM ps_trace.span
     WHERE
             span_tags -> 'pwlen' != '25'::jsonb
         AND resource_tags -> 'service.name' = '"generator"';
 
+EXECUTE neq_test;
+
 /* Not equals uses support function and produces correct plan */
-EXPLAIN (costs off) SELECT *
-    FROM ps_trace.span
-    WHERE
-            span_tags -> 'pwlen' != '25'::jsonb
-        AND resource_tags -> 'service.name' = '"generator"';
+SELECT 
+    x::text LIKE '%InitPlan%',
+    x::text LIKE '% @> ANY%' 
+FROM explain_jsonb('EXECUTE neq_test') AS f(x);
 
 /* Equals operator returns correct result */
+PREPARE eq_test AS
 SELECT trace_id
     FROM ps_trace.span
     WHERE
@@ -46,8 +60,7 @@ SELECT trace_id
         AND resource_tags -> 'service.name' = '"generator"';
 
 /* Equals uses support function and produces correct plan */
-EXPLAIN (costs off) SELECT *
-    FROM ps_trace.span
-    WHERE
-            span_tags -> 'pwlen' = '25'::jsonb
-        AND resource_tags -> 'service.name' = '"generator"';
+SELECT 
+    x::text LIKE '%InitPlan%',
+    x::text LIKE '% @> %' 
+FROM explain_jsonb('EXECUTE eq_test') AS f(x);
