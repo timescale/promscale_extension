@@ -127,7 +127,7 @@ if ! command -v fpm; then
 fi
 
 if [ -z "${version}" ]; then
-    if ! version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')"; then
+    if ! version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "promscale") | .version')"; then
         echo "${version}"
         echo "Failed to read extension version from Cargo metadata!"
         exit 1
