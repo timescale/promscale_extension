@@ -26,12 +26,12 @@ jobs:
         - name: linux
           distro: debian
           version: 11
-          codename: bullseye
+          pkg_cloud_tag: debian/bullseye
           pkg_type: deb
         - name: linux
           distro: centos
           version: 7
-          codename: 7
+          pkg_cloud_tag: el/7
           pkg_type: rpm
         postgres:
         - version: "12"
@@ -142,7 +142,7 @@ jobs:
       env:
         PACKAGECLOUD_TOKEN: ${{ secrets.IO_PACKAGECLOUD_TOKEN }}
       run: |
-        package_cloud push ${{ steps.metadata.outputs.repo }}/${{ matrix.os.distro }}/${{ matrix.os.codename }} artifacts/${{ steps.metadata.outputs.outfile }}
+        package_cloud push ${{ steps.metadata.outputs.repo }}/${{ matrix.os.pkg_cloud_tag }} artifacts/${{ steps.metadata.outputs.outfile }}
 
     outputs:
       tag: ${{ steps.metadata.outputs.tag }}
