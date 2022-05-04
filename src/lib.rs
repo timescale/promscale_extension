@@ -32,8 +32,7 @@ where
     res
 }
 
-/// TODO: presently, we deliberate on how to structure SQL-only tests.
-/// As soon as we agree on something these tests should be moved over.
+/// TODO: convert these tests to e2e
 
 #[cfg(any(test, feature = "pg_test"))]
 #[pg_schema]
@@ -150,7 +149,7 @@ mod tests {
         );
 
         let eval_eq_res = Spi::get_one::<JsonB>(
-            r#"SELECT _ps_trace.eval_equals(ROW('service.name', '"myservice"'::jsonb));"#,
+            r#"SELECT _ps_trace.tag_v_eq_matching_tags('service.name', '"myservice"'::jsonb);"#,
         )
         .expect("SQL query failed");
         assert_eq!(eval_eq_res.0, serde_json::json!({ "1": srvc_tag_id }));
