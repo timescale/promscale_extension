@@ -27,22 +27,27 @@ endif
 # Calculate the correct dockerfile to use when running the release target
 ifeq ($(OS_NAME),debian)
 	DOCKERFILE = deb.dockerfile
+	TESTDOCKERFILE = deb.test.dockerfile
 	PKG_TYPE = deb
 endif
 ifeq ($(OS_NAME),ubuntu)
 	DOCKERFILE = deb.dockerfile
+	TESTDOCKERFILE = deb.test.dockerfile
 	PKG_TYPE = deb
 endif
 ifeq ($(OS_NAME),centos)
 	DOCKERFILE = rpm.dockerfile
+	TESTDOCKERFILE = rpm.test.dockerfile
 	PKG_TYPE = rpm
 endif
 ifeq ($(OS_NAME),rhel)
 	DOCKERFILE = rpm.dockerfile
+	TESTDOCKERFILE = rpm.test.dockerfile
 	PKG_TYPE = rpm
 endif
 ifeq ($(OS_NAME),fedora)
 	DOCKERFILE = rpm.dockerfile
+	TESTDOCKERFILE = rpm.test.dockerfile
 	PKG_TYPE = rpm
 endif
 RELEASE_IMAGE_NAME = promscale-extension-pkg:$(EXT_VERSION)-$(OS_NAME)$(OS_VERSION)-pg$(PG_RELEASE_VERSION)
@@ -97,11 +102,13 @@ install: promscale.control ## Install the extension in the Postgres found via pg
 	bash create-upgrade-symlinks.sh
 	cargo pgx install --pg-config ${PG_CONFIG}
 
-.PHONY: release
-release: release-builder ## Produces release artifacts based on OS_NAME, OS_VERSION, and PG_RELEASE_VERSION
+dist/$(RELEASE_FILE_NAME): release-builder
 	@container="$$(docker create $(RELEASE_IMAGE_NAME))"; \
 	docker cp "$${container}:/dist/$(RELEASE_FILE_NAME)" ./dist/; \
 	docker rm -f "$${container}"
+
+.PHONY: release
+release: dist/$(RELEASE_FILE_NAME) ## Produces release artifacts based on OS_NAME, OS_VERSION, and PG_RELEASE_VERSION
 
 .PHONY: release-builder
 release-builder: dist/$(DOCKERFILE) ## Build image with the release artifact for OS_NAME, OS_VERSION, and PG_RELEASE_VERSION
@@ -123,22 +130,20 @@ endif
 		.
 
 .PHONY: release-tester
-release-tester: dist/$(DOCKERFILE) ## Build image used for testing a specific release package
+release-tester: dist/$(TESTDOCKERFILE) ## Build image used for testing a specific release package
 ifndef DOCKERFILE
-	$(error Unsupported OS_NAME '$(OS_NAME)'! Expected one of debian,ubuntu,centos,rhel,fedora)
+	$(error Unsupported OS_NAME '$(OS_NAME)'! Expected one of debian,ubuntu,centos,rhel)
 endif
 ifndef DOCKER_PLATFORM
 	$(error Unsupported ARCH '$(ARCH)'! Expected one of arm64,x86_64)
 endif
 	docker buildx build --load --platform $(DOCKER_PLATFORM) \
-		--build-arg OS_NAME=$(OS_NAME) \
-		--build-arg OS_VERSION=$(OS_VERSION) \
-		--build-arg PG_VERSION=$(PG_RELEASE_VERSION) \
-		--build-arg RUST_VERSION=$(RUST_VERSION) \
-		--build-arg RELEASE_FILE_NAME=$(RELEASE_FILE_NAME) \
-		--target tester \
+		--build-arg=DISTRO=$(OS_NAME) \
+		--build-arg=DISTRO_VERSION=$(OS_VERSION) \
+		--build-arg=PG_VERSION=$(PG_RELEASE_VERSION) \
+		--build-arg=RELEASE_FILE_NAME=dist/$(RELEASE_FILE_NAME) \
 		-t "$(RELEASE_IMAGE_NAME)-test" \
-		-f dist/$(DOCKERFILE) \
+		-f dist/$(TESTDOCKERFILE) \
 		.
 
 .PHONY: release-test
