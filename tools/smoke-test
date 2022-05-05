@@ -23,6 +23,8 @@ done
 
 if ! docker run --rm --link "${TESTER_NAME}" --platform="${DOCKER_PLATFORM}" -i "${CONNECTOR_DOCKER_IMAGE}" -db.uri "postgres://postgres:postgres@${TESTER_NAME}:5432/postgres?sslmode=allow" -startup.only -startup.upgrade-prerelease-extensions; then
     echo "Encountered error while testing image ${EXTENSION_DOCKER_IMAGE}";
+    docker logs "${TESTER_NAME}"
+    docker stop "${TESTER_NAME}"
     docker rm -f "${TESTER_NAME}"
     exit 1
 fi;
