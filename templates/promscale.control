@@ -1,5 +1,5 @@
 # promscale extension
-comment = 'Promscale support functions'
+comment = 'tables, types and functions supporting Promscale'
 default_version = '@CARGO_VERSION@'
 module_pathname = '$libdir/promscale'
 relocatable = false
