@@ -32,7 +32,9 @@ CREATE TABLE _ps_trace.tag (
 );
 CREATE UNIQUE INDEX tag_key_value_id_key_id_key_idx ON _ps_trace.tag (key, _prom_ext.jsonb_digest(value)) INCLUDE (id, key_id);
 GRANT SELECT ON TABLE _ps_trace.tag TO prom_reader;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.tag TO prom_writer;
+REVOKE ALL PRIVILEGES ON TABLE _ps_trace.tag FROM prom_writer; -- prev migration granted too many privileges
+GRANT SELECT, INSERT ON TABLE _ps_trace.tag TO prom_writer;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.tag TO prom_modifier;
 
 --redefine enums to be more user friendly
 DROP TYPE ps_trace.span_kind CASCADE;
@@ -65,9 +67,10 @@ CREATE TABLE IF NOT EXISTS _ps_trace.operation
     UNIQUE (service_name_id, span_name, span_kind)
 );
 GRANT SELECT ON TABLE _ps_trace.operation TO prom_reader;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.operation TO prom_writer;
-GRANT USAGE ON SEQUENCE _ps_trace.operation_id_seq TO prom_writer;
-
+REVOKE ALL PRIVILEGES ON TABLE _ps_trace.operation FROM prom_writer; -- prev migration granted too many privileges
+GRANT SELECT, INSERT ON TABLE _ps_trace.operation TO prom_writer;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.operation TO prom_modifier;
+GRANT USAGE ON SEQUENCE _ps_trace.operation_id_seq TO prom_modifier, prom_writer;
 
 -- We are replacing domain with custom type
 DROP DOMAIN ps_trace.trace_id CASCADE;
@@ -434,13 +437,14 @@ CREATE TABLE _ps_trace.span
     resource_tags ps_trace.tag_map NOT NULL,
     PRIMARY KEY (span_id, trace_id, start_time)
 );
-
 CREATE INDEX ON _ps_trace.span USING BTREE (trace_id, parent_span_id) INCLUDE (span_id); -- used for recursive CTEs for trace tree queries
 CREATE INDEX ON _ps_trace.span USING GIN (span_tags jsonb_path_ops); -- supports tag filters. faster ingest than json_ops
 CREATE INDEX ON _ps_trace.span USING BTREE (operation_id); -- supports filters/joins to operation table
 CREATE INDEX ON _ps_trace.span USING GIN (resource_tags jsonb_path_ops); -- supports tag filters. faster ingest than json_ops
 GRANT SELECT ON TABLE _ps_trace.span TO prom_reader;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.span TO prom_writer;
+REVOKE ALL PRIVILEGES ON TABLE _ps_trace.span FROM prom_writer; -- prev migration granted too many privileges
+GRANT SELECT, INSERT ON TABLE _ps_trace.span TO prom_writer;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.span TO prom_modifier;
 
 CREATE TABLE _ps_trace.event
 (
@@ -455,7 +459,9 @@ CREATE TABLE _ps_trace.event
 CREATE INDEX ON _ps_trace.event USING GIN (tags jsonb_path_ops);
 CREATE INDEX ON _ps_trace.event USING BTREE (trace_id, span_id);
 GRANT SELECT ON TABLE _ps_trace.event TO prom_reader;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.event TO prom_writer;
+REVOKE ALL PRIVILEGES ON TABLE _ps_trace.event FROM prom_writer; -- prev migration granted too many privileges
+GRANT SELECT, INSERT ON TABLE _ps_trace.event TO prom_writer;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.event TO prom_modifier;
 
 CREATE TABLE _ps_trace.link
 (
@@ -472,7 +478,9 @@ CREATE TABLE _ps_trace.link
 CREATE INDEX ON _ps_trace.link USING BTREE (trace_id, span_id);
 CREATE INDEX ON _ps_trace.link USING GIN (tags jsonb_path_ops);
 GRANT SELECT ON TABLE _ps_trace.link TO prom_reader;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.link TO prom_writer;
+REVOKE ALL PRIVILEGES ON TABLE _ps_trace.link FROM prom_writer; -- prev migration granted too many privileges
+GRANT SELECT, INSERT ON TABLE _ps_trace.link TO prom_writer;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.link TO prom_modifier;
 
 /*
     If "vanilla" postgres is installed, do nothing.
@@ -582,3 +590,24 @@ BEGIN
 END;
 $block$
 ;
+
+
+REVOKE ALL PRIVILEGES ON TABLE _ps_trace.tag_key FROM prom_writer; -- prev migration granted too many privileges
+GRANT SELECT, INSERT ON TABLE _ps_trace.tag_key TO prom_writer;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.tag_key TO prom_modifier;
+GRANT USAGE ON SEQUENCE _ps_trace.tag_key_id_seq TO prom_writer, prom_modifier;
+
+REVOKE ALL PRIVILEGES ON TABLE _ps_trace.operation FROM prom_writer; -- prev migration granted too many privileges
+GRANT SELECT, INSERT ON TABLE _ps_trace.operation TO prom_writer;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.operation TO prom_modifier;
+GRANT USAGE ON SEQUENCE _ps_trace.operation_id_seq TO prom_writer, prom_modifier;
+
+REVOKE ALL PRIVILEGES ON TABLE _ps_trace.schema_url FROM prom_writer; -- prev migration granted too many privileges
+GRANT SELECT, INSERT ON TABLE _ps_trace.schema_url TO prom_writer;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.schema_url TO prom_modifier;
+GRANT USAGE ON SEQUENCE _ps_trace.schema_url_id_seq TO prom_writer, prom_modifier;
+
+REVOKE ALL PRIVILEGES ON TABLE _ps_trace.instrumentation_lib FROM prom_writer; -- prev migration granted too many privileges
+GRANT SELECT, INSERT ON TABLE _ps_trace.instrumentation_lib TO prom_writer;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.instrumentation_lib TO prom_modifier;
+GRANT USAGE ON SEQUENCE _ps_trace.instrumentation_lib_id_seq TO prom_writer, prom_modifier;
