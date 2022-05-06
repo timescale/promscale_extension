@@ -69,3 +69,16 @@ FROM explain_jsonb('EXECUTE eq_test') AS f(x);
 SELECT ps_trace.tag_v_eq(NULL, NULL);
 SELECT ps_trace.tag_v_ne(NULL, NULL);
 SELECT ps_trace.tag_map_object_field(NULL, NULL);
+
+/* Test tags in the link view */
+INSERT INTO _ps_trace.link(trace_id, span_id, linked_trace_id, linked_span_id, tags, span_start_time)
+    VALUES
+        (E'78dd078e-8c69-e10a-d2fe-9e9f47de7728',-2771219554170079234, E'05a8be0f-bb79-c052-223e-48608580efce',2625299614982951051, E'{"1": 114, "5": 94, "6": 93, "7": 95}', E'2022-04-26 11:44:55.185139+00');
+	
+SELECT span_tags, resource_tags, linked_span_tags, linked_resource_tags, link_tags FROM link;
+
+INSERT INTO _ps_trace.event(time, trace_id, span_id, name, tags)
+    VALUES
+        (E'2022-04-26 11:44:55.185139+00', E'78dd078e-8c69-e10a-d2fe-9e9f47de7728',-2771219554170079234, E'foobar', E'{"6": 93, "7": 95}');
+
+SELECT event_tags, span_tags, resource_tags FROM event;
