@@ -1,6 +1,5 @@
 [workspace]
 members = ["e2e"]
-exclude = ["tools/post-install"]
 
 [package]
 name = "promscale"

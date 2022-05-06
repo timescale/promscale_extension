@@ -233,9 +233,6 @@ cd "${ROOT_DIR}"
 
 PATH="${pg_config_dir}:${PATH}" make package
 
-echo "Post-processing build.."
-cargo run --manifest-path tools/post-install/Cargo.toml -- --dir "target/release/promscale-pg${pg_version}"
-
 echo "Stripping objects.."
 find "target/release/promscale-pg${pg_version}"/ -type f -name "*.so" -exec strip {} +
 
