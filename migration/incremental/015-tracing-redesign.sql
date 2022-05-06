@@ -591,9 +591,13 @@ END;
 $block$
 ;
 
+REVOKE ALL PRIVILEGES ON TABLE _ps_trace.tag FROM prom_writer; -- prev migration granted too many privileges
+GRANT SELECT, INSERT, UPDATE ON TABLE _ps_trace.tag TO prom_writer;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.tag TO prom_modifier;
+GRANT USAGE ON SEQUENCE _ps_trace.tag_id_seq TO prom_writer, prom_modifier;
 
 REVOKE ALL PRIVILEGES ON TABLE _ps_trace.tag_key FROM prom_writer; -- prev migration granted too many privileges
-GRANT SELECT, INSERT ON TABLE _ps_trace.tag_key TO prom_writer;
+GRANT SELECT, INSERT, UPDATE ON TABLE _ps_trace.tag_key TO prom_writer;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.tag_key TO prom_modifier;
 GRANT USAGE ON SEQUENCE _ps_trace.tag_key_id_seq TO prom_writer, prom_modifier;
 
