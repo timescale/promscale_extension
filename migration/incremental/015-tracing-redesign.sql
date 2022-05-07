@@ -28,7 +28,8 @@ CREATE TABLE _ps_trace.tag (
     key_id BIGINT NOT NULL,
     tag_type ps_trace.tag_type NOT NULL,
     key ps_trace.tag_k NOT NULL REFERENCES _ps_trace.tag_key (key) ON DELETE CASCADE,
-    value ps_trace.tag_v NOT NULL
+    value ps_trace.tag_v NOT NULL,
+    PRIMARY KEY(id) --note: cannot include (key, value) because value can be big
 );
 CREATE UNIQUE INDEX tag_key_value_id_key_id_key_idx ON _ps_trace.tag (key, _prom_ext.jsonb_digest(value)) INCLUDE (id, key_id);
 GRANT SELECT ON TABLE _ps_trace.tag TO prom_reader;
