@@ -628,16 +628,22 @@ $do$
 DECLARE
     _pg_version int4 := current_setting('server_version_num')::int4;
 BEGIN
+    SET search_path = pg_catalog;
     IF (_pg_version >= 140000) THEN
-        EXECUTE
-            'CREATE OR REPLACE FUNCTION ps_trace.tag_map_subscript_handler(internal) ' ||
-                'RETURNS internal '                 ||
-                'LANGUAGE internal '                ||
-                'IMMUTABLE PARALLEL SAFE STRICT '   ||
-                'AS $f$jsonb_subscript_handler$f$;'
-            ;
+        CREATE OR REPLACE FUNCTION ps_trace.tag_map_subscript_handler(internal)
+                RETURNS internal
+                LANGUAGE internal
+                IMMUTABLE PARALLEL SAFE STRICT
+                AS $f$jsonb_subscript_handler$f$;
 
-        ALTER TYPE ps_trace.tag_map SET (SUBSCRIPT = ps_trace.tag_map_subscript_handler);
+        IF (SELECT
+                typsubscript = 'ps_trace.tag_map_subscript_handler'::regproc
+            FROM pg_type
+            WHERE typname      = 'tag_map'
+              AND typnamespace = 'ps_trace'::regnamespace
+            ) THEN
+                ALTER TYPE ps_trace.tag_map SET (SUBSCRIPT = ps_trace.tag_map_subscript_handler);
+        END IF;
     END IF;
 END
 $do$;
@@ -680,15 +686,21 @@ $do$
 DECLARE
     _pg_version int4 := pg_catalog.current_setting('server_version_num')::int4;
 BEGIN
+    SET search_path = pg_catalog;
     IF (_pg_version >= 140000) THEN
-        EXECUTE
-            'CREATE OR REPLACE FUNCTION _ps_trace.tag_v_subscript_handler(internal) ' ||
-                'RETURNS internal '                 ||
-                'LANGUAGE internal '                ||
-                'IMMUTABLE PARALLEL SAFE STRICT '   ||
-                'AS $f$jsonb_subscript_handler$f$;'
-            ;
-        ALTER TYPE _ps_trace.tag_v SET (SUBSCRIPT = _ps_trace.tag_v_subscript_handler);
+        CREATE OR REPLACE FUNCTION _ps_trace.tag_v_subscript_handler(internal)
+                RETURNS internal
+                LANGUAGE internal
+                IMMUTABLE PARALLEL SAFE STRICT
+                AS $f$jsonb_subscript_handler$f$;
+        IF (SELECT
+                typsubscript = '_ps_trace.tag_v_subscript_handler'::regproc
+            FROM pg_type
+            WHERE typname      = 'tag_v'
+              AND typnamespace = '_ps_trace'::regnamespace
+            ) THEN
+                ALTER TYPE _ps_trace.tag_v SET (SUBSCRIPT = _ps_trace.tag_v_subscript_handler);
+        END IF;
     END IF;
 END
 $do$;
