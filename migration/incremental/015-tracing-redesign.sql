@@ -304,7 +304,6 @@ $do$
 DECLARE
     _pg_version int4 := current_setting('server_version_num')::int4;
 BEGIN
-    SET search_path = pg_catalog;
     IF (_pg_version >= 140000) THEN
         CREATE OR REPLACE FUNCTION ps_trace.tag_map_subscript_handler(internal)
                 RETURNS internal
@@ -375,7 +374,6 @@ $do$
 DECLARE
     _pg_version int4 := pg_catalog.current_setting('server_version_num')::int4;
 BEGIN
-    SET search_path = pg_catalog;
     IF (_pg_version >= 140000) THEN
         CREATE OR REPLACE FUNCTION _ps_trace.tag_v_subscript_handler(internal)
                 RETURNS internal

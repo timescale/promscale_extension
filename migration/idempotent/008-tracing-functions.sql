@@ -628,7 +628,6 @@ $do$
 DECLARE
     _pg_version int4 := current_setting('server_version_num')::int4;
 BEGIN
-    SET search_path = pg_catalog;
     IF (_pg_version >= 140000) THEN
         CREATE OR REPLACE FUNCTION ps_trace.tag_map_subscript_handler(internal)
                 RETURNS internal
@@ -636,6 +635,9 @@ BEGIN
                 IMMUTABLE PARALLEL SAFE STRICT
                 AS $f$jsonb_subscript_handler$f$;
 
+        /* Add subscript handler in case of a prior PG13 -> PG14 upgrade that
+         * didn't take care of this
+         */
         IF (SELECT
                 typsubscript != 'ps_trace.tag_map_subscript_handler'::regproc
             FROM pg_type
@@ -686,13 +688,15 @@ $do$
 DECLARE
     _pg_version int4 := pg_catalog.current_setting('server_version_num')::int4;
 BEGIN
-    SET search_path = pg_catalog;
     IF (_pg_version >= 140000) THEN
         CREATE OR REPLACE FUNCTION _ps_trace.tag_v_subscript_handler(internal)
                 RETURNS internal
                 LANGUAGE internal
                 IMMUTABLE PARALLEL SAFE STRICT
                 AS $f$jsonb_subscript_handler$f$;
+        /* Add subscript handler in case of a prior PG13 -> PG14 upgrade that
+         * didn't take care of this
+         */
         IF (SELECT
                 typsubscript != '_ps_trace.tag_v_subscript_handler'::regproc
             FROM pg_type
