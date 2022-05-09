@@ -638,11 +638,10 @@ BEGIN
         /* Add subscript handler in case of a prior PG13 -> PG14 upgrade that
          * didn't take care of this
          */
-        IF NOT (SELECT
-                typsubscript = 'ps_trace.tag_map_subscript_handler'::regproc
-            FROM pg_type
+        IF NOT EXISTS (SELECT FROM pg_catalog.pg_type
             WHERE typname      = 'tag_map'
               AND typnamespace = 'ps_trace'::regnamespace
+              AND typsubscript = 'ps_trace.tag_map_subscript_handler'::regproc
             ) THEN
                 ALTER TYPE ps_trace.tag_map SET (SUBSCRIPT = ps_trace.tag_map_subscript_handler);
         END IF;
@@ -697,11 +696,10 @@ BEGIN
         /* Add subscript handler in case of a prior PG13 -> PG14 upgrade that
          * didn't take care of this
          */
-        IF NOT (SELECT
-                typsubscript = '_ps_trace.tag_v_subscript_handler'::regproc
-            FROM pg_type
+        IF NOT EXISTS (SELECT FROM pg_catalog.pg_type
             WHERE typname      = 'tag_v'
               AND typnamespace = '_ps_trace'::regnamespace
+              AND typsubscript = '_ps_trace.tag_v_subscript_handler'::regproc
             ) THEN
                 ALTER TYPE _ps_trace.tag_v SET (SUBSCRIPT = _ps_trace.tag_v_subscript_handler);
         END IF;
