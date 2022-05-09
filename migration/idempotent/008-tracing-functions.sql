@@ -589,3 +589,103 @@ LANGUAGE sql;
 GRANT EXECUTE ON FUNCTION ps_trace.delete_all_traces() TO prom_admin;
 COMMENT ON FUNCTION ps_trace.delete_all_traces IS
 $$WARNING: this function deletes all spans and related tracing data in the system and restores it to a "just installed" state.$$;
+
+CREATE OR REPLACE FUNCTION ps_trace.tag_map_in(cstring)
+RETURNS ps_trace.tag_map
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$jsonb_in$function$
+;
+
+CREATE OR REPLACE FUNCTION ps_trace.tag_map_out(ps_trace.tag_map)
+RETURNS cstring
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$jsonb_out$function$
+;
+
+CREATE OR REPLACE FUNCTION ps_trace.tag_map_send(ps_trace.tag_map)
+RETURNS bytea
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$jsonb_send$function$
+;
+
+CREATE OR REPLACE FUNCTION ps_trace.tag_map_recv(internal)
+RETURNS ps_trace.tag_map
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$jsonb_recv$function$
+;
+
+DO
+$do$
+
+/* Create subscript_handler function for pg v14+.
+ * For pg v13 jsonb type doesn't have a subscript_handler function so it shall
+ * be omitted.
+ */
+DECLARE
+    _pg_version int4 := current_setting('server_version_num')::int4;
+BEGIN
+    IF (_pg_version >= 140000) THEN
+        EXECUTE
+            'CREATE OR REPLACE FUNCTION ps_trace.tag_map_subscript_handler(internal) ' ||
+                'RETURNS internal '                 ||
+                'LANGUAGE internal '                ||
+                'IMMUTABLE PARALLEL SAFE STRICT '   ||
+                'AS $f$jsonb_subscript_handler$f$;'
+            ;
+    END IF;
+END
+$do$;
+
+CREATE OR REPLACE FUNCTION _ps_trace.tag_v_in(cstring)
+RETURNS _ps_trace.tag_v
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$jsonb_in$function$
+;
+
+CREATE OR REPLACE FUNCTION _ps_trace.tag_v_out(_ps_trace.tag_v)
+RETURNS cstring
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$jsonb_out$function$
+;
+
+CREATE OR REPLACE FUNCTION _ps_trace.tag_v_send(_ps_trace.tag_v)
+RETURNS bytea
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$jsonb_send$function$
+;
+
+CREATE OR REPLACE FUNCTION _ps_trace.tag_v_recv(internal)
+RETURNS _ps_trace.tag_v
+LANGUAGE internal
+IMMUTABLE PARALLEL SAFE STRICT
+AS $function$jsonb_recv$function$
+;
+
+DO
+$do$
+
+/* Create subscript_handler function for pg v14+.
+ * For pg v13 jsonb type doesn't have a subscript_handler function so it shall
+ * be omitted.
+ */
+DECLARE
+    _pg_version int4 := pg_catalog.current_setting('server_version_num')::int4;
+BEGIN
+    IF (_pg_version >= 140000) THEN
+        EXECUTE
+            'CREATE OR REPLACE FUNCTION _ps_trace.tag_v_subscript_handler(internal) ' ||
+                'RETURNS internal '                 ||
+                'LANGUAGE internal '                ||
+                'IMMUTABLE PARALLEL SAFE STRICT '   ||
+                'AS $f$jsonb_subscript_handler$f$;'
+            ;
+    END IF;
+END
+$do$;
