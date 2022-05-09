@@ -636,6 +636,8 @@ BEGIN
                 'IMMUTABLE PARALLEL SAFE STRICT '   ||
                 'AS $f$jsonb_subscript_handler$f$;'
             ;
+
+        ALTER TYPE ps_trace.tag_map SET (SUBSCRIPT = ps_trace.tag_map_subscript_handler);
     END IF;
 END
 $do$;
@@ -686,6 +688,8 @@ BEGIN
                 'IMMUTABLE PARALLEL SAFE STRICT '   ||
                 'AS $f$jsonb_subscript_handler$f$;'
             ;
+        ALTER TYPE _ps_trace.tag_v SET (SUBSCRIPT = _ps_trace.tag_v_subscript_handler);
     END IF;
 END
 $do$;
+
