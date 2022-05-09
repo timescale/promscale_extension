@@ -637,7 +637,7 @@ BEGIN
                 AS $f$jsonb_subscript_handler$f$;
 
         IF (SELECT
-                typsubscript = 'ps_trace.tag_map_subscript_handler'::regproc
+                typsubscript != 'ps_trace.tag_map_subscript_handler'::regproc
             FROM pg_type
             WHERE typname      = 'tag_map'
               AND typnamespace = 'ps_trace'::regnamespace
@@ -694,7 +694,7 @@ BEGIN
                 IMMUTABLE PARALLEL SAFE STRICT
                 AS $f$jsonb_subscript_handler$f$;
         IF (SELECT
-                typsubscript = '_ps_trace.tag_v_subscript_handler'::regproc
+                typsubscript != '_ps_trace.tag_v_subscript_handler'::regproc
             FROM pg_type
             WHERE typname      = 'tag_v'
               AND typnamespace = '_ps_trace'::regnamespace
