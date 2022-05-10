@@ -11,13 +11,13 @@ BEGIN
 
     PERFORM _prom_catalog.set_app_name(format('promscale tracing compression: %s', hypertable_name));
     IF log_verbose THEN
-        RAISE LOG 'promscale tracing compression starting';
+        RAISE LOG 'promscale tracing compression: % starting', hypertable_name;
     END IF;
 
     CALL _prom_catalog.compress_old_chunks('_ps_trace', hypertable_name, now() - INTERVAL '1 hour');
 
     IF log_verbose THEN
-        RAISE LOG 'promscale tracing compression: %s finished in %', hypertable_name, clock_timestamp()-startT;
+        RAISE LOG 'promscale tracing compression: % finished in %', hypertable_name, clock_timestamp()-startT;
     END IF;
 END;
 $$ LANGUAGE PLPGSQL;
@@ -33,6 +33,7 @@ DECLARE
    ae_key text;
    ae_value text;
    ae_load boolean := FALSE;
+   hypertable_name name;
 BEGIN
     -- Note: We cannot use SET in the procedure declaration because we do transaction control
     -- and we can _only_ use SET LOCAL in a procedure which _does_ transaction control

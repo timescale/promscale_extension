@@ -3127,7 +3127,7 @@ BEGIN
             FROM _timescaledb_catalog.chunk ch
                 JOIN _timescaledb_catalog.hypertable ht ON ht.id = ch.hypertable_id
                 JOIN _timescaledb_catalog.chunk_constraint chcons ON ch.id = chcons.chunk_id
-                JOIN _timescaledb_catalog.dimension dim ON ch.hypertable_id = dim.hypertable_id
+                JOIN _timescaledb_catalog.dimension dim ON (ch.hypertable_id = dim.hypertable_id AND dim.column_name IN ('time', 'start_time','span_start_time'))
                 JOIN _timescaledb_catalog.dimension_slice dimsl ON dim.id = dimsl.dimension_id AND chcons.dimension_slice_id = dimsl.id
             WHERE ch.dropped IS FALSE
                 AND (ch.status & 1) != 1 -- only check for uncompressed chunks

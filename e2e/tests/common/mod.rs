@@ -50,13 +50,12 @@ pub fn exec_sql_script(node: &Container<Cli, GenericImage>, script_path: &str) -
     let output = Command::new("docker")
         .arg("exec")
         .arg(id)
-        .arg("psql")
-        .arg("-U")
-        .arg(USER)
-        .arg("-d")
-        .arg(DB)
-        .arg("-f")
-        .arg(&abs_script_path)
+        .arg("bash")
+        .arg("-c")
+        .arg(format!(
+            "psql -U {} -d {} -f {} 2>&1",
+            USER, DB, abs_script_path
+        ))
         .stdout(Stdio::piped())
         .spawn()
         .unwrap()
