@@ -12,5 +12,5 @@ fn golden_test(resource: &str) {
     let node = run_postgres(&docker);
     let query_result = exec_sql_script(&node, resource);
 
-    assert_snapshot!(query_result);
+    assert_snapshot!(resource, query_result);
 }
