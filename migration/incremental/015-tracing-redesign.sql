@@ -609,4 +609,4 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.instrumentation_lib TO p
 GRANT USAGE ON SEQUENCE _ps_trace.instrumentation_lib_id_seq TO prom_writer, prom_modifier;
 
 DROP FUNCTION IF EXISTS _prom_catalog.compress_chunk_for_metric(TEXT, name, name);
-DROP FUNCTION IF EXISTS _prom_catalog.compress_old_chunks(TEXT, TIMESTAMPTZ);
+DROP PROCEDURE IF EXISTS _prom_catalog.compress_old_chunks(TEXT, TIMESTAMPTZ);
