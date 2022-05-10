@@ -306,31 +306,25 @@ DECLARE
     _pg_version int4 := current_setting('server_version_num')::int4;
 BEGIN
     IF (_pg_version >= 140000) THEN
-        EXECUTE
-            'CREATE OR REPLACE FUNCTION ps_trace.tag_map_subscript_handler(internal) ' ||
-                'RETURNS internal '                 ||
-                'LANGUAGE internal '                ||
-                'IMMUTABLE PARALLEL SAFE STRICT '   ||
-                'AS $f$jsonb_subscript_handler$f$;'
-            ;
+        CREATE OR REPLACE FUNCTION ps_trace.tag_map_subscript_handler(internal)
+                RETURNS internal
+                LANGUAGE internal
+                IMMUTABLE PARALLEL SAFE STRICT
+                AS $f$jsonb_subscript_handler$f$;
 
-        EXECUTE
-            'CREATE TYPE ps_trace.tag_map ( '       ||
-                'INPUT = ps_trace.tag_map_in, '     ||
-                'OUTPUT = ps_trace.tag_map_out, '   ||
-                'SEND = ps_trace.tag_map_send, '    ||
-                'RECEIVE = ps_trace.tag_map_recv, ' ||
-                'SUBSCRIPT = ps_trace.tag_map_subscript_handler);'
-            ;
+        CREATE TYPE ps_trace.tag_map (
+                INPUT = ps_trace.tag_map_in,
+                OUTPUT = ps_trace.tag_map_out,
+                SEND = ps_trace.tag_map_send,
+                RECEIVE = ps_trace.tag_map_recv,
+                SUBSCRIPT = ps_trace.tag_map_subscript_handler);
 
     ELSE
-        EXECUTE
-            'CREATE TYPE ps_trace.tag_map ( '       ||
-                'INPUT = ps_trace.tag_map_in, '     ||
-                'OUTPUT = ps_trace.tag_map_out, '   ||
-                'SEND = ps_trace.tag_map_send, '    ||
-                'RECEIVE = ps_trace.tag_map_recv);'
-            ;
+            CREATE TYPE ps_trace.tag_map (
+                INPUT = ps_trace.tag_map_in,
+                OUTPUT = ps_trace.tag_map_out,
+                SEND = ps_trace.tag_map_send,
+                RECEIVE = ps_trace.tag_map_recv);
 
     END IF;
 END
@@ -382,31 +376,24 @@ DECLARE
     _pg_version int4 := pg_catalog.current_setting('server_version_num')::int4;
 BEGIN
     IF (_pg_version >= 140000) THEN
-        EXECUTE
-            'CREATE OR REPLACE FUNCTION _ps_trace.tag_v_subscript_handler(internal) ' ||
-                'RETURNS internal '                 ||
-                'LANGUAGE internal '                ||
-                'IMMUTABLE PARALLEL SAFE STRICT '   ||
-                'AS $f$jsonb_subscript_handler$f$;'
-            ;
+        CREATE OR REPLACE FUNCTION _ps_trace.tag_v_subscript_handler(internal)
+                RETURNS internal
+                LANGUAGE internal
+                IMMUTABLE PARALLEL SAFE STRICT
+                AS $f$jsonb_subscript_handler$f$;
 
-        EXECUTE
-            'CREATE TYPE _ps_trace.tag_v ( '       ||
-                'INPUT = _ps_trace.tag_v_in, '     ||
-                'OUTPUT = _ps_trace.tag_v_out, '   ||
-                'SEND = _ps_trace.tag_v_send, '    ||
-                'RECEIVE = _ps_trace.tag_v_recv, ' ||
-                'SUBSCRIPT = _ps_trace.tag_v_subscript_handler);'
-            ;
-
+        CREATE TYPE _ps_trace.tag_v (
+                INPUT = _ps_trace.tag_v_in,
+                OUTPUT = _ps_trace.tag_v_out,
+                SEND = _ps_trace.tag_v_send,
+                RECEIVE = _ps_trace.tag_v_recv,
+                SUBSCRIPT = _ps_trace.tag_v_subscript_handler);
     ELSE
-        EXECUTE
-            'CREATE TYPE _ps_trace.tag_v ( '       ||
-                'INPUT = _ps_trace.tag_v_in, '     ||
-                'OUTPUT = _ps_trace.tag_v_out, '   ||
-                'SEND = _ps_trace.tag_v_send, '    ||
-                'RECEIVE = _ps_trace.tag_v_recv);'
-            ;
+        CREATE TYPE _ps_trace.tag_v (
+            INPUT = _ps_trace.tag_v_in,
+            OUTPUT = _ps_trace.tag_v_out,
+            SEND = _ps_trace.tag_v_send,
+            RECEIVE = _ps_trace.tag_v_recv);
 
     END IF;
 END
