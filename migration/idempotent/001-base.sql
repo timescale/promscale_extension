@@ -900,7 +900,7 @@ AS $$
     UNION ALL
     SELECT
         (_prom_catalog.get_new_pos_for_key(get_or_create_label_key_pos.metric_name, m.table_name, array[get_or_create_label_key_pos.key], false))[1]
-    FROM 
+    FROM
         _prom_catalog.get_or_create_metric_table_name(get_or_create_label_key_pos.metric_name) m
     LIMIT 1
 $$
@@ -3080,7 +3080,7 @@ BEGIN
     --this function isolates the logic that needs to be security definer
     --cannot fold it into compress_old_chunks because cannot have security
     --definer do txn-all stuff like commit
-    CREATE OR REPLACE FUNCTION _prom_catalog.compress_chunk_for_metric(metric_table TEXT, chunk_schema_name name, chunk_table_name name)
+    CREATE OR REPLACE FUNCTION _prom_catalog.compress_chunk_for_hypertable(_hypertable_schema_name name, _hypertable_table_name name, _chunk_schema_name name, _chunk_table_name name)
     RETURNS VOID
     SECURITY DEFINER
     SET search_path = pg_catalog, pg_temp
@@ -3093,19 +3093,20 @@ BEGIN
         INTO chunk_full_name
         FROM _timescaledb_catalog.chunk ch
             JOIN _timescaledb_catalog.hypertable ht ON ht.id = ch.hypertable_id
-        WHERE ht.schema_name = 'prom_data'
-          AND ht.table_name = metric_table
-          AND ch.schema_name = chunk_schema_name
-          AND ch.table_name = chunk_table_name;
+        WHERE ht.schema_name IN ('prom_data', '_ps_trace') --for security, can only work on our tables
+          AND ht.schema_name = _hypertable_schema_name
+          AND ht.table_name = _hypertable_table_name
+          AND ch.schema_name = _chunk_schema_name
+          AND ch.table_name = _chunk_table_name;
 
         PERFORM public.compress_chunk(chunk_full_name, if_not_compressed => true);
     END;
     $$
     LANGUAGE PLPGSQL;
-    REVOKE ALL ON FUNCTION _prom_catalog.compress_chunk_for_metric(TEXT, name, name) FROM PUBLIC;
-    GRANT EXECUTE ON FUNCTION _prom_catalog.compress_chunk_for_metric(TEXT, name, name) TO prom_maintenance;
+    REVOKE ALL ON FUNCTION _prom_catalog.compress_chunk_for_hypertable(name, name, name, name) FROM PUBLIC;
+    GRANT EXECUTE ON FUNCTION _prom_catalog.compress_chunk_for_hypertable(name, name, name, name) TO prom_maintenance;
 
-    CREATE OR REPLACE PROCEDURE _prom_catalog.compress_old_chunks(metric_table TEXT, compress_before TIMESTAMPTZ)
+    CREATE OR REPLACE PROCEDURE _prom_catalog.compress_old_chunks(_hypertable_schema_name NAME, _hypertable_table_name NAME, _compress_before TIMESTAMPTZ)
     AS $$
     DECLARE
         chunk_schema_name name;
@@ -3130,19 +3131,19 @@ BEGIN
                 JOIN _timescaledb_catalog.dimension_slice dimsl ON dim.id = dimsl.dimension_id AND chcons.dimension_slice_id = dimsl.id
             WHERE ch.dropped IS FALSE
                 AND (ch.status & 1) != 1 -- only check for uncompressed chunks
-                AND ht.schema_name = 'prom_data'
-                AND ht.table_name = metric_table
+                AND ht.schema_name = _hypertable_schema_name
+                AND ht.table_name = _hypertable_table_name
             ORDER BY 3 ASC
         LOOP
-            CONTINUE WHEN chunk_num <= 1 OR chunk_range_end > compress_before;
-            PERFORM _prom_catalog.compress_chunk_for_metric(metric_table, chunk_schema_name, chunk_table_name);
+            CONTINUE WHEN chunk_num <= 1 OR chunk_range_end > _compress_before;
+            PERFORM _prom_catalog.compress_chunk_for_hypertable(_hypertable_schema_name, _hypertable_table_name, chunk_schema_name, chunk_table_name);
             COMMIT;
             -- reset search path after transaction end
             SET LOCAL search_path = pg_catalog, pg_temp;
         END LOOP;
     END;
     $$ LANGUAGE PLPGSQL;
-    GRANT EXECUTE ON PROCEDURE _prom_catalog.compress_old_chunks(TEXT, TIMESTAMPTZ) TO prom_maintenance;
+    GRANT EXECUTE ON PROCEDURE _prom_catalog.compress_old_chunks(NAME, NAME, TIMESTAMPTZ) TO prom_maintenance;
 END
 $DO$;
 $ee$);
@@ -3165,10 +3166,10 @@ BEGIN
     -- on all the datanodes to search for uncompressed chunks
     IF _prom_catalog.is_multinode() THEN
         CALL public.distributed_exec(format($dist$
-            CALL _prom_catalog.compress_old_chunks(%L, now() - INTERVAL '1 hour')
+            CALL _prom_catalog.compress_old_chunks('prom_data', %L, now() - INTERVAL '1 hour')
         $dist$, metric_table), transactional => false);
     ELSE
-        CALL _prom_catalog.compress_old_chunks(metric_table, now() - INTERVAL '1 hour');
+        CALL _prom_catalog.compress_old_chunks('prom_data', metric_table, now() - INTERVAL '1 hour');
     END IF;
 END
 $$ LANGUAGE PLPGSQL;
@@ -3314,7 +3315,7 @@ BEGIN
     ) USING time_array, value_array, series_id_array;
     GET DIAGNOSTICS num_rows = ROW_COUNT;
     RETURN num_rows;
-EXCEPTION WHEN unique_violation THEN 
+EXCEPTION WHEN unique_violation THEN
 	EXECUTE FORMAT(
 	'INSERT INTO  prom_data.%1$I (time, value, series_id)
 		 SELECT * FROM unnest($1, $2, $3) a(t,v,s) ORDER BY s,t ON CONFLICT DO NOTHING',
