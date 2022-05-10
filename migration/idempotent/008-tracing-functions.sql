@@ -584,7 +584,7 @@ BEGIN
 
     SET LOCAL log_statement = 'none';
 
-    EXECUTE format($sql$CREATE TEMPORARY TABLE IF NOT EXISTS %I ON COMMIT DELETE ROWS AS TABLE _ps_trace.%I WITH NO DATA$sql$,
+    EXECUTE format($sql$CREATE TEMPORARY TABLE IF NOT EXISTS %I (LIKE _ps_trace.%I) ON COMMIT DELETE ROWS$sql$,
                     _temp_table_name, _proto_table_name);
     EXECUTE format($sql$GRANT SELECT, INSERT ON TABLE %I TO prom_writer$sql$,
                     _temp_table_name);
