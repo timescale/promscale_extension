@@ -554,9 +554,13 @@ BEGIN
         ALTER TABLE _ps_trace.event SET (timescaledb.compress, timescaledb.compress_orderby='trace_id,span_id,time');
         ALTER TABLE _ps_trace.link SET (timescaledb.compress, timescaledb.compress_orderby='trace_id,span_id,span_start_time');
 
-        PERFORM public.add_compression_policy('_ps_trace.span', INTERVAL '1 hours');
-        PERFORM public.add_compression_policy('_ps_trace.event', INTERVAL '1 hours');
-        PERFORM public.add_compression_policy('_ps_trace.link', INTERVAL '1 hours');
+        --stub to be replaced later
+        CREATE OR REPLACE PROCEDURE _ps_trace.execute_tracing_compression_job(job_id int, config jsonb)
+        AS $$ BEGIN END $$ LANGUAGE PLPGSQL;
+
+        PERFORM public.add_job('_ps_trace.execute_tracing_compression_job', INTERVAL '1 hour', config=>JSONB '{"log_verbose":false,"hypertable_name":"span"}');
+        PERFORM public.add_job('_ps_trace.execute_tracing_compression_job', INTERVAL '1 hour', config=>JSONB '{"log_verbose":false,"hypertable_name":"event"}');
+        PERFORM public.add_job('_ps_trace.execute_tracing_compression_job', INTERVAL '1 hour', config=>JSONB '{"log_verbose":false,"hypertable_name":"link"}');
 
         -- we do not want the compressed hypertables to be associated with the extension
         -- we want both the table definitions and data to be dumped by pg_dump
@@ -603,3 +607,6 @@ REVOKE ALL PRIVILEGES ON TABLE _ps_trace.instrumentation_lib FROM prom_writer; -
 GRANT SELECT, INSERT ON TABLE _ps_trace.instrumentation_lib TO prom_writer;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.instrumentation_lib TO prom_modifier;
 GRANT USAGE ON SEQUENCE _ps_trace.instrumentation_lib_id_seq TO prom_writer, prom_modifier;
+
+DROP FUNCTION IF EXISTS _prom_catalog.compress_chunk_for_metric(TEXT, name, name);
+DROP FUNCTION IF EXISTS _prom_catalog.compress_old_chunks(TEXT, TIMESTAMPTZ);
