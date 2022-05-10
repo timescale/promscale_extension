@@ -21,55 +21,49 @@ To compile the extension (see instructions below):
 
 ### Precompiled OS Packages
 
-You can install the promscale extension starting from the 0.3.0 release, using precompiled .deb and .rpm packages for Debian and RedHat-based distributions. 
+You can install the Promscale extension using precompiled packages for Debian and RedHat-based distributions (RHEL-7 only). 
 
-The packages can be found on the GitHub [release page](https://github.com/timescale/promscale_extension/releases). 
+The packages can be found in the Timescale [repository](https://packagecloud.io/app/timescale/timescaledb/search?q=promscale-extension). 
 
-While the extension declares a dependency on Postgres 12-14, it can be run on TimescaleDB 2.x as well, which fufills the requirement
+While the extension declares a dependency on Postgres 12-14, it can be run on TimescaleDB 2.x as well, which fulfills the requirement
 on Postgres indirectly. You can find the installation instructions for TimescaleDB [here](https://docs.timescale.com/install/latest/self-hosted/)
-
-If you are using TimescaleDB, the steps below which install Postgres can be skipped.
 
 #### Debian Derivatives
 
-1. Install Postgres
-    ```
-    apt-get install -y wget gnupg2 lsb-release
-    echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
-    wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
-    apt-get update
-    apt-get install -y postgresql-14
-    ```
+1. Install Postgres or TimescaleDB
+   Instructions for installing TimescaleDB and Postgres can be found [here](https://docs.timescale.com/install/latest/self-hosted/installation-debian/#install-self-hosted-timescaledb-on-debian-based-systems), and [here](https://www.postgresql.org/download/) respectively. 
 
-2. Install the extension
+3. Install the Promscale extension
     ```
-    wget https://github.com/timescale/promscale_extension/releases/download/0.3.0/promscale_extension-0.3.0.pg14.x86_64.deb
-    dpkg -i promscale_extension-0.3.0.pg14.x86_64.deb
+    wget --quiet -O - https://packagecloud.io/timescale/timescaledb/gpgkey | apt-key add -
+    apt update
+    apt install promscale-extension-postgresql-14
     ```
 
-#### RHEL/CentOS/Fedora
-
-NOTE: In the following instructions, `$PG_REPO` is used to indicate the yum repo for PostgreSQL. The repo is slightly
-different between RHEL/CentOS and Fedora, and contains the major version of the distro:
-
-* RHEL/CentOS: `PG_REPO=https://download.postgresql.org/pub/repos/yum/reporpms/EL-${OS_MAJOR_VERSION}-x86_64/pgdg-redhat-repo-latest.noarch.rpm`
-* Fedora: `PG_REPO=https://download.postgresql.org/pub/repos/yum/reporpms/F-${OS_MAJOR_VERSION}-x86_64/pgdg-redhat-repo-latest.noarch.rpm`
-
-So for example, if we are installing on CentOS 7, the value of `$PG_REPO` would be `https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm`.
+#### RHEL/CentOS
 
 See the Postgres [documentation](https://www.postgresql.org/download/linux/redhat/) for more information.
 
-1. Install Postgres
-    ```
-    yum install -y $PG_REPO
-    yum install -y postgresql14-server
-    ```
+1. Install TimescaleDB or Postgres
+   Instructions for installing TimescaleDB and Postgres can be found [here](https://docs.timescale.com/install/latest/self-hosted/installation-debian/#install-self-hosted-timescaledb-on-debian-based-systems), and [here](https://www.postgresql.org/download/) respectively.
 
-2. Install the extension
+2. Install the extension (on CentOS 7)
     ```
-    yum install -y wget
-    wget https://github.com/timescale/promscale_extension/releases/download/0.3.0/promscale_extension-0.3.0.pg14.x86_64.rpm
-    yum localinstall -y promscale_extension-0.3.0.pg14.x86_64.rpm
+    yum install https://download.postgresql.org/pub/repos/yum/reporpms/EL-$(rpm -E %{centos})-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+    tee /etc/yum.repos.d/timescale_timescaledb.repo <<EOL
+    [timescale_timescaledb]
+    name=timescale_timescaledb
+    baseurl=https://packagecloud.io/timescale/timescaledb/el/$(rpm -E %{rhel})/\$basearch
+    repo_gpgcheck=1
+    gpgcheck=0
+    enabled=1
+    gpgkey=https://packagecloud.io/timescale/timescaledb/gpgkey
+    sslverify=1
+    sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+    metadata_expire=300
+    EOL
+    yum update
+    yum install -y promscale-extension-postgresql-14
     ```
 
 ### Docker images
