@@ -569,6 +569,31 @@ $func$
 LANGUAGE plpgsql;
 GRANT EXECUTE ON FUNCTION ps_trace.put_instrumentation_lib(text, text, bigint) TO prom_writer;
 
+-- Creates a temporary table (if it doesn't exist), suitable for tracing data ingestion.
+-- Supresses corresponding DDL logging, otherwise PG log may get unnecessarily verbose.
+CREATE OR REPLACE FUNCTION _ps_trace.ensure_trace_ingest_temp_table(_temp_table_name text, _proto_table_name text)
+    RETURNS void
+    SECURITY DEFINER
+    VOLATILE
+    SET search_path = pg_catalog, pg_temp
+AS $func$
+BEGIN
+    IF _proto_table_name NOT IN ('span', 'link', 'event') THEN
+        RAISE EXCEPTION 'Invalid table prototype specified: %', _proto_table_name;
+    END IF;
+
+    SET LOCAL log_statement = 'none';
+
+    EXECUTE format($sql$CREATE TEMPORARY TABLE IF NOT EXISTS %I ON COMMIT DELETE ROWS AS TABLE _ps_trace.%I WITH NO DATA$sql$,
+                    _temp_table_name, _proto_table_name);
+    EXECUTE format($sql$GRANT SELECT, INSERT ON TABLE %I TO prom_writer$sql$,
+                    _temp_table_name);
+END;
+$func$
+LANGUAGE plpgsql;
+REVOKE ALL ON FUNCTION _ps_trace.ensure_trace_ingest_temp_table(text, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION _ps_trace.ensure_trace_ingest_temp_table(text, text) TO prom_writer;
+
 CREATE OR REPLACE FUNCTION ps_trace.delete_all_traces()
     RETURNS void
     SECURITY DEFINER

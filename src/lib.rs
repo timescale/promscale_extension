@@ -16,7 +16,7 @@ mod util;
 pg_module_magic!();
 
 /// A helper function for building [`pgx::PgList`] out of
-/// iterable collection of binary, C-compatible strings.
+/// iterable collection of `str`.
 ///
 /// For safety reasons it p-allocates and copies its arguemnts
 /// every time. Which is OK for our current once-per-query usage,
