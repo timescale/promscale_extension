@@ -51,7 +51,7 @@ ifeq ($(OS_NAME),fedora)
 	PKG_TYPE = rpm
 endif
 RELEASE_IMAGE_NAME = promscale-extension-pkg:$(EXT_VERSION)-$(OS_NAME)$(OS_VERSION)-pg$(PG_RELEASE_VERSION)
-RELEASE_FILE_NAME = promscale_extension-$(EXT_VERSION).pg$(PG_RELEASE_VERSION).$(OS_NAME)$(OS_VERSION).$(ARCH).$(PKG_TYPE)
+RELEASE_FILE_NAME = promscale-extension-$(EXT_VERSION).pg$(PG_RELEASE_VERSION).$(OS_NAME)$(OS_VERSION).$(ARCH).$(PKG_TYPE)
 
 .PHONY: help
 help:

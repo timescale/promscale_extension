@@ -190,7 +190,7 @@ esac
 
 # Ensure a package filename is set
 if [ -z "${pkg_name}" ]; then
-    pkg_name="promscale_extension-${version}.pg${pg_version}.${os_name}${os_version}.${arch}.${pkg_type}"
+    pkg_name="promscale-extension-${version}.pg${pg_version}.${os_name}${os_version}.${arch}.${pkg_type}"
 fi
 
 # Select the appropriate package name for the Postgres dependency
@@ -267,7 +267,7 @@ fpm --log info -s dir -t "${pkg_type}" \
     --url 'https://github.com/timescale/promscale_extension' \
     --category database \
     --depends "${pg_package}" \
-    --name "promscale_extension-postgresql-${pg_version}" \
+    --name "promscale-extension-postgresql-${pg_version}" \
     --version "${version}" \
     --iteration 1 \
     -C "target/release/promscale-pg${pg_version}" \
