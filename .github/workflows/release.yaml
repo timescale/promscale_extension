@@ -75,11 +75,11 @@ jobs:
         fi;
         echo "::set-output name=version::${version}"
         echo "::set-output name=tag::${tag}"
-        echo "::set-output name=filename::promscale_extension-${tag}.pg${{ matrix.postgres.version }}.${{ matrix.os.distro }}${{ matrix.os.version }}.${{ matrix.arch.cpu }}.${{ matrix.os.pkg_type }}"
-        echo "::set-output name=outfile::promscale_extension-${version}.pg${{ matrix.postgres.version }}.${{ matrix.os.distro }}${{ matrix.os.version }}.${{ matrix.arch.cpu }}.${{ matrix.os.pkg_type }}"
+        echo "::set-output name=filename::promscale-extension-${tag}.pg${{ matrix.postgres.version }}.${{ matrix.os.distro }}${{ matrix.os.version }}.${{ matrix.arch.cpu }}.${{ matrix.os.pkg_type }}"
+        echo "::set-output name=outfile::promscale-extension-${version}.pg${{ matrix.postgres.version }}.${{ matrix.os.distro }}${{ matrix.os.version }}.${{ matrix.arch.cpu }}.${{ matrix.os.pkg_type }}"
         echo "::set-output name=repo::${repo}"
         echo "::set-output name=ghopts::${ghopts}"
-        echo "::set-output name=image::promscale_extension:${tag}.pg${{ matrix.postgres.version }}.${{ matrix.os.distro }}${{ matrix.os.version }}"
+        echo "::set-output name=image::promscale-extension:${tag}.pg${{ matrix.postgres.version }}.${{ matrix.os.distro }}${{ matrix.os.version }}"
 
     - name: Setup QEMU
       uses: docker/setup-qemu-action@v1
