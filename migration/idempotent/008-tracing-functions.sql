@@ -350,7 +350,7 @@ $func$
 LANGUAGE plpgsql;
 GRANT EXECUTE ON FUNCTION ps_trace.put_tag_key(ps_trace.tag_k, ps_trace.tag_type) TO prom_writer;
 
-CREATE OR REPLACE FUNCTION ps_trace.put_tag(_key ps_trace.tag_k, _value ps_trace.tag_v, _tag_type ps_trace.tag_type)
+CREATE OR REPLACE FUNCTION ps_trace.put_tag(_key ps_trace.tag_k, _value _ps_trace.tag_v, _tag_type ps_trace.tag_type)
     RETURNS BIGINT
     VOLATILE STRICT
     SET search_path = pg_catalog, pg_temp
@@ -401,7 +401,7 @@ BEGIN
 END;
 $func$
 LANGUAGE plpgsql;
-GRANT EXECUTE ON FUNCTION ps_trace.put_tag(ps_trace.tag_k, ps_trace.tag_v, ps_trace.tag_type) TO prom_writer;
+GRANT EXECUTE ON FUNCTION ps_trace.put_tag(ps_trace.tag_k, _ps_trace.tag_v, ps_trace.tag_type) TO prom_writer;
 
 CREATE OR REPLACE FUNCTION ps_trace.get_tag_map(_tags jsonb)
 RETURNS ps_trace.tag_map

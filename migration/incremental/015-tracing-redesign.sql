@@ -23,19 +23,6 @@ ANALYZE _ps_trace.instrumentation_lib;
 TRUNCATE TABLE _ps_trace.schema_url CASCADE;
 ANALYZE _ps_trace.schema_url;
 
-CREATE TABLE _ps_trace.tag (
-    id BIGINT NOT NULL GENERATED ALWAYS AS IDENTITY,
-    key_id BIGINT NOT NULL,
-    tag_type ps_trace.tag_type NOT NULL,
-    key ps_trace.tag_k NOT NULL REFERENCES _ps_trace.tag_key (key) ON DELETE CASCADE,
-    value ps_trace.tag_v NOT NULL,
-    PRIMARY KEY(id) --note: cannot include (key, value) because value can be big
-);
-CREATE UNIQUE INDEX tag_key_value_id_key_id_key_idx ON _ps_trace.tag (key, _prom_ext.jsonb_digest(value)) INCLUDE (id, key_id);
-GRANT SELECT ON TABLE _ps_trace.tag TO prom_reader;
-REVOKE ALL PRIVILEGES ON TABLE _ps_trace.tag FROM prom_writer; -- prev migration granted too many privileges
-GRANT SELECT, INSERT ON TABLE _ps_trace.tag TO prom_writer;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.tag TO prom_modifier;
 
 --redefine enums to be more user friendly
 DROP TYPE ps_trace.span_kind CASCADE;
@@ -247,6 +234,8 @@ CREATE CAST(ps_trace.trace_id as uuid) WITHOUT FUNCTION AS IMPLICIT;
 CREATE CAST(uuid AS ps_trace.trace_id) WITHOUT FUNCTION AS IMPLICIT;
 /* Drop the old tag_map type */
 DROP DOMAIN ps_trace.tag_map CASCADE;
+/* Drop the old tag_v type */
+DROP DOMAIN ps_trace.tag_v CASCADE;
 
 DROP FUNCTION IF EXISTS _ps_trace.eval_tags_by_key(ps_trace.tag_k);
 DROP FUNCTION IF EXISTS _ps_trace.eval_jsonb_path_exists(ps_tag.tag_op_jsonb_path_exists);
@@ -399,8 +388,25 @@ BEGIN
 END
 $do$;
 
+CREATE CAST (_ps_trace.tag_v AS jsonb) WITHOUT FUNCTION AS IMPLICIT;
+CREATE CAST (jsonb AS _ps_trace.tag_v) WITHOUT FUNCTION AS IMPLICIT;
+
 GRANT USAGE ON TYPE ps_trace.tag_map TO prom_reader;
 GRANT USAGE ON TYPE _ps_trace.tag_v TO prom_reader;
+
+CREATE TABLE _ps_trace.tag (
+    id BIGINT NOT NULL GENERATED ALWAYS AS IDENTITY,
+    key_id BIGINT NOT NULL,
+    tag_type ps_trace.tag_type NOT NULL,
+    key ps_trace.tag_k NOT NULL REFERENCES _ps_trace.tag_key (key) ON DELETE CASCADE,
+    value _ps_trace.tag_v NOT NULL,
+    PRIMARY KEY(id) --note: cannot include (key, value) because value can be big
+);
+CREATE UNIQUE INDEX tag_key_value_id_key_id_key_idx ON _ps_trace.tag (key, _prom_ext.jsonb_digest(value)) INCLUDE (id, key_id);
+GRANT SELECT ON TABLE _ps_trace.tag TO prom_reader;
+REVOKE ALL PRIVILEGES ON TABLE _ps_trace.tag FROM prom_writer; -- prev migration granted too many privileges
+GRANT SELECT, INSERT ON TABLE _ps_trace.tag TO prom_writer;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.tag TO prom_modifier;
 
 CREATE TABLE _ps_trace.span
 (
