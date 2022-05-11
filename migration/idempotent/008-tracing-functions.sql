@@ -675,20 +675,20 @@ END
 $do$;
 
 CREATE OR REPLACE FUNCTION _ps_trace.tag_v_in(cstring)
-RETURNS _ps_trace.tag_v
+RETURNS ps_trace.tag_v
 LANGUAGE internal
 IMMUTABLE PARALLEL SAFE STRICT
 AS $function$jsonb_in$function$
 ;
 
-CREATE OR REPLACE FUNCTION _ps_trace.tag_v_out(_ps_trace.tag_v)
+CREATE OR REPLACE FUNCTION _ps_trace.tag_v_out(ps_trace.tag_v)
 RETURNS cstring
 LANGUAGE internal
 IMMUTABLE PARALLEL SAFE STRICT
 AS $function$jsonb_out$function$
 ;
 
-CREATE OR REPLACE FUNCTION _ps_trace.tag_v_send(_ps_trace.tag_v)
+CREATE OR REPLACE FUNCTION _ps_trace.tag_v_send(ps_trace.tag_v)
 RETURNS bytea
 LANGUAGE internal
 IMMUTABLE PARALLEL SAFE STRICT
@@ -696,7 +696,7 @@ AS $function$jsonb_send$function$
 ;
 
 CREATE OR REPLACE FUNCTION _ps_trace.tag_v_recv(internal)
-RETURNS _ps_trace.tag_v
+RETURNS ps_trace.tag_v
 LANGUAGE internal
 IMMUTABLE PARALLEL SAFE STRICT
 AS $function$jsonb_recv$function$
@@ -726,7 +726,7 @@ BEGIN
               AND typnamespace = '_ps_trace'::regnamespace
               AND typsubscript = '_ps_trace.tag_v_subscript_handler'::regproc
             ) THEN
-                ALTER TYPE _ps_trace.tag_v SET (SUBSCRIPT = _ps_trace.tag_v_subscript_handler);
+                ALTER TYPE ps_trace.tag_v SET (SUBSCRIPT = _ps_trace.tag_v_subscript_handler);
         END IF;
     END IF;
 END

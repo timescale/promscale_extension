@@ -13,6 +13,10 @@ DROP VIEW IF EXISTS ps_trace.event CASCADE;
 DROP VIEW IF EXISTS ps_trace.link CASCADE;
 DROP VIEW IF EXISTS ps_trace.span CASCADE;
 
+/* Drop the old tag_map type */
+DROP DOMAIN ps_trace.tag_map CASCADE;
+DROP DOMAIN ps_trace.tag_v CASCADE;
+
 DELETE FROM _ps_trace.tag_key WHERE id >= 1000;
 ANALYZE _ps_trace.tag_key;
 REINDEX TABLE _ps_trace.tag_key;
@@ -22,20 +26,6 @@ TRUNCATE TABLE _ps_trace.instrumentation_lib CASCADE;
 ANALYZE _ps_trace.instrumentation_lib;
 TRUNCATE TABLE _ps_trace.schema_url CASCADE;
 ANALYZE _ps_trace.schema_url;
-
-CREATE TABLE _ps_trace.tag (
-    id BIGINT NOT NULL GENERATED ALWAYS AS IDENTITY,
-    key_id BIGINT NOT NULL,
-    tag_type ps_trace.tag_type NOT NULL,
-    key ps_trace.tag_k NOT NULL REFERENCES _ps_trace.tag_key (key) ON DELETE CASCADE,
-    value ps_trace.tag_v NOT NULL,
-    PRIMARY KEY(id) --note: cannot include (key, value) because value can be big
-);
-CREATE UNIQUE INDEX tag_key_value_id_key_id_key_idx ON _ps_trace.tag (key, _prom_ext.jsonb_digest(value)) INCLUDE (id, key_id);
-GRANT SELECT ON TABLE _ps_trace.tag TO prom_reader;
-REVOKE ALL PRIVILEGES ON TABLE _ps_trace.tag FROM prom_writer; -- prev migration granted too many privileges
-GRANT SELECT, INSERT ON TABLE _ps_trace.tag TO prom_writer;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.tag TO prom_modifier;
 
 --redefine enums to be more user friendly
 DROP TYPE ps_trace.span_kind CASCADE;
@@ -245,8 +235,6 @@ GRANT USAGE ON TYPE ps_trace.trace_id TO prom_reader;
 -- ps_trace.trace_id and uuid are binary coercible
 CREATE CAST(ps_trace.trace_id as uuid) WITHOUT FUNCTION AS IMPLICIT;
 CREATE CAST(uuid AS ps_trace.trace_id) WITHOUT FUNCTION AS IMPLICIT;
-/* Drop the old tag_map type */
-DROP DOMAIN ps_trace.tag_map CASCADE;
 
 DROP FUNCTION IF EXISTS _ps_trace.eval_tags_by_key(ps_trace.tag_k);
 DROP FUNCTION IF EXISTS _ps_trace.eval_jsonb_path_exists(ps_tag.tag_op_jsonb_path_exists);
@@ -265,7 +253,7 @@ DROP FUNCTION IF EXISTS _ps_trace.eval_greater_than_or_equal(ps_tag.tag_op_great
  */
 
 CREATE TYPE ps_trace.tag_map;
-CREATE TYPE _ps_trace.tag_v;
+CREATE TYPE ps_trace.tag_v;
 
 CREATE OR REPLACE FUNCTION ps_trace.tag_map_in(cstring)
 RETURNS ps_trace.tag_map
@@ -330,6 +318,7 @@ BEGIN
 END
 $do$;
 
+GRANT USAGE ON TYPE ps_trace.tag_map TO prom_reader;
 
 CREATE CAST (jsonb AS ps_trace.tag_map) WITHOUT FUNCTION AS IMPLICIT;
 CREATE CAST (ps_trace.tag_map AS jsonb) WITHOUT FUNCTION AS IMPLICIT;
@@ -338,20 +327,20 @@ CREATE CAST (json AS ps_trace.tag_map) WITH INOUT AS ASSIGNMENT;
 CREATE CAST (ps_trace.tag_map AS json) WITH INOUT AS ASSIGNMENT;
 
 CREATE OR REPLACE FUNCTION _ps_trace.tag_v_in(cstring)
-RETURNS _ps_trace.tag_v
+RETURNS ps_trace.tag_v
 LANGUAGE internal
 IMMUTABLE PARALLEL SAFE STRICT
 AS $function$jsonb_in$function$
 ;
 
-CREATE OR REPLACE FUNCTION _ps_trace.tag_v_out(_ps_trace.tag_v)
+CREATE OR REPLACE FUNCTION _ps_trace.tag_v_out(ps_trace.tag_v)
 RETURNS cstring
 LANGUAGE internal
 IMMUTABLE PARALLEL SAFE STRICT
 AS $function$jsonb_out$function$
 ;
 
-CREATE OR REPLACE FUNCTION _ps_trace.tag_v_send(_ps_trace.tag_v)
+CREATE OR REPLACE FUNCTION _ps_trace.tag_v_send(ps_trace.tag_v)
 RETURNS bytea
 LANGUAGE internal
 IMMUTABLE PARALLEL SAFE STRICT
@@ -359,7 +348,7 @@ AS $function$jsonb_send$function$
 ;
 
 CREATE OR REPLACE FUNCTION _ps_trace.tag_v_recv(internal)
-RETURNS _ps_trace.tag_v
+RETURNS ps_trace.tag_v
 LANGUAGE internal
 IMMUTABLE PARALLEL SAFE STRICT
 AS $function$jsonb_recv$function$
@@ -382,14 +371,14 @@ BEGIN
                 IMMUTABLE PARALLEL SAFE STRICT
                 AS $f$jsonb_subscript_handler$f$;
 
-        CREATE TYPE _ps_trace.tag_v (
+        CREATE TYPE ps_trace.tag_v (
                 INPUT = _ps_trace.tag_v_in,
                 OUTPUT = _ps_trace.tag_v_out,
                 SEND = _ps_trace.tag_v_send,
                 RECEIVE = _ps_trace.tag_v_recv,
                 SUBSCRIPT = _ps_trace.tag_v_subscript_handler);
     ELSE
-        CREATE TYPE _ps_trace.tag_v (
+        CREATE TYPE ps_trace.tag_v (
             INPUT = _ps_trace.tag_v_in,
             OUTPUT = _ps_trace.tag_v_out,
             SEND = _ps_trace.tag_v_send,
@@ -399,8 +388,24 @@ BEGIN
 END
 $do$;
 
-GRANT USAGE ON TYPE ps_trace.tag_map TO prom_reader;
-GRANT USAGE ON TYPE _ps_trace.tag_v TO prom_reader;
+GRANT USAGE ON TYPE ps_trace.tag_v TO prom_reader;
+
+CREATE DOMAIN ps_trace.tag_ids_map jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(value) = 'object');
+GRANT USAGE ON DOMAIN ps_trace.tag_ids_map TO prom_reader;
+
+CREATE TABLE _ps_trace.tag (
+    id BIGINT NOT NULL GENERATED ALWAYS AS IDENTITY,
+    key_id BIGINT NOT NULL,
+    tag_type ps_trace.tag_type NOT NULL,
+    key ps_trace.tag_k NOT NULL REFERENCES _ps_trace.tag_key (key) ON DELETE CASCADE,
+    value pg_catalog.jsonb NOT NULL,
+    PRIMARY KEY(id) --note: cannot include (key, value) because value can be big
+);
+CREATE UNIQUE INDEX tag_key_value_id_key_id_key_idx ON _ps_trace.tag (key, _prom_ext.jsonb_digest(value)) INCLUDE (id, key_id);
+GRANT SELECT ON TABLE _ps_trace.tag TO prom_reader;
+REVOKE ALL PRIVILEGES ON TABLE _ps_trace.tag FROM prom_writer; -- prev migration granted too many privileges
+GRANT SELECT, INSERT ON TABLE _ps_trace.tag TO prom_writer;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _ps_trace.tag TO prom_modifier;
 
 CREATE TABLE _ps_trace.span
 (
@@ -420,9 +425,9 @@ CREATE TABLE _ps_trace.span
     resource_dropped_tags_count int NOT NULL default 0,
     status_code ps_trace.status_code NOT NULL,
     trace_state text, /* empty string not allowed */
-    span_tags ps_trace.tag_map NOT NULL,
+    span_tags ps_trace.tag_ids_map NOT NULL,
     status_message text,
-    resource_tags ps_trace.tag_map NOT NULL,
+    resource_tags ps_trace.tag_ids_map NOT NULL,
     PRIMARY KEY (span_id, trace_id, start_time)
 );
 CREATE INDEX ON _ps_trace.span USING BTREE (trace_id, parent_span_id) INCLUDE (span_id); -- used for recursive CTEs for trace tree queries
@@ -443,7 +448,7 @@ CREATE TABLE _ps_trace.event
     event_nbr int NOT NULL DEFAULT 0,
     dropped_tags_count int NOT NULL DEFAULT 0,
     name text NOT NULL,
-    tags ps_trace.tag_map NOT NULL
+    tags ps_trace.tag_ids_map NOT NULL
 );
 CREATE INDEX ON _ps_trace.event USING GIN (tags jsonb_path_ops);
 CREATE INDEX ON _ps_trace.event USING BTREE (trace_id, span_id);
@@ -463,7 +468,7 @@ CREATE TABLE _ps_trace.link
     link_nbr int NOT NULL DEFAULT 0,
     dropped_tags_count int NOT NULL DEFAULT 0,
     trace_state text, /* empty string not allowed */
-    tags ps_trace.tag_map NOT NULL
+    tags ps_trace.tag_ids_map NOT NULL
 );
 CREATE INDEX ON _ps_trace.link USING BTREE (trace_id, span_id);
 CREATE INDEX ON _ps_trace.link USING GIN (tags jsonb_path_ops);
