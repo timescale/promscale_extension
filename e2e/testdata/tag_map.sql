@@ -1,5 +1,4 @@
 \set ECHO all
-\set ON_ERROR_STOP 1
 
 CREATE EXTENSION promscale;
 
@@ -46,9 +45,9 @@ SELECT trace_id
 EXECUTE neq_test;
 
 /* Not equals uses support function and produces correct plan */
-SELECT 
+SELECT
     x::text LIKE '%InitPlan%',
-    x::text LIKE '% @> ANY%' 
+    x::text LIKE '% @> ANY%'
 FROM explain_jsonb('EXECUTE neq_test') AS f(x);
 
 /* Equals operator returns correct result */
@@ -60,21 +59,23 @@ SELECT trace_id
         AND resource_tags -> 'service.name' = '"generator"';
 
 /* Equals uses support function and produces correct plan */
-SELECT 
+SELECT
     x::text LIKE '%InitPlan%',
-    x::text LIKE '% @> %' 
+    x::text LIKE '% @> %'
 FROM explain_jsonb('EXECUTE eq_test') AS f(x);
 
 /* Functions, underpinning tag_map operators handle NULL arguments correctly */
-SELECT ps_trace.tag_v_eq(NULL, NULL);
-SELECT ps_trace.tag_v_ne(NULL, NULL);
-SELECT ps_trace.tag_map_object_field(NULL, NULL);
+SELECT ps_trace.tag_v_eq(NULL::_ps_trace.tag_v, NULL::pg_catalog.jsonb) IS NULL;
+SELECT ps_trace.tag_v_eq(NULL::_ps_trace.tag_v, NULL::_ps_trace.tag_v) IS NULL;
+SELECT ps_trace.tag_v_ne(NULL::_ps_trace.tag_v, NULL::pg_catalog.jsonb) IS NULL;
+SELECT ps_trace.tag_v_ne(NULL::_ps_trace.tag_v, NULL::_ps_trace.tag_v) IS NULL;
+SELECT ps_trace.tag_map_object_field(NULL, NULL) IS NULL;
 
 /* Test tags in the link view */
 INSERT INTO _ps_trace.link(trace_id, span_id, linked_trace_id, linked_span_id, tags, span_start_time)
     VALUES
         (E'78dd078e-8c69-e10a-d2fe-9e9f47de7728',-2771219554170079234, E'05a8be0f-bb79-c052-223e-48608580efce',2625299614982951051, E'{"1": 114, "5": 94, "6": 93, "7": 95}', E'2022-04-26 11:44:55.185139+00');
-	
+
 SELECT span_tags, resource_tags, linked_span_tags, linked_resource_tags, link_tags FROM link;
 
 INSERT INTO _ps_trace.event(time, trace_id, span_id, name, tags)
@@ -82,3 +83,9 @@ INSERT INTO _ps_trace.event(time, trace_id, span_id, name, tags)
         (E'2022-04-26 11:44:55.185139+00', E'78dd078e-8c69-e10a-d2fe-9e9f47de7728',-2771219554170079234, E'foobar', E'{"6": 93, "7": 95}');
 
 SELECT event_tags, span_tags, resource_tags FROM event;
+
+/* Distinct/group by for tag_v type */
+SELECT DISTINCT span_tags -> 'pwlen' FROM span ;
+
+SELECT span_tags -> 'pwlen' AS tagv FROM span  GROUP BY tagv;
+
