@@ -71,7 +71,7 @@ jobs:
           ghopts='--prerelease --draft'; \
         else \
           repo='timescale/timescaledb'; \
-          ghopts=''; \
+          ghopts='--draft'; \
         fi;
         echo "::set-output name=version::${version}"
         echo "::set-output name=tag::${tag}"
