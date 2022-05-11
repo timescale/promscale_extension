@@ -1545,7 +1545,7 @@ dependencies = [
 
 [[package]]
 name = "promscale"
-version = "0.5.0-alpha.2"
+version = "0.5.0"
 dependencies = [
  "askama",
  "bincode",
