@@ -12,7 +12,7 @@ CREATE OR REPLACE FUNCTION _ps_trace.tag_map_denormalize(_map ps_trace.tag_map)
  * search_path-agnostic.
  */
 $fnc$
-    SELECT pg_catalog.jsonb_object_agg(t.key, t.value)
+    SELECT pg_catalog.jsonb_object_agg(t.key, t.value::jsonb)
         FROM pg_catalog.jsonb_each(_map) f(k,v)
             JOIN _ps_trace.tag t ON f.v::pg_catalog.int8 OPERATOR(pg_catalog.=) t.id;
 $fnc$;
