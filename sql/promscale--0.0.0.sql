@@ -651,6 +651,10 @@ BEGIN
         pg_get_constraintdef(oid) similar to 'CHECK \(\(\(labels\[1\] = \d*\) AND \(labels\[1\] IS NOT NULL\)\)\)'
         OR
         pg_get_constraintdef(oid) similar to $$CHECK \(\(\("time" >= '(\d|\-| |\.|\:|\+)*'::timestamp with time zone\) AND \("time" < '(\d|\-| |\.|\:|\+)*'::timestamp with time zone\)\)\)$$
+        OR
+        pg_get_constraintdef(oid) similar to $$CHECK \(\(\(start_time >= '(\d|\-| |\.|\:|\+)*'::timestamp with time zone\) AND \(start_time < '(\d|\-| |\.|\:|\+)*'::timestamp with time zone\)\)\)$$
+        OR
+        pg_get_constraintdef(oid) similar to $$CHECK \(\(\(span_start_time >= '(\d|\-| |\.|\:|\+)*'::timestamp with time zone\) AND \(span_start_time < '(\d|\-| |\.|\:|\+)*'::timestamp with time zone\)\)\)$$
         ) IS NOT TRUE; --use is not true for correct NULL handling
 
         IF array_length(errors, 1) > 0 THEN
