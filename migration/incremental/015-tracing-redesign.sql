@@ -230,8 +230,8 @@ DEFAULT FOR TYPE ps_trace.trace_id USING hash AS
 GRANT USAGE ON TYPE ps_trace.trace_id TO prom_reader;
 
 -- ps_trace.trace_id and uuid are binary coercible
-CREATE CAST(ps_trace.trace_id as uuid) WITHOUT FUNCTION AS IMPLICIT;
-CREATE CAST(uuid AS ps_trace.trace_id) WITHOUT FUNCTION AS IMPLICIT;
+CREATE CAST(ps_trace.trace_id as pg_catalog.uuid) WITHOUT FUNCTION AS IMPLICIT;
+CREATE CAST(pg_catalog.uuid AS ps_trace.trace_id) WITHOUT FUNCTION AS IMPLICIT;
 /* Drop the old tag_map type */
 DROP DOMAIN ps_trace.tag_map CASCADE;
 /* Drop the old tag_v type */
@@ -320,11 +320,11 @@ END
 $do$;
 
 
-CREATE CAST (jsonb AS ps_trace.tag_map) WITHOUT FUNCTION AS IMPLICIT;
-CREATE CAST (ps_trace.tag_map AS jsonb) WITHOUT FUNCTION AS IMPLICIT;
+CREATE CAST (pg_catalog.jsonb AS ps_trace.tag_map) WITHOUT FUNCTION AS IMPLICIT;
+CREATE CAST (ps_trace.tag_map AS pg_catalog.jsonb) WITHOUT FUNCTION AS IMPLICIT;
 
-CREATE CAST (json AS ps_trace.tag_map) WITH INOUT AS ASSIGNMENT;
-CREATE CAST (ps_trace.tag_map AS json) WITH INOUT AS ASSIGNMENT;
+CREATE CAST (pg_catalog.json AS ps_trace.tag_map) WITH INOUT AS ASSIGNMENT;
+CREATE CAST (ps_trace.tag_map AS pg_catalog.json) WITH INOUT AS ASSIGNMENT;
 
 CREATE OR REPLACE FUNCTION _ps_trace.tag_v_in(cstring)
 RETURNS _ps_trace.tag_v
@@ -388,8 +388,8 @@ BEGIN
 END
 $do$;
 
-CREATE CAST (_ps_trace.tag_v AS jsonb) WITHOUT FUNCTION AS IMPLICIT;
-CREATE CAST (jsonb AS _ps_trace.tag_v) WITHOUT FUNCTION AS IMPLICIT;
+CREATE CAST (_ps_trace.tag_v AS pg_catalog.jsonb) WITHOUT FUNCTION AS IMPLICIT;
+CREATE CAST (pg_catalog.jsonb AS _ps_trace.tag_v) WITHOUT FUNCTION AS IMPLICIT;
 
 GRANT USAGE ON TYPE ps_trace.tag_map TO prom_reader;
 GRANT USAGE ON TYPE _ps_trace.tag_v TO prom_reader;
