@@ -1,0 +1,98 @@
+name: docker
+on:
+  pull_request:
+    paths-ignore:
+    - '.github/workflows/release.yaml'
+    - 'dist/*'
+    - 'tools/*'
+  push:
+    branches:
+      - develop
+      - master
+    tags:
+      - "*"
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        pgversion:
+        - 14
+        - 13
+        - 12
+        tsversion:
+        - 2.6.1
+        base:
+        - ha
+        - alpine
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Gather metadata
+        id: metadata
+        run: |
+          tsmajor=$(echo ${{ matrix.tsversion }} | cut -d. -f1)
+          tsmajmin=$(echo ${{ matrix.tsversion }} | cut -d. -f1,2)
+          branch_name=$(echo ${{github.head_ref || github.ref_name}} | sed 's#/#-#')
+          build_type_suffix=$(echo "-${{matrix.base}}" | sed 's/-ha//')
+          echo "::set-output name=tsmajor::${tsmajor}"
+          echo "::set-output name=tsmajmin::${tsmajmin}"
+          echo "::set-output name=branch_name::${branch_name}"
+          echo "::set-output name=build_type_suffix::${build_type_suffix}"
+
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          build-args: |
+            PG_VERSION=${{ matrix.pgversion }}
+            TIMESCALEDB_VERSION_FULL=${{ matrix.tsversion }}
+            TIMESCALEDB_VERSION_MAJOR=${{ steps.metadata.outputs.tsmajor }}
+            TIMESCALEDB_VERSION_MAJMIN=${{ steps.metadata.outputs.tsmajmin }}
+          secrets: |
+            "AWS_ACCESS_KEY_ID=${{ secrets.PROMSCALE_EXTENSION_SCCACHE_AWS_ACCESS_KEY_ID }}"
+            "AWS_SECRET_ACCESS_KEY=${{ secrets.PROMSCALE_EXTENSION_SCCACHE_AWS_SECRET_ACCESS_KEY }}"
+          context: .
+          file: ${{matrix.base}}.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
+            ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.branch_name}}-ts${{steps.metadata.outputs.tsmajor}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
+            ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.branch_name}}-ts${{steps.metadata.outputs.tsmajmin}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
+          # Note: it's necessary to use a different cache scope to achieve caching for both Ubuntu and Alpine images
+          cache-from: type=gha,scope=${{matrix.base}}-${{matrix.pgversion}}-${{matrix.tsversion}}
+          cache-to: type=gha,mode=max,scope=${{matrix.base}}-${{matrix.pgversion}}-${{matrix.tsversion}}
+
+      - name: Run end-to-end tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: -p e2e
+        env:
+          TS_DOCKER_IMAGE: ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
+
+  # This allows us to set a single job which must pass in GitHub's branch protection rules,
+  # otherwise we have to keep updating them as we add or remove postgres versions etc.
+  docker-result:
+    name: docker result
+    if: always()
+    needs:
+      - docker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark the job as a success
+        if: needs.docker.result == 'success'
+        run: exit 0
+      - name: Mark the job as a failure
+        if: needs.docker.result != 'success'
+        run: exit 1

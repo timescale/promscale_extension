@@ -1,0 +1,195 @@
+name: release
+on:
+  pull_request:
+    paths:
+    - '.github/workflows/release.yaml'
+    - 'dist/*'
+    - 'tools/*'
+  push:
+    branches:
+    - main
+    tags:
+    - "*"
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    env:
+      RUST_VERSION: "1.58.0"
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+        - cpu: x86_64
+          platform: amd64
+        os:
+        - name: linux
+          distro: debian
+          version: 11
+          pkg_cloud_tags:
+            - debian/stretch
+            - debian/buster
+            - debian/bullseye
+            - ubuntu/bionic
+            - ubuntu/focal
+            - ubuntu/hirsute
+            - ubuntu/jammy
+            - ubuntu/impish
+          pkg_type: deb
+        - name: linux
+          distro: centos
+          version: 7
+          pkg_cloud_tags:
+            - el/7
+          pkg_type: rpm
+        postgres:
+        - version: "12"
+        - version: "13"
+        - version: "14"
+
+    steps:
+    - name: Install PackageCloud
+      if: ${{ startsWith(github.ref, 'refs/tags') }}
+      run: |
+        sudo gem install package_cloud --no-doc
+
+    - uses: actions/checkout@v2
+
+    - name: Gather Metadata
+      id: metadata
+      run: |
+        if [[ "${GITHUB_REF}" =~ 'refs/tags' ]]; then \
+          version="$(echo "${GITHUB_REF}" | sed -e 's|refs/tags/||')"; \
+          tag="${version}"; \
+        else \
+          tag="$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[] | select(.name == "promscale") | .version')"; \
+          version="${tag}-snapshot"; \
+        fi;
+        # a dash indicates a pre-release version in semver
+        if [[ "$version" =~ '-' ]]; then \
+          repo='timescale/timescaledb-exp'; \
+          ghopts='--prerelease --draft'; \
+        else \
+          repo='timescale/timescaledb'; \
+          ghopts='--draft'; \
+        fi;
+        echo "::set-output name=version::${version}"
+        echo "::set-output name=tag::${tag}"
+        echo "::set-output name=filename::promscale-extension-${tag}.pg${{ matrix.postgres.version }}.${{ matrix.os.distro }}${{ matrix.os.version }}.${{ matrix.arch.cpu }}.${{ matrix.os.pkg_type }}"
+        echo "::set-output name=outfile::promscale-extension-${version}.pg${{ matrix.postgres.version }}.${{ matrix.os.distro }}${{ matrix.os.version }}.${{ matrix.arch.cpu }}.${{ matrix.os.pkg_type }}"
+        echo "::set-output name=repo::${repo}"
+        echo "::set-output name=ghopts::${ghopts}"
+        echo "::set-output name=image::promscale-extension:${tag}.pg${{ matrix.postgres.version }}.${{ matrix.os.distro }}${{ matrix.os.version }}"
+
+    - name: Setup QEMU
+      uses: docker/setup-qemu-action@v1
+
+    - name: Setup Docker Buildx
+      uses: docker/setup-buildx-action@v1
+
+    - name: Build Package
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        load: true
+        platforms: ${{ matrix.os.name }}/${{ matrix.arch.platform }}
+        file: dist/${{ matrix.os.pkg_type }}.dockerfile
+        target: packager
+        build-args: |
+          OS_NAME=${{ matrix.os.distro }}
+          OS_VERSION=${{ matrix.os.version }}
+          PG_VERSION=${{ matrix.postgres.version }}
+          RUST_VERSION=${{ env.RUST_VERSION }}
+          RELEASE_FILE_NAME=${{ steps.metadata.outputs.filename }}
+        secrets: |
+          "AWS_ACCESS_KEY_ID=${{ secrets.PROMSCALE_EXTENSION_SCCACHE_AWS_ACCESS_KEY_ID }}"
+          "AWS_SECRET_ACCESS_KEY=${{ secrets.PROMSCALE_EXTENSION_SCCACHE_AWS_SECRET_ACCESS_KEY }}"
+        tags: ${{ steps.metadata.outputs.image }}
+
+    - name: Extract Package
+      env:
+        DOCKER_PLATFORM: ${{ matrix.os.name }}/${{ matrix.arch.platform }}
+      run: |
+        mkdir -p artifacts
+        container="$(docker create --platform "${DOCKER_PLATFORM}" "${{ steps.metadata.outputs.image }}")"
+        docker cp ${container}:/dist/${{ steps.metadata.outputs.filename }} artifacts/${{ steps.metadata.outputs.outfile }}
+        docker rm -f "${container}"
+        ls -la artifacts/*
+
+    - name: Test package against all variants
+      env:
+        PG_VERSION: ${{ matrix.postgres.version }}
+        DOCKER_PLATFORM: ${{ matrix.os.name }}/${{ matrix.arch.platform }}
+        PACKAGE_TO_TEST: artifacts/${{ steps.metadata.outputs.outfile }}
+        IMAGE_BASE: ${{ steps.metadata.outputs.image }}-test
+        DOCKER_FILE: dist/${{ matrix.os.pkg_type }}.test.dockerfile
+        CONNECTOR_DOCKER_IMAGE: "timescale/promscale:0.11.0-alpha"
+      run: |
+        for pkg_cloud_tag in ${{ join(matrix.os.pkg_cloud_tags, ' ') }}; do \
+          DISTRO=$(echo ${pkg_cloud_tag} | cut -d'/' -f 1 | sed 's/el/centos/'); \
+          DISTRO_VERSION=$(echo ${pkg_cloud_tag} | cut -d'/' -f 2); \
+          EXTENSION_DOCKER_IMAGE="${IMAGE_BASE}-${DISTRO}-${DISTRO_VERSION}"; \
+          docker buildx build --load --platform=${DOCKER_PLATFORM} \
+            --build-arg=DISTRO=${DISTRO} \
+            --build-arg=DISTRO_VERSION=${DISTRO_VERSION} \
+            --build-arg=PG_VERSION=${PG_VERSION} \
+            --build-arg=RELEASE_FILE_NAME=${PACKAGE_TO_TEST} \
+            -t ${EXTENSION_DOCKER_IMAGE} \
+            -f ${DOCKER_FILE} \
+            . ; \
+          ./tools/smoke-test "${EXTENSION_DOCKER_IMAGE}" "${CONNECTOR_DOCKER_IMAGE}" "${DOCKER_PLATFORM}"; \
+        done
+
+    - name: Upload Artifact for Job
+      uses: actions/upload-artifact@v2
+      with:
+        name: ${{ steps.metadata.outputs.outfile }}
+        path: artifacts/${{ steps.metadata.outputs.outfile }}
+        retention-days: 1
+
+    - name: Upload Artifacts to PackageCloud
+      if: ${{ startsWith(github.ref, 'refs/tags') }}
+      env:
+        PACKAGECLOUD_TOKEN: ${{ secrets.IO_PACKAGECLOUD_TOKEN }}
+      run: |
+        for pkg_cloud_tag in ${{ join(matrix.os.pkg_cloud_tags, ' ') }}; do \
+          package_cloud push ${{ steps.metadata.outputs.repo }}/${pkg_cloud_tag} artifacts/${{ steps.metadata.outputs.outfile }}; \
+        done
+
+    outputs:
+      tag: ${{ steps.metadata.outputs.tag }}
+      version: ${{ steps.metadata.outputs.version }}
+      ghopts: ${{ steps.metadata.outputs.ghopts }}
+
+  release:
+    runs-on: ubuntu-latest
+    needs: package
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Download Packages
+      id: download
+      uses: actions/download-artifact@v2
+      with:
+        path: packages
+
+    - name: Stage Packages
+      run: |
+        mkdir artifacts && find ./packages -type f -regextype posix-extended -regex '.*.(deb|rpm)' -exec mv {} ./artifacts/ \;
+
+    - name: List Release Contents
+      if: ${{ !startsWith(github.ref, 'refs/tags') }}
+      run: |
+        ls -la artifacts/*
+
+    - name: Generate Release Notes
+      run: |
+        tools/changelog '${{ needs.package.outputs.tag }}' > dist/RELEASE_NOTES.md
+        cat dist/RELEASE_NOTES.md
+
+    - name: Create Release
+      if: ${{ startsWith(github.ref, 'refs/tags') }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh release create -R timescale/promscale_extension --target ${GITHUB_SHA} ${{ needs.package.outputs.ghopts }} --notes-file dist/RELEASE_NOTES.md ${{ needs.package.outputs.version }} artifacts/*

@@ -1,0 +1,13 @@
+# promscale extension
+comment = 'tables, types and functions supporting Promscale'
+default_version = '@CARGO_VERSION@'
+module_pathname = '$libdir/promscale'
+relocatable = false
+schema = public
+superuser = true
+{%if !is_pg_12 -%}
+trusted = true
+{%-endif%}
+# comma-separated list of previous versions this version can be upgraded from
+# directly. This is used to generate upgrade scripts.
+# upgradeable_from = '0.0.0'

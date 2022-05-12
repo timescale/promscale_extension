@@ -1,0 +1,15 @@
+Format: http://dep.debian.net/deps/dep5
+Upstream-Name: promscale_extension
+Source: https://github.com/timescale/promscale_extension
+
+Files: *
+Copyright: 2016-2021 Timescale
+License: Timescale
+ Licensed under the Timescale License (the "License").
+ .
+ You may not install or use this software unless you agree to be bound by
+ the terms and conditions of the License.  You may obtain a copy of the
+ License at
+ .
+     https://github.com/timescale/timescaledb/blob/master/tsl/LICENSE-TIMESCALE
+ .
