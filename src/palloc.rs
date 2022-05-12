@@ -1,4 +1,9 @@
-use std::ptr::NonNull;
+use std::{
+    ffi::CStr,
+    ops::{Deref, DerefMut},
+    os::raw::c_char,
+    ptr::NonNull,
+};
 
 use pgx::*;
 
@@ -10,59 +15,84 @@ pub unsafe fn in_memory_context<T, F: FnOnce() -> T>(mctx: pg_sys::MemoryContext
     t
 }
 
-pub struct Internal<T>(pub NonNull<T>);
+/// The type to take ownership of string values
+/// that a caller is supposed to pfree.
+pub struct PallocdString {
+    pg_box: PgBox<c_char, AllocatedByRust>,
+}
 
-impl<T> FromDatum for Internal<T> {
-    #[inline]
-    unsafe fn from_datum(
-        datum: pg_sys::Datum,
-        is_null: bool,
-        _: pg_sys::Oid,
-    ) -> Option<Internal<T>> {
-        if is_null {
-            return None;
+impl PallocdString {
+    /// SAFETY: the pointer passed into this function must be a NULL-terminated string
+    /// and conform to the requirements of [`std::ffi::CStr`]
+    pub unsafe fn from_ptr(ptr: *mut c_char) -> Option<Self> {
+        if ptr.is_null() {
+            None
+        } else {
+            Some(PallocdString {
+                pg_box: PgBox::<_, AllocatedByRust>::from_rust(ptr),
+            })
         }
+    }
 
-        let ptr = datum as *mut T;
-        // FIXME it looks like timescale occasionally passes a 0 ptr as non-null
-        //       we special case 0-sized types to ensure that we still function
-        //       in that case
-        if std::mem::size_of::<T>() == 0 && ptr.is_null() {
-            return Some(Internal(NonNull::dangling()));
-        }
-        let nn = NonNull::new(ptr).unwrap_or_else(|| {
-            panic!("Internal-type Datum flagged not null but its datum is zero")
-        });
-        Some(Internal(nn))
+    pub fn as_c_str(&self) -> &CStr {
+        unsafe { CStr::from_ptr(self.pg_box.as_ptr()) }
     }
 }
 
-impl<T> IntoDatum for Internal<T> {
-    fn into_datum(self) -> Option<pg_sys::Datum> {
-        Some(self.0.as_ptr() as pg_sys::Datum)
-    }
+pub use pgx::Internal;
 
-    fn type_oid() -> pg_sys::Oid {
-        pg_sys::INTERNALOID
+#[allow(clippy::missing_safety_doc)]
+pub unsafe trait InternalAsValue {
+    unsafe fn to_inner<T>(self) -> Option<Inner<T>>;
+}
+
+unsafe impl InternalAsValue for Internal {
+    unsafe fn to_inner<T>(self) -> Option<Inner<T>> {
+        self.unwrap().map(|p| Inner(NonNull::new(p as _).unwrap()))
     }
 }
 
-impl<T> From<T> for Internal<T> {
-    fn from(t: T) -> Self {
-        let ptr = pgx::Internal::new(t).unwrap().unwrap();
-        Internal::<T>(NonNull::new(ptr as _).unwrap())
-    }
+#[allow(clippy::missing_safety_doc)]
+pub unsafe trait ToInternal {
+    fn internal(self) -> Internal;
 }
 
-impl<T> std::ops::Deref for Internal<T> {
+pub struct Inner<T>(pub NonNull<T>);
+
+impl<T> Deref for Inner<T> {
     type Target = T;
+
     fn deref(&self) -> &Self::Target {
         unsafe { self.0.as_ref() }
     }
 }
 
-impl<T> std::ops::DerefMut for Internal<T> {
+impl<T> DerefMut for Inner<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { self.0.as_mut() }
+    }
+}
+
+unsafe impl<T> ToInternal for Option<Inner<T>> {
+    fn internal(self) -> Internal {
+        self.map(|p| p.0.as_ptr() as pg_sys::Datum).into()
+    }
+}
+
+unsafe impl<T> ToInternal for Inner<T> {
+    fn internal(self) -> Internal {
+        Some(self.0.as_ptr() as pg_sys::Datum).into()
+    }
+}
+
+impl<T> From<T> for Inner<T> {
+    fn from(t: T) -> Self {
+        unsafe { Internal::new(t).to_inner().unwrap() }
+    }
+}
+
+unsafe impl<T> ToInternal for *mut T {
+    fn internal(self) -> Internal {
+        Internal::from(Some(self as pg_sys::Datum))
     }
 }

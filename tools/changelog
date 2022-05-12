@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+set -eo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/../" && pwd -P)"
+
+function usage(){
+    echo "usage: $(basename "$0") <VERSION> [OPTIONS]"
+	echo ""
+	echo "Prints the release notes for VERSION."
+	echo ""
+	echo "If VERSION has no changes recorded in CHANGELOG.md, then the "
+	echo "changes from the unreleased section are used instead."
+    echo ""
+    echo "OPTIONS"
+    echo " -h | --help     Print this help message"
+    echo ""
+}
+
+tag="$1"
+if [ -z "$tag" ]; then
+	echo "Expected the desired version number as the first argument!"
+	echo ""
+	usage
+	exit 2
+fi
+
+if [ "$tag" = "-h" ] || [ "$tag" = "--help" ]; then
+	usage
+	exit 2
+fi
+
+awk -v tag="${tag}" -v header="^## \\\[${tag}\\\]" '
+    BEGIN                { notes="";flag=0;unreleased=0 }
+	$0~header            { flag=1; notes=$0 "\n"; next}
+	/^## \[Unreleased\]/ { unreleased=1; notes=$0 "\n"; next }
+	/^## /  {
+		if (unreleased == 1) { unreleased=0 }
+		if (flag == 0) {
+		    next
+		} else {
+			exit
+		}
+	}
+	flag==1||unreleased==1 {notes=notes $0 "\n"; next}
+	END                   { gsub(/[\n]+$/, "", notes); print notes }
+' "${ROOT_DIR}/CHANGELOG.md"

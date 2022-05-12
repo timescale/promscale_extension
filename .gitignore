@@ -1,7 +1,8 @@
-.deps
-src/*.o
-src/*.bc
-src/*.d
-promscale.so
-/target
 .idea/
+dist/*.rpm
+dist/*.deb
+dist/*.tar
+target
+/hand-written-migration.sql
+/promscale.control
+/bootstrap.sql
