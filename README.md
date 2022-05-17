@@ -123,14 +123,14 @@ For bare-metal installations, the full instructions for setting up PostgreSQL, T
     ```
 1) Download this repo and change directory into it
     ```bash
-    curl -L -o "promscale_extension.zip" "https://github.com/timescale/promscale_extension/archive/refs/tags/0.3.0.zip"
-    sudo apt-get install unzip
-    unzip promscale_extension.zip
-    cd promscale_extension-0.3.0
+    sudo apt-get install -y git
+    git clone https://github.com/timescale/promscale_extension
+    cd promscale_extension
+    git checkout 0.5.0
     ```
 1) Compile and install
     ```bash
-    make
+    make package
     sudo make install
     ```
 1) Create a PostgreSQL user and database for promscale (use an appropriate password!)

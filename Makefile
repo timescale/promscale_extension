@@ -3,11 +3,13 @@
 ARCH ?= $(shell uname -m)
 # This little workaround allows usage of the '#' character on both gnu make 3.8 and 4.3+
 H := \#
-EXT_VERSION ?= $(shell cargo pkgid | cut -d'$H' -f2 | cut -d':' -f2)
+# We want to be able to execute `sudo make install`, but cargo and rustc are probably both
+# not available for sudo, so we use `command -v` to only run them if they are available
+EXT_VERSION ?= $(shell command -v cargo >/dev/null && cargo pkgid | cut -d'$H' -f2 | cut -d':' -f2)
+RUST_VERSION ?= $(shell command -v rustc >/dev/null && rustc --version | cut -d' ' -f2)
 IMAGE_NAME ?= timescaledev/promscale-extension
 OS_NAME ?= debian
 OS_VERSION ?= 11
-RUST_VERSION ?= $(shell rustc --version | cut -d' ' -f2)
 PG_CONFIG ?= pg_config
 PG_RELEASE_VERSION ?= $(shell ${PG_CONFIG} --version | awk -F'[ \. ]' '{print $$2}')
 PG_BUILD_VERSION = $(shell ${PG_CONFIG} --version | awk -F'[ \. ]' '{print $$2}')
@@ -97,10 +99,8 @@ package: promscale.control ## Generate extension artifacts for packaging
 	cargo pgx package --pg-config ${PG_CONFIG}
 
 .PHONY: install
-install: promscale.control ## Install the extension in the Postgres found via pg_config
-	cargo pgx schema pg${PG_BUILD_VERSION} --out sql/promscale--${EXT_VERSION}.sql --release
-	bash create-upgrade-symlinks.sh
-	cargo pgx install --pg-config ${PG_CONFIG}
+install: ## Install the extension in the Postgres found via pg_config
+	cp -a ./target/release/promscale-pg${PG_BUILD_VERSION}/* /
 
 dist/$(RELEASE_FILE_NAME): release-builder
 	@container="$$(docker create $(RELEASE_IMAGE_NAME))"; \
