@@ -1106,36 +1106,40 @@ CREATE OR REPLACE FUNCTION _prom_catalog.get_or_create_label_ids(metric_name TEX
     VOLATILE
     SET search_path = pg_catalog, pg_temp
 AS $$
-        WITH cte as (
-        SELECT
-            -- only call the functions to create new key positions
-            -- and label ids if they don't exist (for performance reasons)
-            lkp.pos as known_pos,
-            coalesce(l.id, _prom_catalog.get_or_create_label_id(kv.key, kv.value)) label_id,
-            kv.key key_str,
-            kv.value val_str
-        FROM ROWS FROM(unnest(label_keys), UNNEST(label_values)) AS kv(key, value)
-            LEFT JOIN _prom_catalog.label l
-               ON (l.key = kv.key AND l.value = kv.value)
-            LEFT JOIN _prom_catalog.label_key_position lkp ON
-            (
-                    lkp.metric_name = get_or_create_label_ids.metric_name AND
-                    lkp.key = kv.key
+    BEGIN
+        RETURN QUERY EXECUTE format($query$
+        WITH cte AS (
+            SELECT
+                -- only call the functions to create new key positions
+                -- and label ids if they don't exist (for performance reasons)
+                lkp.pos as known_pos,
+                coalesce(l.id, _prom_catalog.get_or_create_label_id(kv.key, kv.value)) label_id,
+                kv.key key_str,
+                kv.value val_str
+            FROM ROWS FROM(unnest(%3$L::text[]), unnest(%4$L::text[])) AS kv(key, value)
+                LEFT JOIN _prom_catalog.label l
+                ON (l.key = kv.key AND l.value = kv.value)
+                LEFT JOIN _prom_catalog.label_key_position lkp ON
+                (
+                        lkp.metric_name = %1$L AND
+                        lkp.key = kv.key
+                )
+            ORDER BY kv.key, kv.value
             )
-        ORDER BY kv.key, kv.value
-        )
-        SELECT
-           case when count(*) = count(known_pos) Then
-              array_agg(known_pos)
-           else
-              _prom_catalog.get_new_pos_for_key(get_or_create_label_ids.metric_name, get_or_create_label_ids.metric_table, array_agg(key_str), false)
-           end as poss,
-           array_agg(label_id) as label_ids,
-           array_agg(key_str) as keys,
-           array_agg(val_str) as vals
-        FROM cte
+            SELECT
+            case when count(*) = count(known_pos) Then
+                array_agg(known_pos)
+            else
+                _prom_catalog.get_new_pos_for_key(%1$L, %2$L, array_agg(key_str), false)
+            end as poss,
+            array_agg(label_id) as label_ids,
+            array_agg(key_str) as keys,
+            array_agg(val_str) as vals
+            FROM cte
+        $query$, metric_name, metric_table, label_keys, label_values);
+    END
 $$
-LANGUAGE SQL;
+LANGUAGE PLPGSQL;
 COMMENT ON FUNCTION _prom_catalog.get_or_create_label_ids(text, name, text[], text[])
 IS 'converts a metric name, array of keys, and array of values to a list of label ids';
 GRANT EXECUTE ON FUNCTION _prom_catalog.get_or_create_label_ids(TEXT, NAME, text[], text[]) TO prom_writer;
