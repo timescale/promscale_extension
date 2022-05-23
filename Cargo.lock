@@ -1218,9 +1218,9 @@ dependencies = [
 
 [[package]]
 name = "pgx"
-version = "0.4.4"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "541daadd2b8b6bcbcca8772c03dcdec968f97ea54e0faca7b0299a8eec4e6869"
+checksum = "00f3f571b70d230cba9ec46c530000469710ef2c1ea3eadf56d7bc8a62b3510c"
 dependencies = [
  "atomic-traits",
  "bitflags",
@@ -1246,9 +1246,9 @@ dependencies = [
 
 [[package]]
 name = "pgx-macros"
-version = "0.4.4"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90af33a34d24228eedae09bd34f6c57a8f89dcc910bd5b6d08dac1c4816b17c3"
+checksum = "b854e9b42fa8940b5fa393915df75db559384f14663c8966eb5161b554ff5842"
 dependencies = [
  "pgx-utils",
  "proc-macro2 1.0.39",
@@ -1259,9 +1259,9 @@ dependencies = [
 
 [[package]]
 name = "pgx-pg-sys"
-version = "0.4.4"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b93a0a406092cd49372344542f1e04f009203c746060d76b9014cb144e7bbb8"
+checksum = "57be652efd8d69525ba4ec04743b2aa2feb024ef7c5d39d35f9bf5638bf64d48"
 dependencies = [
  "bindgen",
  "build-deps",
@@ -1281,9 +1281,9 @@ dependencies = [
 
 [[package]]
 name = "pgx-tests"
-version = "0.4.4"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1c08b94a24472166ca4bb57ecf1ef3a6db37b25e58b5a9a3c3ade8b322fef36"
+checksum = "e9012d509f69898cc15762c3feb78b6a61b3a66a533084351f6afe89c78b8e47"
 dependencies = [
  "eyre",
  "libc",
@@ -1302,9 +1302,9 @@ dependencies = [
 
 [[package]]
 name = "pgx-utils"
-version = "0.4.4"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b8719c1423a83062bd22670f9d9e2e7bb1cf2044c57e9b74986f421641f3841"
+checksum = "ce5d334b177a9cd741521d01ebea505417adddaef4d368753b34ac4a43052674"
 dependencies = [
  "atty",
  "convert_case",
@@ -2060,9 +2060,9 @@ dependencies = [
 
 [[package]]
 name = "syntect"
-version = "4.6.0"
+version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b20815bbe80ee0be06e6957450a841185fcf690fe0178f14d77a05ce2caa031"
+checksum = "c6c454c27d9d7d9a84c7803aaa3c50cd088d2906fe3c6e42da3209aa623576a8"
 dependencies = [
  "bincode",
  "bitflags",
@@ -2070,12 +2070,13 @@ dependencies = [
  "flate2",
  "fnv",
  "lazy_static",
- "lazycell",
+ "once_cell",
  "plist",
  "regex-syntax",
  "serde",
  "serde_derive",
  "serde_json",
+ "thiserror",
  "walkdir",
  "yaml-rust",
 ]
