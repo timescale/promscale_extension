@@ -102,9 +102,12 @@ fn render_bootstrap(manifest_dir: &str) -> String {
     ext_schema_path.push("migration/bootstrap/001-create-ext-schema.sql");
     let ext_schema_sql = wrap(ext_schema_path.as_path(), &Incremental);
 
+    let stop_bgw_sql = include_str!("migration/bootstrap/002-stop-bgw.sql").to_string();
+
     let mut result = String::from("");
     result.push_str(&migration_table_sql);
     result.push_str(&ext_schema_sql);
+    result.push_str(&stop_bgw_sql);
     result
 }
 

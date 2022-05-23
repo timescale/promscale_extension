@@ -1,4 +1,22 @@
 SET LOCAL search_path = pg_catalog, pg_temp;
+
+--stop background workers; see note in bootstrap/002-stop-bgw.sql
+DO
+$stop_bgw$
+DECLARE
+    _is_timescaledb_installed boolean = false;
+BEGIN
+    SELECT count(*) > 0
+    INTO STRICT _is_timescaledb_installed
+    FROM pg_extension
+    WHERE extname='timescaledb';
+
+    IF _is_timescaledb_installed THEN
+        PERFORM _timescaledb_internal.restart_background_workers();
+    END IF;
+END;
+$stop_bgw$;
+
 DROP TABLE public.prom_schema_migrations;
 
 REVOKE EXECUTE ON FUNCTION ps_trace.delete_all_traces() FROM prom_writer;
