@@ -3,8 +3,8 @@
 This [Postgres extension](https://www.postgresql.org/docs/12/extend-extensions.html)
 contains support functions to improve the performance of Promscale.
 
-While Promscale will run without it, adding this extension will
-cause it to perform better.
+Promscale 0.11.0 and higher require that the Promscale extension is installed.
+Check the [release notes](https://github.com/timescale/promscale/releases/) for more details.
 
 ## Requirements
 
