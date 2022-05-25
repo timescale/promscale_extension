@@ -2568,10 +2568,10 @@ SET search_path = pg_catalog, pg_temp
 AS $function$
     SELECT
         ch.hypertable_name::text,
-        (COALESCE(sum(ch.total_bytes), 0) - COALESCE(sum(ch.index_bytes), 0) - COALESCE(sum(ch.toast_bytes), 0) + COALESCE(sum(ch.compressed_heap_size), 0))::bigint + pg_relation_size(format('%I.%I', ch.hypertable_schema, ch.hypertable_name)::regclass)::bigint AS heap_bytes,
+        (COALESCE(sum(ch.total_bytes), 0) - COALESCE(sum(ch.index_bytes), 0) - COALESCE(sum(ch.toast_bytes), 0) + COALESCE(sum(ch.compressed_heap_size), 0))::bigint + pg_relation_size(format('%I.%I', ch.hypertable_schema, ch.hypertable_name::text)::regclass)::bigint AS heap_bytes,
         (COALESCE(sum(ch.index_bytes), 0) + COALESCE(sum(ch.compressed_index_size), 0))::bigint + pg_indexes_size(format('%I.%I', ch.hypertable_schema, ch.hypertable_name)::regclass)::bigint AS index_bytes,
         (COALESCE(sum(ch.toast_bytes), 0) + COALESCE(sum(ch.compressed_toast_size), 0))::bigint AS toast_bytes,
-        (COALESCE(sum(ch.total_bytes), 0) + COALESCE(sum(ch.compressed_heap_size), 0) + COALESCE(sum(ch.compressed_index_size), 0) + COALESCE(sum(ch.compressed_toast_size), 0))::bigint + pg_total_relation_size(format('%I.%I', ch.hypertable_schema, ch.hypertable_name)::regclass)::bigint AS total_bytes
+        (COALESCE(sum(ch.total_bytes), 0) + COALESCE(sum(ch.compressed_heap_size), 0) + COALESCE(sum(ch.compressed_index_size), 0) + COALESCE(sum(ch.compressed_toast_size), 0))::bigint + pg_total_relation_size(format('%I.%I', ch.hypertable_schema, ch.hypertable_name::text)::regclass)::bigint AS total_bytes
     FROM _timescaledb_internal.hypertable_chunk_local_size ch
     WHERE ch.hypertable_schema = schema_name_in
     GROUP BY ch.hypertable_name::text, ch.hypertable_schema;
@@ -2755,113 +2755,57 @@ BEGIN
         RETURN;
     END IF;
 
---    IF _prom_catalog.get_timescale_major_version() >= 2 THEN
-        RETURN QUERY
-        WITH ci AS (
-            SELECT
-                hypertable_name as hypertable_name,
-                COALESCE(SUM(range_end-range_start) FILTER (WHERE is_compressed), INTERVAL '0') AS compressed_interval,
-                COALESCE(SUM(range_end-range_start), INTERVAL '0') AS total_interval
-            FROM timescaledb_information.chunks c
-            WHERE hypertable_schema='prom_data'
-            GROUP BY hypertable_schema, hypertable_name
-        )
+    RETURN QUERY
+    WITH ci AS (
         SELECT
-            m.id,
-            m.metric_name,
-            m.table_name::text as table_name,
-            ARRAY(
-                SELECT key
-                FROM _prom_catalog.label_key_position lkp
-                WHERE lkp.metric_name = m.metric_name
-                ORDER BY key) label_keys,
-            _prom_catalog.get_metric_retention_period(m.table_schema, m.metric_name) as retention_period,
-            dims.time_interval as chunk_interval,
-            ci.compressed_interval,
-            ci.total_interval,
-            hcs.before_compression_total_bytes::bigint,
-            hcs.after_compression_total_bytes::bigint,
-            hs.total_bytes::bigint as total_size_bytes,
-            pg_size_pretty(hs.total_bytes::bigint) as total_size,
-            (1.0 - (hcs.after_compression_total_bytes::NUMERIC / hcs.before_compression_total_bytes::NUMERIC)) * 100 as compression_ratio,
-            hcs.total_chunks::BIGINT,
-            hcs.number_compressed_chunks::BIGINT as compressed_chunks
-        FROM _prom_catalog.metric m
-        LEFT JOIN
+            hypertable_name as hypertable_name,
+            COALESCE(SUM(range_end-range_start) FILTER (WHERE is_compressed), INTERVAL '0') AS compressed_interval,
+            COALESCE(SUM(range_end-range_start), INTERVAL '0') AS total_interval
+        FROM timescaledb_information.chunks c
+        WHERE hypertable_schema='prom_data'
+        GROUP BY hypertable_schema, hypertable_name
+    )
+    SELECT
+        m.id,
+        m.metric_name,
+        m.table_name::text as table_name,
+        ARRAY(
+            SELECT key
+            FROM _prom_catalog.label_key_position lkp
+            WHERE lkp.metric_name = m.metric_name
+            ORDER BY key) label_keys,
+        _prom_catalog.get_metric_retention_period(m.table_schema, m.metric_name) as retention_period,
+        dims.time_interval as chunk_interval,
+        ci.compressed_interval,
+        ci.total_interval,
+        hcs.before_compression_total_bytes::bigint,
+        hcs.after_compression_total_bytes::bigint,
+        hs.total_bytes::bigint as total_size_bytes,
+        pg_size_pretty(hs.total_bytes::bigint) as total_size,
+        (1.0 - (hcs.after_compression_total_bytes::NUMERIC / hcs.before_compression_total_bytes::NUMERIC)) * 100 as compression_ratio,
+        hcs.total_chunks::BIGINT,
+        hcs.number_compressed_chunks::BIGINT as compressed_chunks
+    FROM _prom_catalog.metric m
+    LEFT JOIN
+    (
+        SELECT
+          x.hypertable_name
+        , sum(x.total_bytes::bigint) as total_bytes
+        FROM
         (
-            SELECT
-              x.hypertable_name
-            , sum(x.total_bytes::bigint) as total_bytes
-            FROM
-            (
-                SELECT *
-                FROM _prom_catalog.hypertable_local_size('prom_data')
-                UNION ALL
-                SELECT *
-                FROM _prom_catalog.hypertable_remote_size('prom_data')
-            ) x
-            GROUP BY x.hypertable_name
-        ) hs ON (hs.hypertable_name = m.table_name)
-        LEFT JOIN timescaledb_information.dimensions dims ON
-            (dims.hypertable_schema = 'prom_data' AND dims.hypertable_name = m.table_name)
-        LEFT JOIN _prom_catalog.hypertable_compression_stats_for_schema('prom_data') hcs ON (hcs.hypertable_name = m.table_name)
-        LEFT JOIN ci ON (ci.hypertable_name = m.table_name)
-        ;
-
-/*    ELSE
-        RETURN QUERY
-            SELECT
-                m.id,
-                m.metric_name,
-                m.table_name,
-                ARRAY(
-                    SELECT key
-                        FROM _prom_catalog.label_key_position lkp
-                    WHERE lkp.metric_name = m.metric_name
-                    ORDER BY key
-                ) label_keys,
-                _prom_catalog.get_metric_retention_period(m.table_schema, m.metric_name) as retention_period,
-                (
-                    SELECT _timescaledb_internal.to_interval(interval_length)
-                        FROM _timescaledb_catalog.dimension d
-                    WHERE d.hypertable_id = h.id
-                    ORDER BY d.id ASC LIMIT 1
-                ) as chunk_interval,
-                ci.compressed_interval,
-                ci.total_interval,
-                pg_size_bytes(chs.uncompressed_total_bytes) as before_compression_bytes,
-                pg_size_bytes(chs.compressed_total_bytes) as after_compression_bytes,
-                pg_size_bytes(hi.total_size) as total_bytes,
-                hi.total_size as total_size,
-                (1.0 - (pg_size_bytes(chs.compressed_total_bytes)::numeric / pg_size_bytes(chs.uncompressed_total_bytes)::numeric)) * 100 as compression_ratio,
-                chs.total_chunks,
-                chs.number_compressed_chunks as compressed_chunks
-            FROM _prom_catalog.metric m
-                LEFT JOIN timescaledb_information.hypertable hi ON
-                    (hi.table_schema = 'prom_data' AND hi.table_name = m.table_name)
-                LEFT JOIN timescaledb_information.compressed_hypertable_stats chs ON
-                    (chs.hypertable_name = format('%I.%I', 'prom_data', m.table_name)::regclass)
-                LEFT JOIN _timescaledb_catalog.hypertable h ON
-                    (h.schema_name = 'prom_data' AND h.table_name = m.table_name)
-                LEFT JOIN LATERAL
-                    (
-                        SELECT COALESCE(
-                                SUM(
-                                    UPPER(rs.ranges[1]::TSTZRANGE) - LOWER(rs.ranges[1]::TSTZRANGE)
-                                ),
-                                INTERVAL '0'
-                            ) total_interval,
-                            COALESCE(
-                                SUM(
-                                    UPPER(rs.ranges[1]::TSTZRANGE) - LOWER(rs.ranges[1]::TSTZRANGE)
-                                ) FILTER (WHERE cs.compression_status = 'Compressed'),
-                                INTERVAL '0'
-                            ) compressed_interval
-                        FROM public.chunk_relation_size_pretty(FORMAT('prom_data.%I', m.table_name)) rs
-                        LEFT JOIN timescaledb_information.compressed_chunk_stats cs ON
-                            (cs.chunk_name::text = rs.chunk_table::text)
-                    ) as ci ON TRUE;
-    END IF;*/
+            SELECT *
+            FROM _prom_catalog.hypertable_local_size('prom_data')
+            UNION ALL
+            SELECT *
+            FROM _prom_catalog.hypertable_remote_size('prom_data')
+        ) x
+        GROUP BY x.hypertable_name
+    ) hs ON (hs.hypertable_name = m.table_name)
+    LEFT JOIN timescaledb_information.dimensions dims ON
+        (dims.hypertable_schema = 'prom_data' AND dims.hypertable_name = m.table_name)
+    LEFT JOIN _prom_catalog.hypertable_compression_stats_for_schema('prom_data') hcs ON (hcs.hypertable_name = m.table_name)
+    LEFT JOIN ci ON (ci.hypertable_name = m.table_name)
+    ;
 END
 $func$
 LANGUAGE PLPGSQL STABLE;
