@@ -1464,13 +1464,13 @@ COMMENT ON FUNCTION prom_api.reset_metric_chunk_interval(TEXT)
 IS 'resets the chunk interval for a specific metric to using the default';
 GRANT EXECUTE ON FUNCTION prom_api.reset_metric_chunk_interval(TEXT) TO prom_admin;
 
-CREATE OR REPLACE FUNCTION _prom_catalog.get_metric_retention_period(schema_name TEXT, metric_name TEXT)
+CREATE OR REPLACE FUNCTION _prom_catalog.get_metric_retention_period(_schema_name TEXT, _metric_name TEXT)
     RETURNS INTERVAL
     SET search_path = pg_catalog, pg_temp
 AS $$
     SELECT COALESCE(m.retention_period, _prom_catalog.get_default_retention_period())
     FROM _prom_catalog.metric m
-    WHERE id IN (SELECT id FROM _prom_catalog.get_metric_table_name_if_exists(schema_name, get_metric_retention_period.metric_name))
+    WHERE id IN (SELECT id FROM _prom_catalog.get_metric_table_name_if_exists(_schema_name, _metric_name))
     UNION ALL
     SELECT _prom_catalog.get_default_retention_period()
     LIMIT 1
@@ -1480,12 +1480,12 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_metric_retention_period(TEXT, TEXT) 
 
 -- convenience function for returning retention period of raw metrics
 -- without the need to specify the schema
-CREATE OR REPLACE FUNCTION _prom_catalog.get_metric_retention_period(metric_name TEXT)
+CREATE OR REPLACE FUNCTION _prom_catalog.get_metric_retention_period(_metric_name TEXT)
     RETURNS INTERVAL
     SET search_path = pg_catalog, pg_temp
 AS $$
     SELECT *
-    FROM _prom_catalog.get_metric_retention_period('prom_data', metric_name)
+    FROM _prom_catalog.get_metric_retention_period('prom_data', _metric_name)
 $$
 LANGUAGE SQL STABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION _prom_catalog.get_metric_retention_period(TEXT) TO prom_reader;
@@ -2569,7 +2569,7 @@ AS $function$
     SELECT
         ch.hypertable_name::text,
         (COALESCE(sum(ch.total_bytes), 0) - COALESCE(sum(ch.index_bytes), 0) - COALESCE(sum(ch.toast_bytes), 0) + COALESCE(sum(ch.compressed_heap_size), 0))::bigint + pg_relation_size(format('%I.%I', ch.hypertable_schema, ch.hypertable_name::text)::regclass)::bigint AS heap_bytes,
-        (COALESCE(sum(ch.index_bytes), 0) + COALESCE(sum(ch.compressed_index_size), 0))::bigint + pg_indexes_size(format('%I.%I', ch.hypertable_schema, ch.hypertable_name)::regclass)::bigint AS index_bytes,
+        (COALESCE(sum(ch.index_bytes), 0) + COALESCE(sum(ch.compressed_index_size), 0))::bigint + pg_indexes_size(format('%I.%I', ch.hypertable_schema, ch.hypertable_name::text)::regclass)::bigint AS index_bytes,
         (COALESCE(sum(ch.toast_bytes), 0) + COALESCE(sum(ch.compressed_toast_size), 0))::bigint AS toast_bytes,
         (COALESCE(sum(ch.total_bytes), 0) + COALESCE(sum(ch.compressed_heap_size), 0) + COALESCE(sum(ch.compressed_index_size), 0) + COALESCE(sum(ch.compressed_toast_size), 0))::bigint + pg_total_relation_size(format('%I.%I', ch.hypertable_schema, ch.hypertable_name::text)::regclass)::bigint AS total_bytes
     FROM _timescaledb_internal.hypertable_chunk_local_size ch
@@ -2774,7 +2774,7 @@ BEGIN
             FROM _prom_catalog.label_key_position lkp
             WHERE lkp.metric_name = m.metric_name
             ORDER BY key) label_keys,
-        _prom_catalog.get_metric_retention_period(m.table_schema, m.metric_name) as retention_period,
+        coalesce(m.retention_period, _prom_catalog.get_default_retention_period()) as retention_period,
         dims.time_interval as chunk_interval,
         ci.compressed_interval,
         ci.total_interval,
