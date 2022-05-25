@@ -158,7 +158,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.is_multinode()
     RETURNS BOOLEAN
     SET search_path = pg_catalog, pg_temp
 AS $func$
-    SELECT count(*) > 0 FROM timescaledb_information.data_nodes
+    SELECT EXISTS (SELECT 1 FROM timescaledb_information.data_nodes)
 $func$
 LANGUAGE sql STABLE;
 GRANT EXECUTE ON FUNCTION _prom_catalog.is_multinode() TO prom_reader;
