@@ -73,7 +73,7 @@ REVOKE ALL ON FUNCTION _prom_catalog.create_exemplar_table_if_not_exists(TEXT) F
 GRANT EXECUTE ON FUNCTION _prom_catalog.create_exemplar_table_if_not_exists(TEXT) TO prom_writer;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.insert_exemplar_row(
-    metric_table NAME,
+    metric_table TEXT,
     time_array TIMESTAMPTZ[],
     series_id_array BIGINT[],
     exemplar_label_values_array prom_api.label_value_array[],
@@ -96,4 +96,4 @@ BEGIN
 END;
 $$
 LANGUAGE PLPGSQL;
-GRANT EXECUTE ON FUNCTION _prom_catalog.insert_exemplar_row(NAME, TIMESTAMPTZ[], BIGINT[], prom_api.label_value_array[], DOUBLE PRECISION[]) TO prom_writer;
+GRANT EXECUTE ON FUNCTION _prom_catalog.insert_exemplar_row(TEXT, TIMESTAMPTZ[], BIGINT[], prom_api.label_value_array[], DOUBLE PRECISION[]) TO prom_writer;

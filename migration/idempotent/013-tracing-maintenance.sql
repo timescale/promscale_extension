@@ -1,4 +1,4 @@
-CREATE OR REPLACE PROCEDURE _ps_trace.execute_tracing_compression(hypertable_name name, log_verbose BOOLEAN = false)
+CREATE OR REPLACE PROCEDURE _ps_trace.execute_tracing_compression(hypertable_name text, log_verbose BOOLEAN = false)
 AS $$
 DECLARE
    startT TIMESTAMPTZ;
@@ -21,9 +21,9 @@ BEGIN
     END IF;
 END;
 $$ LANGUAGE PLPGSQL;
-COMMENT ON PROCEDURE _ps_trace.execute_tracing_compression(name, boolean)
+COMMENT ON PROCEDURE _ps_trace.execute_tracing_compression(text, boolean)
 IS 'Execute tracing compression compresses tracing tables';
-GRANT EXECUTE ON PROCEDURE _ps_trace.execute_tracing_compression(name, boolean) TO prom_maintenance;
+GRANT EXECUTE ON PROCEDURE _ps_trace.execute_tracing_compression(text, boolean) TO prom_maintenance;
 
 --job boilerplate
 CREATE OR REPLACE PROCEDURE _ps_trace.execute_tracing_compression_job(job_id int, config jsonb)

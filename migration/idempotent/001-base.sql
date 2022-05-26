@@ -618,7 +618,7 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_or_create_label_key(TEXT) to prom_wr
 -- This uses some pretty heavy locks so use sparingly.
 -- locks: label_key_position, data table, series partition (in view creation),
 CREATE OR REPLACE FUNCTION _prom_catalog.get_new_pos_for_key(
-        metric_name text, metric_table name, key_name_array text[], is_for_exemplar boolean)
+        metric_name text, metric_table text, key_name_array text[], is_for_exemplar boolean)
     RETURNS int[]
     --security definer needed to lock the series table
     SECURITY DEFINER
@@ -740,9 +740,9 @@ END
 $func$
 LANGUAGE PLPGSQL;
 --redundant given schema settings but extra caution for security definers
-REVOKE ALL ON FUNCTION _prom_catalog.get_new_pos_for_key(text, name, text[], boolean) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION _prom_catalog.get_new_pos_for_key(text, name, text[], boolean) TO prom_reader; -- For exemplars querying.
-GRANT EXECUTE ON FUNCTION _prom_catalog.get_new_pos_for_key(text, name, text[], boolean) TO prom_writer;
+REVOKE ALL ON FUNCTION _prom_catalog.get_new_pos_for_key(text, text, text[], boolean) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION _prom_catalog.get_new_pos_for_key(text, text, text[], boolean) TO prom_reader; -- For exemplars querying.
+GRANT EXECUTE ON FUNCTION _prom_catalog.get_new_pos_for_key(text, text, text[], boolean) TO prom_writer;
 
 --should only be called after a check that that the label doesn't exist
 CREATE OR REPLACE FUNCTION _prom_catalog.get_new_label_id(key_name text, value_name text, OUT id INT)
@@ -821,7 +821,7 @@ $$;
 GRANT EXECUTE ON FUNCTION _prom_catalog.safe_approximate_row_count(regclass) to prom_reader;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.delete_series_catalog_row(
-    metric_table name,
+    metric_table text,
     series_ids bigint[]
 )
     RETURNS VOID
@@ -837,7 +837,7 @@ BEGIN
 END;
 $$
 LANGUAGE PLPGSQL;
-GRANT EXECUTE ON FUNCTION _prom_catalog.delete_series_catalog_row(name, bigint[]) to prom_modifier;
+GRANT EXECUTE ON FUNCTION _prom_catalog.delete_series_catalog_row(text, bigint[]) to prom_modifier;
 
 ---------------------------------------------------
 ------------------- Public APIs -------------------
@@ -1101,7 +1101,7 @@ COMMENT ON FUNCTION _prom_catalog.get_or_create_label_array(text, text[], text[]
 IS 'converts a metric name, array of keys, and array of values to a label array';
 GRANT EXECUTE ON FUNCTION _prom_catalog.get_or_create_label_array(TEXT, text[], text[]) TO prom_writer;
 
-CREATE OR REPLACE FUNCTION _prom_catalog.get_or_create_label_ids(metric_name TEXT, metric_table NAME, label_keys text[], label_values text[])
+CREATE OR REPLACE FUNCTION _prom_catalog.get_or_create_label_ids(metric_name TEXT, metric_table TEXT, label_keys text[], label_values text[])
     RETURNS TABLE(pos int[], id int[], label_key text[], label_value text[])
     VOLATILE
     SET search_path = pg_catalog, pg_temp
@@ -1136,9 +1136,9 @@ AS $$
         FROM cte
 $$
 LANGUAGE SQL;
-COMMENT ON FUNCTION _prom_catalog.get_or_create_label_ids(text, name, text[], text[])
+COMMENT ON FUNCTION _prom_catalog.get_or_create_label_ids(text, text, text[], text[])
 IS 'converts a metric name, array of keys, and array of values to a list of label ids';
-GRANT EXECUTE ON FUNCTION _prom_catalog.get_or_create_label_ids(TEXT, NAME, text[], text[]) TO prom_writer;
+GRANT EXECUTE ON FUNCTION _prom_catalog.get_or_create_label_ids(TEXT, TEXT, text[], text[]) TO prom_writer;
 
 
 -- Returns ids, keys and values for a label_array
@@ -1202,7 +1202,7 @@ GRANT EXECUTE ON FUNCTION prom_api.labels(series_id BIGINT) TO prom_reader;
 --Do not call before checking that the series does not yet exist
 CREATE OR REPLACE FUNCTION _prom_catalog.create_series(
         metric_id int,
-        metric_table_name NAME,
+        metric_table_name TEXT,
         label_array prom_api.label_array,
         OUT series_id BIGINT)
     VOLATILE
@@ -1237,9 +1237,9 @@ END LOOP;
 END
 $func$
 LANGUAGE PLPGSQL;
-GRANT EXECUTE ON FUNCTION _prom_catalog.create_series(int, name, prom_api.label_array) TO prom_writer;
+GRANT EXECUTE ON FUNCTION _prom_catalog.create_series(int, text, prom_api.label_array) TO prom_writer;
 
-CREATE OR REPLACE FUNCTION _prom_catalog.resurrect_series_ids(metric_table name, series_id bigint)
+CREATE OR REPLACE FUNCTION _prom_catalog.resurrect_series_ids(metric_table text, series_id bigint)
     RETURNS VOID
     --security definer to add jobs as the logged-in user
     SECURITY DEFINER
@@ -1256,8 +1256,8 @@ END
 $func$
 LANGUAGE PLPGSQL;
 --redundant given schema settings but extra caution for security definers
-REVOKE ALL ON FUNCTION _prom_catalog.resurrect_series_ids(name, bigint) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION _prom_catalog.resurrect_series_ids(name, bigint) TO prom_writer;
+REVOKE ALL ON FUNCTION _prom_catalog.resurrect_series_ids(text, bigint) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION _prom_catalog.resurrect_series_ids(text, bigint) TO prom_writer;
 
 -- There shouldn't be a need to have a read only version of this as we'll use
 -- the eq or other matcher functions to find series ids like this. However,
@@ -1352,7 +1352,7 @@ LANGUAGE PLPGSQL;
 GRANT EXECUTE ON FUNCTION _prom_catalog.get_or_create_series_id_for_kv_array(TEXT, text[], text[]) TO prom_writer;
 
 
-CREATE OR REPLACE FUNCTION _prom_catalog.get_or_create_series_id_for_label_array(metric_id INT, table_name NAME, larray prom_api.label_array, OUT series_id BIGINT)
+CREATE OR REPLACE FUNCTION _prom_catalog.get_or_create_series_id_for_label_array(metric_id INT, table_name TEXT, larray prom_api.label_array, OUT series_id BIGINT)
     VOLATILE
     SET search_path = pg_catalog, pg_temp
 AS $func$
@@ -1379,7 +1379,7 @@ BEGIN
 END
 $func$
 LANGUAGE PLPGSQL;
-GRANT EXECUTE ON FUNCTION _prom_catalog.get_or_create_series_id_for_label_array(INT, NAME, prom_api.label_array) TO prom_writer;
+GRANT EXECUTE ON FUNCTION _prom_catalog.get_or_create_series_id_for_label_array(INT, TEXT, prom_api.label_array) TO prom_writer;
 
 --
 -- Parameter manipulation functions
@@ -1885,7 +1885,7 @@ IS 'ABORT an INSERT transaction due to the ID epoch being out of date';
 GRANT EXECUTE ON FUNCTION _prom_catalog.epoch_abort TO prom_writer;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.get_confirmed_unused_series(
-    metric_schema NAME, metric_table NAME, series_table NAME, potential_series_ids BIGINT[], check_time TIMESTAMPTZ
+    metric_schema TEXT, metric_table TEXT, series_table TEXT, potential_series_ids BIGINT[], check_time TIMESTAMPTZ
 )
     RETURNS BIGINT[]
     SET search_path = pg_catalog, pg_temp
@@ -1931,7 +1931,7 @@ BEGIN
 END
 $func$
 LANGUAGE PLPGSQL STABLE PARALLEL SAFE;
-GRANT EXECUTE ON FUNCTION _prom_catalog.get_confirmed_unused_series(NAME, NAME, NAME, BIGINT[], TIMESTAMPTZ) TO prom_maintenance;
+GRANT EXECUTE ON FUNCTION _prom_catalog.get_confirmed_unused_series(TEXT, TEXT, TEXT, BIGINT[], TIMESTAMPTZ) TO prom_maintenance;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.mark_unused_series(
     metric_schema TEXT, metric_table TEXT, metric_series_table TEXT, older_than TIMESTAMPTZ, check_time TIMESTAMPTZ
@@ -2399,7 +2399,7 @@ LANGUAGE PLPGSQL;
 REVOKE ALL ON FUNCTION _prom_catalog.create_metric_view(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION _prom_catalog.create_metric_view(text) TO prom_writer;
 
-CREATE OR REPLACE FUNCTION prom_api.register_metric_view(schema_name name, view_name name, if_not_exists BOOLEAN = false)
+CREATE OR REPLACE FUNCTION prom_api.register_metric_view(schema_name text, view_name text, if_not_exists BOOLEAN = false)
     RETURNS BOOLEAN
     SECURITY DEFINER
     VOLATILE
@@ -2475,10 +2475,10 @@ END
 $func$
 LANGUAGE PLPGSQL;
 --redundant given schema settings but extra caution for security definers
-REVOKE ALL ON FUNCTION prom_api.register_metric_view(name, name, boolean) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION prom_api.register_metric_view(name, name, boolean) TO prom_admin;
+REVOKE ALL ON FUNCTION prom_api.register_metric_view(text, text, boolean) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION prom_api.register_metric_view(text, text, boolean) TO prom_admin;
 
-CREATE OR REPLACE FUNCTION prom_api.unregister_metric_view(schema_name name, view_name name, if_exists BOOLEAN = false)
+CREATE OR REPLACE FUNCTION prom_api.unregister_metric_view(schema_name text, view_name text, if_exists BOOLEAN = false)
     RETURNS BOOLEAN
     SECURITY DEFINER
     VOLATILE
@@ -2507,8 +2507,8 @@ END
 $func$
 LANGUAGE PLPGSQL;
 --redundant given schema settings but extra caution for security definers
-REVOKE ALL ON FUNCTION prom_api.unregister_metric_view(name, name, boolean) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION prom_api.unregister_metric_view(name, name, boolean) TO prom_admin;
+REVOKE ALL ON FUNCTION prom_api.unregister_metric_view(text, text, boolean) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION prom_api.unregister_metric_view(text, text, boolean) TO prom_admin;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.delete_series_from_metric(name text, series_ids bigint[])
     RETURNS BIGINT
@@ -2975,7 +2975,7 @@ GRANT SELECT ON prom_info.metric_stats TO prom_reader;
 
 --this should the only thing run inside the transaction. It's important the txn ends after calling this function
 --to release locks
-CREATE OR REPLACE FUNCTION _prom_catalog.delay_compression_job(ht_table name, new_start timestamptz)
+CREATE OR REPLACE FUNCTION _prom_catalog.delay_compression_job(ht_table text, new_start timestamptz)
     RETURNS VOID
     SECURITY DEFINER
     SET search_path = pg_catalog, pg_temp
@@ -3002,8 +3002,8 @@ END
 $$
 LANGUAGE PLPGSQL;
 --redundant given schema settings but extra caution for security definers
-REVOKE ALL ON FUNCTION _prom_catalog.delay_compression_job(name, timestamptz) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION _prom_catalog.delay_compression_job(name, timestamptz) TO prom_writer;
+REVOKE ALL ON FUNCTION _prom_catalog.delay_compression_job(text, timestamptz) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION _prom_catalog.delay_compression_job(text, timestamptz) TO prom_writer;
 
 CALL _prom_catalog.execute_everywhere('_prom_catalog.do_decompress_chunks_after', $ee$
 DO $DO$
@@ -3011,7 +3011,7 @@ BEGIN
     --this function isolates the logic that needs to be security definer
     --cannot fold it into do_decompress_chunks_after because cannot have security
     --definer do txn-al stuff like commit
-    CREATE OR REPLACE FUNCTION _prom_catalog.decompress_chunk_for_metric(metric_table TEXT, chunk_schema_name name, chunk_table_name name)
+    CREATE OR REPLACE FUNCTION _prom_catalog.decompress_chunk_for_metric(metric_table TEXT, chunk_schema_name text, chunk_table_name text)
     RETURNS VOID
     SECURITY DEFINER
     SET search_path = pg_catalog, pg_temp
@@ -3053,14 +3053,14 @@ BEGIN
     END;
     $$
     LANGUAGE PLPGSQL;
-    REVOKE ALL ON FUNCTION _prom_catalog.decompress_chunk_for_metric(TEXT, name, name) FROM PUBLIC;
-    GRANT EXECUTE ON FUNCTION _prom_catalog.decompress_chunk_for_metric(TEXT, name, name) TO prom_writer;
+    REVOKE ALL ON FUNCTION _prom_catalog.decompress_chunk_for_metric(TEXT, text, text) FROM PUBLIC;
+    GRANT EXECUTE ON FUNCTION _prom_catalog.decompress_chunk_for_metric(TEXT, text, text) TO prom_writer;
 
 
     --Decompression should take place in a procedure because we don't want locks held across
     --decompress_chunk calls since that function takes some heavier locks at the end.
     --Thus, transactional parameter should usually be false
-    CREATE OR REPLACE PROCEDURE _prom_catalog.do_decompress_chunks_after(metric_table NAME, min_time TIMESTAMPTZ, transactional BOOLEAN = false)
+    CREATE OR REPLACE PROCEDURE _prom_catalog.do_decompress_chunks_after(metric_table TEXT, min_time TIMESTAMPTZ, transactional BOOLEAN = false)
     AS $$
     DECLARE
         chunk_row record;
@@ -3100,12 +3100,12 @@ BEGIN
         END LOOP;
     END;
     $$ LANGUAGE PLPGSQL;
-    GRANT EXECUTE ON PROCEDURE _prom_catalog.do_decompress_chunks_after(NAME, TIMESTAMPTZ, BOOLEAN) TO prom_writer;
+    GRANT EXECUTE ON PROCEDURE _prom_catalog.do_decompress_chunks_after(TEXT, TIMESTAMPTZ, BOOLEAN) TO prom_writer;
 END
 $DO$;
 $ee$);
 
-CREATE OR REPLACE PROCEDURE _prom_catalog.decompress_chunks_after(metric_table NAME, min_time TIMESTAMPTZ, transactional BOOLEAN = false)
+CREATE OR REPLACE PROCEDURE _prom_catalog.decompress_chunks_after(metric_table TEXT, min_time TIMESTAMPTZ, transactional BOOLEAN = false)
 AS $proc$
 BEGIN
     --do not set search path here since this can be called transactionally or not
@@ -3127,7 +3127,7 @@ BEGIN
     END IF;
 END
 $proc$ LANGUAGE PLPGSQL;
-GRANT EXECUTE ON PROCEDURE _prom_catalog.decompress_chunks_after(name, TIMESTAMPTZ, boolean) TO prom_writer;
+GRANT EXECUTE ON PROCEDURE _prom_catalog.decompress_chunks_after(text, TIMESTAMPTZ, boolean) TO prom_writer;
 
 CALL _prom_catalog.execute_everywhere('_prom_catalog.compress_old_chunks', $ee$
 DO $DO$
@@ -3135,7 +3135,7 @@ BEGIN
     --this function isolates the logic that needs to be security definer
     --cannot fold it into compress_old_chunks because cannot have security
     --definer do txn-all stuff like commit
-    CREATE OR REPLACE FUNCTION _prom_catalog.compress_chunk_for_hypertable(_hypertable_schema_name name, _hypertable_table_name name, _chunk_schema_name name, _chunk_table_name name)
+    CREATE OR REPLACE FUNCTION _prom_catalog.compress_chunk_for_hypertable(_hypertable_schema_name text, _hypertable_table_name text, _chunk_schema_name text, _chunk_table_name text)
     RETURNS VOID
     SECURITY DEFINER
     SET search_path = pg_catalog, pg_temp
@@ -3158,10 +3158,10 @@ BEGIN
     END;
     $$
     LANGUAGE PLPGSQL;
-    REVOKE ALL ON FUNCTION _prom_catalog.compress_chunk_for_hypertable(name, name, name, name) FROM PUBLIC;
-    GRANT EXECUTE ON FUNCTION _prom_catalog.compress_chunk_for_hypertable(name, name, name, name) TO prom_maintenance;
+    REVOKE ALL ON FUNCTION _prom_catalog.compress_chunk_for_hypertable(text, text, text, text) FROM PUBLIC;
+    GRANT EXECUTE ON FUNCTION _prom_catalog.compress_chunk_for_hypertable(text, text, text, text) TO prom_maintenance;
 
-    CREATE OR REPLACE PROCEDURE _prom_catalog.compress_old_chunks(_hypertable_schema_name NAME, _hypertable_table_name NAME, _compress_before TIMESTAMPTZ)
+    CREATE OR REPLACE PROCEDURE _prom_catalog.compress_old_chunks(_hypertable_schema_name TEXT, _hypertable_table_name TEXT, _compress_before TIMESTAMPTZ)
     AS $$
     DECLARE
         chunk_schema_name name;
@@ -3198,7 +3198,7 @@ BEGIN
         END LOOP;
     END;
     $$ LANGUAGE PLPGSQL;
-    GRANT EXECUTE ON PROCEDURE _prom_catalog.compress_old_chunks(NAME, NAME, TIMESTAMPTZ) TO prom_maintenance;
+    GRANT EXECUTE ON PROCEDURE _prom_catalog.compress_old_chunks(TEXT, TEXT, TIMESTAMPTZ) TO prom_maintenance;
 END
 $DO$;
 $ee$);
@@ -3348,7 +3348,7 @@ $func$ LANGUAGE PLPGSQL;
 -- add_prom_node is a superuser only function
 
 CREATE OR REPLACE FUNCTION _prom_catalog.insert_metric_row(
-    metric_table name,
+    metric_table text,
     time_array timestamptz[],
     value_array DOUBLE PRECISION[],
     series_id_array bigint[]
@@ -3381,4 +3381,4 @@ EXCEPTION WHEN unique_violation THEN
 END;
 $$
 LANGUAGE PLPGSQL;
-GRANT EXECUTE ON FUNCTION _prom_catalog.insert_metric_row(NAME, TIMESTAMPTZ[], DOUBLE PRECISION[], BIGINT[]) TO prom_writer;
+GRANT EXECUTE ON FUNCTION _prom_catalog.insert_metric_row(TEXT, TIMESTAMPTZ[], DOUBLE PRECISION[], BIGINT[]) TO prom_writer;
