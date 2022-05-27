@@ -2755,6 +2755,60 @@ BEGIN
         RETURN;
     END IF;
 
+    IF NOT _prom_catalog.is_multinode() THEN
+        RETURN QUERY
+        SELECT
+            m.id,
+            m.metric_name,
+            m.table_name::text as table_name,
+            ARRAY
+            (
+                SELECT lkp.key
+                FROM _prom_catalog.label_key_position lkp
+                WHERE lkp.metric_name = m.metric_name
+                ORDER BY lkp.key
+            ) label_keys,
+            coalesce(m.retention_period, _prom_catalog.get_default_retention_period()) as retention_period,
+            _timescaledb_internal.to_interval(d.interval_length) as chunk_interval,
+            x.compressed_interval,
+            x.total_interval,
+            x.before_compression_bytes,
+            x.after_compression_bytes,
+            x.total_chunk_bytes + pg_total_relation_size(format('%I.%I'::text, h.schema_name, h.table_name)::regclass) as total_size_bytes,
+            pg_size_pretty(x.total_chunk_bytes + pg_total_relation_size(format('%I.%I'::text, h.schema_name, h.table_name)::regclass)) as total_size,
+            (1.0 - (x.after_compression_bytes::NUMERIC / x.before_compression_bytes::NUMERIC)) * 100 as compression_ratio,
+            x.total_chunks,
+            x.compressed_chunks
+        FROM _prom_catalog.metric m
+        INNER JOIN _timescaledb_catalog.hypertable h ON (m.table_name = h.table_name)
+        INNER JOIN _timescaledb_catalog.dimension d ON (h.id = d.hypertable_id)
+        LEFT OUTER JOIN LATERAL
+        (
+            SELECT
+                count(*) as total_chunks,
+                count(*) filter (where (c.status & 1) = 1) as compressed_chunks,
+                coalesce(sum(_timescaledb_internal.to_timestamp(ds.range_end) - _timescaledb_internal.to_timestamp(ds.range_start)), interval '0') as total_interval,
+                coalesce(sum(case when (c.status & 1) = 1 then _timescaledb_internal.to_timestamp(ds.range_end) - _timescaledb_internal.to_timestamp(ds.range_start) else interval '0' end), interval '0') as compressed_interval,
+                sum(z.uncompressed_heap_size + z.uncompressed_toast_size + z.uncompressed_index_size)::bigint as before_compression_bytes,
+                sum(z.compressed_heap_size + z.compressed_toast_size + z.compressed_index_size)::bigint as after_compression_bytes,
+                sum
+                (
+                    pg_total_relation_size(format('%I.%I'::text, c.schema_name, c.table_name)::regclass)
+                    + coalesce(z.compressed_heap_size + z.compressed_toast_size + z.compressed_index_size, 0)
+                ) as total_chunk_bytes
+            FROM _timescaledb_catalog.dimension_slice ds
+            INNER JOIN _timescaledb_catalog.chunk_constraint k ON (ds.id = k.dimension_slice_id)
+            INNER JOIN _timescaledb_catalog.chunk c ON (k.chunk_id = c.id AND h.id = c.hypertable_id)
+            LEFT OUTER JOIN _timescaledb_catalog.chunk cc ON (c.compressed_chunk_id = cc.id)
+            LEFT OUTER JOIN _timescaledb_catalog.compression_chunk_size z ON (c.id = z.chunk_id)
+            WHERE ds.dimension_id = d.id
+            AND c.hypertable_id = h.id
+        ) x on (true)
+        WHERE h.schema_name = 'prom_data'
+        ;
+        RETURN;
+    END IF;
+
     RETURN QUERY
     WITH ci AS (
         SELECT
