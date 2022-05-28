@@ -2774,7 +2774,7 @@ BEGIN
             x.total_interval,
             x.before_compression_bytes,
             x.after_compression_bytes,
-            x.total_chunk_bytes + pg_total_relation_size(format('%I.%I'::text, h.schema_name, h.table_name)::regclass) as total_size_bytes,
+            (x.total_chunk_bytes + pg_total_relation_size(format('%I.%I'::text, h.schema_name, h.table_name)::regclass))::bigint as total_size_bytes,
             pg_size_pretty(x.total_chunk_bytes + pg_total_relation_size(format('%I.%I'::text, h.schema_name, h.table_name)::regclass)) as total_size,
             (1.0 - (x.after_compression_bytes::NUMERIC / x.before_compression_bytes::NUMERIC)) * 100 as compression_ratio,
             x.total_chunks,
