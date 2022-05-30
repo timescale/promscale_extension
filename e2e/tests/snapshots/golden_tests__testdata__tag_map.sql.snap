@@ -4,6 +4,13 @@ expression: query_result
 ---
 CREATE EXTENSION promscale;
 CREATE EXTENSION
+-- We don't want retention to mess with the test data
+SELECT ps_trace.set_trace_retention_period('100 years'::INTERVAL);
+ set_trace_retention_period 
+----------------------------
+ t
+(1 row)
+
 SELECT put_tag_key('char', ps_trace.span_tag_type());      /* 1001 */
  put_tag_key 
 -------------
