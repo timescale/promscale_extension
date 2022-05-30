@@ -2,6 +2,9 @@
 
 CREATE EXTENSION promscale;
 
+-- We don't want retention to mess with the test data
+SELECT ps_trace.set_trace_retention_period('100 years'::INTERVAL);
+
 SELECT put_tag_key('char', ps_trace.span_tag_type());      /* 1001 */
 SELECT put_tag_key('iteration', ps_trace.span_tag_type()); /* 1002 */
 SELECT put_tag_key('pwlen', ps_trace.span_tag_type());     /* 1003 that is used */
