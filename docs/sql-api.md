@@ -99,7 +99,7 @@ function void **prom_api.promscale_post_restore**()
 ### prom_api.register_metric_view
 
 ```
-function boolean **prom_api.register_metric_view**(schema_name text, view_name text, if_not_exists boolean DEFAULT false)
+function boolean **prom_api.register_metric_view**(schema_name name, view_name name, if_not_exists boolean DEFAULT false)
 ```
 ### prom_api.reset_metric_chunk_interval
 resets the chunk interval for a specific metric to using the default
@@ -112,14 +112,14 @@ resets the compression setting for a specific metric to using the default
 function boolean **prom_api.reset_metric_compression_setting**(metric_name text)
 ```
 ### prom_api.reset_metric_retention_period
-resets the retention period for a specific metric to using the default
-```
-function boolean **prom_api.reset_metric_retention_period**(schema_name text, metric_name text)
-```
-### prom_api.reset_metric_retention_period
 resets the retention period for a specific raw metric in the default schema to using the default retention period
 ```
 function boolean **prom_api.reset_metric_retention_period**(metric_name text)
+```
+### prom_api.reset_metric_retention_period
+resets the retention period for a specific metric to using the default
+```
+function boolean **prom_api.reset_metric_retention_period**(schema_name text, metric_name text)
 ```
 ### prom_api.set_compression_on_metric_table
 set a compression for a specific metric table
@@ -164,7 +164,7 @@ function boolean **prom_api.set_metric_retention_period**(metric_name text, new_
 ### prom_api.unregister_metric_view
 
 ```
-function boolean **prom_api.unregister_metric_view**(schema_name text, view_name text, if_exists boolean DEFAULT false)
+function boolean **prom_api.unregister_metric_view**(schema_name name, view_name name, if_exists boolean DEFAULT false)
 ```
 ### prom_api.val
 returns the label value from a label id
@@ -414,12 +414,12 @@ function boolean **ps_trace.tag_v_lt**(_ps_trace.tag_v, _ps_trace.tag_v)
 ### ps_trace.tag_v_ne
 
 ```
-function boolean **ps_trace.tag_v_ne**(_ps_trace.tag_v, jsonb)
+function boolean **ps_trace.tag_v_ne**(_ps_trace.tag_v, _ps_trace.tag_v)
 ```
 ### ps_trace.tag_v_ne
 
 ```
-function boolean **ps_trace.tag_v_ne**(_ps_trace.tag_v, _ps_trace.tag_v)
+function boolean **ps_trace.tag_v_ne**(_ps_trace.tag_v, jsonb)
 ```
 ### ps_trace.trace_tree
 
@@ -439,7 +439,7 @@ function void **_prom_catalog.attach_series_partition**(metric_record _prom_cata
 ### _prom_catalog.compress_chunk_for_hypertable
 
 ```
-function void **_prom_catalog.compress_chunk_for_hypertable**(_hypertable_schema_name text, _hypertable_table_name text, _chunk_schema_name text, _chunk_table_name text)
+function void **_prom_catalog.compress_chunk_for_hypertable**(_hypertable_schema_name name, _hypertable_table_name name, _chunk_schema_name name, _chunk_table_name name)
 ```
 ### _prom_catalog.compress_metric_chunks
 
@@ -449,7 +449,7 @@ procedure void **_prom_catalog.compress_metric_chunks**(IN metric_name text)
 ### _prom_catalog.compress_old_chunks
 
 ```
-procedure void **_prom_catalog.compress_old_chunks**(IN _hypertable_schema_name text, IN _hypertable_table_name text, IN _compress_before timestamp with time zone)
+procedure void **_prom_catalog.compress_old_chunks**(IN _hypertable_schema_name name, IN _hypertable_table_name name, IN _compress_before timestamp with time zone)
 ```
 ### _prom_catalog.count_jsonb_keys
 
@@ -479,7 +479,7 @@ function boolean **_prom_catalog.create_metric_view**(metric_name text)
 ### _prom_catalog.create_series
 
 ```
-function bigint **_prom_catalog.create_series**(metric_id integer, metric_table_name text, label_array label_array, OUT series_id bigint)
+function bigint **_prom_catalog.create_series**(metric_id integer, metric_table_name name, label_array label_array, OUT series_id bigint)
 ```
 ### _prom_catalog.create_series_view
 
@@ -489,17 +489,17 @@ function boolean **_prom_catalog.create_series_view**(metric_name text)
 ### _prom_catalog.decompress_chunk_for_metric
 
 ```
-function void **_prom_catalog.decompress_chunk_for_metric**(metric_table text, chunk_schema_name text, chunk_table_name text)
+function void **_prom_catalog.decompress_chunk_for_metric**(metric_table text, chunk_schema_name name, chunk_table_name name)
 ```
 ### _prom_catalog.decompress_chunks_after
 
 ```
-procedure void **_prom_catalog.decompress_chunks_after**(IN metric_table text, IN min_time timestamp with time zone, IN transactional boolean DEFAULT false)
+procedure void **_prom_catalog.decompress_chunks_after**(IN metric_table name, IN min_time timestamp with time zone, IN transactional boolean DEFAULT false)
 ```
 ### _prom_catalog.delay_compression_job
 
 ```
-function void **_prom_catalog.delay_compression_job**(ht_table text, new_start timestamp with time zone)
+function void **_prom_catalog.delay_compression_job**(ht_table name, new_start timestamp with time zone)
 ```
 ### _prom_catalog.delete_expired_series
 
@@ -509,7 +509,7 @@ function void **_prom_catalog.delete_expired_series**(metric_schema text, metric
 ### _prom_catalog.delete_series_catalog_row
 
 ```
-function void **_prom_catalog.delete_series_catalog_row**(metric_table text, series_ids bigint[])
+function void **_prom_catalog.delete_series_catalog_row**(metric_table name, series_ids bigint[])
 ```
 ### _prom_catalog.delete_series_from_metric
 
@@ -519,7 +519,7 @@ function bigint **_prom_catalog.delete_series_from_metric**(name text, series_id
 ### _prom_catalog.do_decompress_chunks_after
 
 ```
-procedure void **_prom_catalog.do_decompress_chunks_after**(IN metric_table text, IN min_time timestamp with time zone, IN transactional boolean DEFAULT false)
+procedure void **_prom_catalog.do_decompress_chunks_after**(IN metric_table name, IN min_time timestamp with time zone, IN transactional boolean DEFAULT false)
 ```
 ### _prom_catalog.drop_metric_chunk_data
 
@@ -579,7 +579,7 @@ function record **_prom_catalog.get_cagg_info**(metric_schema text, metric_table
 ### _prom_catalog.get_confirmed_unused_series
 
 ```
-function bigint[] **_prom_catalog.get_confirmed_unused_series**(metric_schema text, metric_table text, series_table text, potential_series_ids bigint[], check_time timestamp with time zone)
+function bigint[] **_prom_catalog.get_confirmed_unused_series**(metric_schema name, metric_table name, series_table name, potential_series_ids bigint[], check_time timestamp with time zone)
 ```
 ### _prom_catalog.get_default_chunk_interval
 
@@ -654,7 +654,7 @@ function integer **_prom_catalog.get_new_label_id**(key_name text, value_name te
 ### _prom_catalog.get_new_pos_for_key
 
 ```
-function integer[] **_prom_catalog.get_new_pos_for_key**(metric_name text, metric_table text, key_name_array text[], is_for_exemplar boolean)
+function integer[] **_prom_catalog.get_new_pos_for_key**(metric_name text, metric_table name, key_name_array text[], is_for_exemplar boolean)
 ```
 ### _prom_catalog.get_or_create_label_array
 converts a metric name, array of keys, and array of values to a label array
@@ -674,7 +674,7 @@ function integer **_prom_catalog.get_or_create_label_id**(key_name text, value_n
 ### _prom_catalog.get_or_create_label_ids
 converts a metric name, array of keys, and array of values to a list of label ids
 ```
-function TABLE(pos integer[], id integer[], label_key text[], label_value text[]) **_prom_catalog.get_or_create_label_ids**(metric_name text, metric_table text, label_keys text[], label_values text[])
+function TABLE(pos integer[], id integer[], label_key text[], label_value text[]) **_prom_catalog.get_or_create_label_ids**(metric_name text, metric_table name, label_keys text[], label_values text[])
 ```
 ### _prom_catalog.get_or_create_label_key
 
@@ -704,7 +704,7 @@ function record **_prom_catalog.get_or_create_series_id_for_kv_array**(metric_na
 ### _prom_catalog.get_or_create_series_id_for_label_array
 
 ```
-function bigint **_prom_catalog.get_or_create_series_id_for_label_array**(metric_id integer, table_name text, larray label_array, OUT series_id bigint)
+function bigint **_prom_catalog.get_or_create_series_id_for_label_array**(metric_id integer, table_name name, larray label_array, OUT series_id bigint)
 ```
 ### _prom_catalog.get_staggered_chunk_interval
 
@@ -754,7 +754,7 @@ function TABLE(hypertable_name name, table_bytes bigint, index_bytes bigint, toa
 ### _prom_catalog.insert_exemplar_row
 
 ```
-function bigint **_prom_catalog.insert_exemplar_row**(metric_table text, time_array timestamp with time zone[], series_id_array bigint[], exemplar_label_values_array label_value_array[], value_array double precision[])
+function bigint **_prom_catalog.insert_exemplar_row**(metric_table name, time_array timestamp with time zone[], series_id_array bigint[], exemplar_label_values_array label_value_array[], value_array double precision[])
 ```
 ### _prom_catalog.insert_metric_metadatas
 
@@ -764,7 +764,7 @@ function bigint **_prom_catalog.insert_metric_metadatas**(t timestamp with time 
 ### _prom_catalog.insert_metric_row
 
 ```
-function bigint **_prom_catalog.insert_metric_row**(metric_table text, time_array timestamp with time zone[], value_array double precision[], series_id_array bigint[])
+function bigint **_prom_catalog.insert_metric_row**(metric_table name, time_array timestamp with time zone[], value_array double precision[], series_id_array bigint[])
 ```
 ### _prom_catalog.is_multinode
 
@@ -889,7 +889,7 @@ function name **_prom_catalog.pg_name_with_suffix**(full_name text, suffix text)
 ### _prom_catalog.resurrect_series_ids
 
 ```
-function void **_prom_catalog.resurrect_series_ids**(metric_table text, series_id bigint)
+function void **_prom_catalog.resurrect_series_ids**(metric_table name, series_id bigint)
 ```
 ### _prom_catalog.safe_approximate_row_count
 
@@ -1074,7 +1074,7 @@ procedure void **_ps_trace.execute_data_retention_policy**(IN log_verbose boolea
 ### _ps_trace.execute_tracing_compression
 Execute tracing compression compresses tracing tables
 ```
-procedure void **_ps_trace.execute_tracing_compression**(IN hypertable_name text, IN log_verbose boolean DEFAULT false)
+procedure void **_ps_trace.execute_tracing_compression**(IN hypertable_name name, IN log_verbose boolean DEFAULT false)
 ```
 ### _ps_trace.execute_tracing_compression_job
 

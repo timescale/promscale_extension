@@ -1464,13 +1464,13 @@ COMMENT ON FUNCTION prom_api.reset_metric_chunk_interval(TEXT)
 IS 'resets the chunk interval for a specific metric to using the default';
 GRANT EXECUTE ON FUNCTION prom_api.reset_metric_chunk_interval(TEXT) TO prom_admin;
 
-CREATE OR REPLACE FUNCTION _prom_catalog.get_metric_retention_period(_schema_name TEXT, _metric_name TEXT)
+CREATE OR REPLACE FUNCTION _prom_catalog.get_metric_retention_period(schema_name TEXT, metric_name TEXT)
     RETURNS INTERVAL
     SET search_path = pg_catalog, pg_temp
 AS $$
     SELECT COALESCE(m.retention_period, _prom_catalog.get_default_retention_period())
     FROM _prom_catalog.metric m
-    WHERE id IN (SELECT id FROM _prom_catalog.get_metric_table_name_if_exists(_schema_name, _metric_name))
+    WHERE id IN (SELECT id FROM _prom_catalog.get_metric_table_name_if_exists(get_metric_retention_period.schema_name, get_metric_retention_period.metric_name))
     UNION ALL
     SELECT _prom_catalog.get_default_retention_period()
     LIMIT 1
@@ -1480,12 +1480,12 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.get_metric_retention_period(TEXT, TEXT) 
 
 -- convenience function for returning retention period of raw metrics
 -- without the need to specify the schema
-CREATE OR REPLACE FUNCTION _prom_catalog.get_metric_retention_period(_metric_name TEXT)
+CREATE OR REPLACE FUNCTION _prom_catalog.get_metric_retention_period(metric_name TEXT)
     RETURNS INTERVAL
     SET search_path = pg_catalog, pg_temp
 AS $$
     SELECT *
-    FROM _prom_catalog.get_metric_retention_period('prom_data', _metric_name)
+    FROM _prom_catalog.get_metric_retention_period('prom_data', get_metric_retention_period.metric_name)
 $$
 LANGUAGE SQL STABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION _prom_catalog.get_metric_retention_period(TEXT) TO prom_reader;
@@ -1922,7 +1922,7 @@ BEGIN
         ) as lateral_exists(indicator) ON (true)
         WHERE lateral_exists.indicator IS NULL
     $query$, r.table_schema, r.table_name, check_time_condition)
-		USING potential_series_ids
+    USING potential_series_ids
     INTO potential_series_ids;
 
     END LOOP;
@@ -2648,11 +2648,6 @@ STRICT STABLE;
 REVOKE ALL ON FUNCTION _prom_catalog.hypertable_remote_size(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION _prom_catalog.hypertable_remote_size(text) to prom_reader;
 
--- two columns in _timescaledb_internal.compressed_chunk_stats were renamed in version 2.2
--- schema_name -> hypertable_schema
--- table_name -> hypertable_name
--- we use explicit column aliases on _timescaledb_internal.compressed_chunk_stats to rename the
--- `schema_name` and `table_name` in the older versions to the new names
 CREATE OR REPLACE FUNCTION _prom_catalog.hypertable_compression_stats_for_schema(schema_name_in text)
 RETURNS TABLE(hypertable_name text, total_chunks bigint, number_compressed_chunks bigint, before_compression_total_bytes bigint, after_compression_total_bytes bigint)
 SECURITY DEFINER
