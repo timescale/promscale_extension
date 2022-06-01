@@ -2559,8 +2559,8 @@ DO $block$
 BEGIN
     IF _prom_catalog.is_timescaledb_installed() AND _prom_catalog.get_timescale_major_version() >= 2 THEN
 
-        CREATE OR REPLACE FUNCTION _prom_catalog.hypertable_local_size(schema_name_in name)
-        RETURNS TABLE(hypertable_name name, table_bytes bigint, index_bytes bigint, toast_bytes bigint, total_bytes bigint)
+        CREATE OR REPLACE FUNCTION _prom_catalog.hypertable_local_size(schema_name_in text)
+        RETURNS TABLE(hypertable_name text, table_bytes bigint, index_bytes bigint, toast_bytes bigint, total_bytes bigint)
         SECURITY DEFINER
         SET search_path = pg_catalog, pg_temp
         AS $function$
@@ -2572,7 +2572,7 @@ BEGIN
                 -- we explicit aliases to deal with this
                 RETURN QUERY
                 SELECT
-                    ch.hypertable_name,
+                    ch.hypertable_name::text as hypertable_name,
                     (COALESCE(sum(ch.total_bytes), 0) - COALESCE(sum(ch.index_bytes), 0) - COALESCE(sum(ch.toast_bytes), 0) + COALESCE(sum(ch.compressed_heap_size), 0))::bigint + pg_relation_size(format('%I.%I', ch.hypertable_schema, ch.hypertable_name)::regclass)::bigint AS heap_bytes,
                     (COALESCE(sum(ch.index_bytes), 0) + COALESCE(sum(ch.compressed_index_size), 0))::bigint + pg_indexes_size(format('%I.%I', ch.hypertable_schema, ch.hypertable_name)::regclass)::bigint AS index_bytes,
                     (COALESCE(sum(ch.toast_bytes), 0) + COALESCE(sum(ch.compressed_toast_size), 0))::bigint AS toast_bytes,
@@ -2597,7 +2597,7 @@ BEGIN
             ELSE
                 RETURN QUERY
                 SELECT
-                    ch.hypertable_name,
+                    ch.hypertable_name::text as hypertable_name,
                     (COALESCE(sum(ch.total_bytes), 0) - COALESCE(sum(ch.index_bytes), 0) - COALESCE(sum(ch.toast_bytes), 0) + COALESCE(sum(ch.compressed_heap_size), 0))::bigint + pg_relation_size(format('%I.%I', ch.hypertable_schema, ch.hypertable_name)::regclass)::bigint AS heap_bytes,
                     (COALESCE(sum(ch.index_bytes), 0) + COALESCE(sum(ch.compressed_index_size), 0))::bigint + pg_indexes_size(format('%I.%I', ch.hypertable_schema, ch.hypertable_name)::regclass)::bigint AS index_bytes,
                     (COALESCE(sum(ch.toast_bytes), 0) + COALESCE(sum(ch.compressed_toast_size), 0))::bigint AS toast_bytes,
@@ -2624,11 +2624,11 @@ BEGIN
         END;
         $function$
         LANGUAGE plpgsql STRICT STABLE;
-        REVOKE ALL ON FUNCTION _prom_catalog.hypertable_local_size(name) FROM PUBLIC;
-        GRANT EXECUTE ON FUNCTION _prom_catalog.hypertable_local_size(name) to prom_reader;
+        REVOKE ALL ON FUNCTION _prom_catalog.hypertable_local_size(text) FROM PUBLIC;
+        GRANT EXECUTE ON FUNCTION _prom_catalog.hypertable_local_size(text) to prom_reader;
 
-        CREATE OR REPLACE FUNCTION _prom_catalog.hypertable_node_up(schema_name_in name)
-        RETURNS TABLE(hypertable_name name, node_name name, node_up boolean)
+        CREATE OR REPLACE FUNCTION _prom_catalog.hypertable_node_up(schema_name_in text)
+        RETURNS TABLE(hypertable_name text, node_name text, node_up boolean)
         SECURITY DEFINER
         SET search_path = pg_catalog, pg_temp
         AS $function$
@@ -2659,24 +2659,24 @@ BEGIN
                 ) x
             )
             SELECT
-                dht.table_name as hypertable_name,
-                dht.node_name,
+                dht.table_name::text as hypertable_name,
+                dht.node_name::text as node_name,
                 up.node_up
             FROM dht
             JOIN up ON (dht.node_name = up.node_name)
         $function$
         LANGUAGE sql
         STRICT STABLE;
-        REVOKE ALL ON FUNCTION _prom_catalog.hypertable_node_up(name) FROM PUBLIC;
-        GRANT EXECUTE ON FUNCTION _prom_catalog.hypertable_node_up(name) to prom_reader;
+        REVOKE ALL ON FUNCTION _prom_catalog.hypertable_node_up(text) FROM PUBLIC;
+        GRANT EXECUTE ON FUNCTION _prom_catalog.hypertable_node_up(text) to prom_reader;
 
-        CREATE OR REPLACE FUNCTION _prom_catalog.hypertable_remote_size(schema_name_in name)
-        RETURNS TABLE(hypertable_name name, table_bytes bigint, index_bytes bigint, toast_bytes bigint, total_bytes bigint)
+        CREATE OR REPLACE FUNCTION _prom_catalog.hypertable_remote_size(schema_name_in text)
+        RETURNS TABLE(hypertable_name text, table_bytes bigint, index_bytes bigint, toast_bytes bigint, total_bytes bigint)
         SECURITY DEFINER
         SET search_path = pg_catalog, pg_temp
         AS $function$
             SELECT
-                dht.hypertable_name,
+                dht.hypertable_name::text as hypertable_name,
                 sum(x.table_bytes)::bigint AS table_bytes,
                 sum(x.index_bytes)::bigint AS index_bytes,
                 sum(x.toast_bytes)::bigint AS toast_bytes,
@@ -2692,22 +2692,22 @@ BEGIN
         $function$
         LANGUAGE sql
         STRICT STABLE;
-        REVOKE ALL ON FUNCTION _prom_catalog.hypertable_remote_size(name) FROM PUBLIC;
-        GRANT EXECUTE ON FUNCTION _prom_catalog.hypertable_remote_size(name) to prom_reader;
+        REVOKE ALL ON FUNCTION _prom_catalog.hypertable_remote_size(text) FROM PUBLIC;
+        GRANT EXECUTE ON FUNCTION _prom_catalog.hypertable_remote_size(text) to prom_reader;
 
         -- two columns in _timescaledb_internal.compressed_chunk_stats were renamed in version 2.2
         -- schema_name -> hypertable_schema
         -- table_name -> hypertable_name
         -- we use explicit column aliases on _timescaledb_internal.compressed_chunk_stats to rename the
         -- `schema_name` and `table_name` in the older versions to the new names
-        CREATE OR REPLACE FUNCTION _prom_catalog.hypertable_compression_stats_for_schema(schema_name_in name)
-        RETURNS TABLE(hypertable_name name, total_chunks bigint, number_compressed_chunks bigint, before_compression_total_bytes bigint, after_compression_total_bytes bigint)
+        CREATE OR REPLACE FUNCTION _prom_catalog.hypertable_compression_stats_for_schema(schema_name_in text)
+        RETURNS TABLE(hypertable_name text, total_chunks bigint, number_compressed_chunks bigint, before_compression_total_bytes bigint, after_compression_total_bytes bigint)
         SECURITY DEFINER
 
         SET search_path = pg_catalog, pg_temp
         AS $function$
             SELECT
-                x.hypertable_name,
+                x.hypertable_name::text as hypertable_name,
                 count(*)::bigint AS total_chunks,
                 (count(*) FILTER (WHERE x.compression_status = 'Compressed'))::bigint AS number_compressed_chunks,
                 sum(x.before_compression_total_bytes)::bigint AS before_compression_total_bytes,
@@ -2759,8 +2759,8 @@ BEGIN
         $function$
         LANGUAGE sql
         STRICT STABLE;
-        REVOKE ALL ON FUNCTION _prom_catalog.hypertable_compression_stats_for_schema(name) FROM PUBLIC;
-        GRANT EXECUTE ON FUNCTION _prom_catalog.hypertable_compression_stats_for_schema(name) to prom_reader;
+        REVOKE ALL ON FUNCTION _prom_catalog.hypertable_compression_stats_for_schema(text) FROM PUBLIC;
+        GRANT EXECUTE ON FUNCTION _prom_catalog.hypertable_compression_stats_for_schema(text) to prom_reader;
 
     END IF;
 END;
@@ -2770,7 +2770,7 @@ $block$
 --------------------------------- Views --------------------------------
 
 CREATE OR REPLACE FUNCTION _prom_catalog.metric_view()
-    RETURNS TABLE(id int, metric_name text, table_name name, label_keys text[], retention_period interval,
+    RETURNS TABLE(id int, metric_name text, table_name text, label_keys text[], retention_period interval,
               chunk_interval interval, compressed_interval interval, total_interval interval,
               before_compression_bytes bigint, after_compression_bytes bigint,
               total_size_bytes bigint, total_size text, compression_ratio numeric,
@@ -2784,7 +2784,7 @@ BEGIN
                 SELECT
                    i.id,
                    i.metric_name,
-                   i.table_name,
+                   i.table_name::text as table_name,
                    i.label_keys,
                    i.retention_period,
                    i.chunk_interval,
@@ -2833,7 +2833,7 @@ BEGIN
             SELECT
                 m.id,
                 m.metric_name,
-                m.table_name,
+                m.table_name::text as table_name,
                 ARRAY(
                     SELECT key
                     FROM _prom_catalog.label_key_position lkp
@@ -2876,7 +2876,7 @@ BEGIN
                 SELECT
                     m.id,
                     m.metric_name,
-                    m.table_name,
+                    m.table_name::text as table_name,
                     ARRAY(
                         SELECT key
                             FROM _prom_catalog.label_key_position lkp

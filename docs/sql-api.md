@@ -734,22 +734,22 @@ function trigger **_prom_catalog.ha_leases_audit_fn**()
 ### _prom_catalog.hypertable_compression_stats_for_schema
 
 ```
-function TABLE(hypertable_name name, total_chunks bigint, number_compressed_chunks bigint, before_compression_total_bytes bigint, after_compression_total_bytes bigint) **_prom_catalog.hypertable_compression_stats_for_schema**(schema_name_in name)
+function TABLE(hypertable_name text, total_chunks bigint, number_compressed_chunks bigint, before_compression_total_bytes bigint, after_compression_total_bytes bigint) **_prom_catalog.hypertable_compression_stats_for_schema**(schema_name_in text)
 ```
 ### _prom_catalog.hypertable_local_size
 
 ```
-function TABLE(hypertable_name name, table_bytes bigint, index_bytes bigint, toast_bytes bigint, total_bytes bigint) **_prom_catalog.hypertable_local_size**(schema_name_in name)
+function TABLE(hypertable_name text, table_bytes bigint, index_bytes bigint, toast_bytes bigint, total_bytes bigint) **_prom_catalog.hypertable_local_size**(schema_name_in text)
 ```
 ### _prom_catalog.hypertable_node_up
 
 ```
-function TABLE(hypertable_name name, node_name name, node_up boolean) **_prom_catalog.hypertable_node_up**(schema_name_in name)
+function TABLE(hypertable_name text, node_name text, node_up boolean) **_prom_catalog.hypertable_node_up**(schema_name_in text)
 ```
 ### _prom_catalog.hypertable_remote_size
 
 ```
-function TABLE(hypertable_name name, table_bytes bigint, index_bytes bigint, toast_bytes bigint, total_bytes bigint) **_prom_catalog.hypertable_remote_size**(schema_name_in name)
+function TABLE(hypertable_name text, table_bytes bigint, index_bytes bigint, toast_bytes bigint, total_bytes bigint) **_prom_catalog.hypertable_remote_size**(schema_name_in text)
 ```
 ### _prom_catalog.insert_exemplar_row
 
@@ -874,7 +874,7 @@ function boolean **_prom_catalog.match_regexp_not_matches**(labels label_array, 
 ### _prom_catalog.metric_view
 
 ```
-function TABLE(id integer, metric_name text, table_name name, label_keys text[], retention_period interval, chunk_interval interval, compressed_interval interval, total_interval interval, before_compression_bytes bigint, after_compression_bytes bigint, total_size_bytes bigint, total_size text, compression_ratio numeric, total_chunks bigint, compressed_chunks bigint) **_prom_catalog.metric_view**()
+function TABLE(id integer, metric_name text, table_name text, label_keys text[], retention_period interval, chunk_interval interval, compressed_interval interval, total_interval interval, before_compression_bytes bigint, after_compression_bytes bigint, total_size_bytes bigint, total_size text, compression_ratio numeric, total_chunks bigint, compressed_chunks bigint) **_prom_catalog.metric_view**()
 ```
 ### _prom_catalog.pg_name_unique
 
