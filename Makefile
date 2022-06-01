@@ -18,6 +18,8 @@ PUSH ?=
 TIMESCALEDB_VERSION_FULL=2.6.1
 TIMESCALEDB_VERSION_MAJMIN=$(shell echo $(TIMESCALEDB_VERSION_FULL) | cut -d. -f 1,2)
 TIMESCALEDB_VERSION_MAJOR=$(shell echo $(TIMESCALEDB_VERSION_FULL) | cut -d. -f 1)
+TS_DOCKER_IMAGE ?= local/dev_promscale_extension:head-ts2-pg14
+export TS_DOCKER_IMAGE
 
 # Transform ARCH to its Docker platform equivalent
 ifeq ($(ARCH),arm64)
@@ -111,7 +113,7 @@ dist/$(RELEASE_FILE_NAME): release-builder
 release: dist/$(RELEASE_FILE_NAME) ## Produces release artifacts based on OS_NAME, OS_VERSION, and PG_RELEASE_VERSION
 
 .PHONY: gendoc
-gendoc:
+gendoc: ## Generate SQL API documentation, requires built docker image. Use TS_DOCKER_IMAGE to set Docker image
 	cargo run -p gendoc > docs/sql-api.md
 
 .PHONY: release-builder

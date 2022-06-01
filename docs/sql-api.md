@@ -112,14 +112,14 @@ resets the compression setting for a specific metric to using the default
 function boolean **prom_api.reset_metric_compression_setting**(metric_name text)
 ```
 ### prom_api.reset_metric_retention_period
-resets the retention period for a specific metric to using the default
-```
-function boolean **prom_api.reset_metric_retention_period**(schema_name text, metric_name text)
-```
-### prom_api.reset_metric_retention_period
 resets the retention period for a specific raw metric in the default schema to using the default retention period
 ```
 function boolean **prom_api.reset_metric_retention_period**(metric_name text)
+```
+### prom_api.reset_metric_retention_period
+resets the retention period for a specific metric to using the default
+```
+function boolean **prom_api.reset_metric_retention_period**(schema_name text, metric_name text)
 ```
 ### prom_api.set_compression_on_metric_table
 set a compression for a specific metric table
@@ -152,14 +152,14 @@ set a compression setting for a specific metric (this overrides the default)
 function boolean **prom_api.set_metric_compression_setting**(metric_name text, new_compression_setting boolean)
 ```
 ### prom_api.set_metric_retention_period
-set a retention period for a specific metric (this overrides the default)
-```
-function boolean **prom_api.set_metric_retention_period**(schema_name text, metric_name text, new_retention_period interval)
-```
-### prom_api.set_metric_retention_period
 set a retention period for a specific raw metric in default schema (this overrides the default)
 ```
 function boolean **prom_api.set_metric_retention_period**(metric_name text, new_retention_period interval)
+```
+### prom_api.set_metric_retention_period
+set a retention period for a specific metric (this overrides the default)
+```
+function boolean **prom_api.set_metric_retention_period**(schema_name text, metric_name text, new_retention_period interval)
 ```
 ### prom_api.unregister_metric_view
 
@@ -384,12 +384,12 @@ function internal **ps_trace.tag_map_subscript_handler**(internal)
 ### ps_trace.tag_v_eq
 
 ```
-function boolean **ps_trace.tag_v_eq**(_ps_trace.tag_v, jsonb)
+function boolean **ps_trace.tag_v_eq**(_ps_trace.tag_v, _ps_trace.tag_v)
 ```
 ### ps_trace.tag_v_eq
 
 ```
-function boolean **ps_trace.tag_v_eq**(_ps_trace.tag_v, _ps_trace.tag_v)
+function boolean **ps_trace.tag_v_eq**(_ps_trace.tag_v, jsonb)
 ```
 ### ps_trace.tag_v_ge
 
@@ -414,12 +414,12 @@ function boolean **ps_trace.tag_v_lt**(_ps_trace.tag_v, _ps_trace.tag_v)
 ### ps_trace.tag_v_ne
 
 ```
-function boolean **ps_trace.tag_v_ne**(_ps_trace.tag_v, jsonb)
+function boolean **ps_trace.tag_v_ne**(_ps_trace.tag_v, _ps_trace.tag_v)
 ```
 ### ps_trace.tag_v_ne
 
 ```
-function boolean **ps_trace.tag_v_ne**(_ps_trace.tag_v, _ps_trace.tag_v)
+function boolean **ps_trace.tag_v_ne**(_ps_trace.tag_v, jsonb)
 ```
 ### ps_trace.trace_tree
 
@@ -657,14 +657,14 @@ function integer **_prom_catalog.get_new_label_id**(key_name text, value_name te
 function integer[] **_prom_catalog.get_new_pos_for_key**(metric_name text, metric_table text, key_name_array text[], is_for_exemplar boolean)
 ```
 ### _prom_catalog.get_or_create_label_array
-converts a metric name, array of keys, and array of values to a label array
-```
-function label_array **_prom_catalog.get_or_create_label_array**(metric_name text, label_keys text[], label_values text[])
-```
-### _prom_catalog.get_or_create_label_array
 converts a jsonb to a label array
 ```
 function label_array **_prom_catalog.get_or_create_label_array**(js jsonb)
+```
+### _prom_catalog.get_or_create_label_array
+converts a metric name, array of keys, and array of values to a label array
+```
+function label_array **_prom_catalog.get_or_create_label_array**(metric_name text, label_keys text[], label_values text[])
 ```
 ### _prom_catalog.get_or_create_label_id
 
@@ -819,12 +819,12 @@ function SETOF record **_prom_catalog.label_jsonb_each_text**(js jsonb, OUT key 
 ### _prom_catalog.label_match
 
 ```
-function boolean **_prom_catalog.label_match**(labels label_array, matchers matcher_positive)
+function boolean **_prom_catalog.label_match**(labels label_array, matchers matcher_negative)
 ```
 ### _prom_catalog.label_match
 
 ```
-function boolean **_prom_catalog.label_match**(labels label_array, matchers matcher_negative)
+function boolean **_prom_catalog.label_match**(labels label_array, matchers matcher_positive)
 ```
 ### _prom_catalog.label_unnest
 

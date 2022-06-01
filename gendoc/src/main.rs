@@ -38,7 +38,7 @@ SELECT
 FROM pg_catalog.pg_proc p
          JOIN pg_catalog.pg_namespace ON pg_namespace.oid = p.pronamespace
          INNER JOIN schema_visibility ON schema_visibility.schema = pg_namespace.nspname
-ORDER BY schema_visibility.public DESC, pg_namespace.nspname, p.proname;
+ORDER BY schema_visibility.public DESC, pg_namespace.nspname, p.proname, pg_catalog.pg_get_function_arguments(p.oid);
 "#;
 
 const OP_QUERY: &str = r#"
