@@ -18,7 +18,7 @@ type PostgresContainer<'d> = Container<'d, Cli, GenericImage>;
 /// Otherwise, it returns a default image.
 fn postgres_image() -> String {
     env::var("TS_DOCKER_IMAGE").unwrap_or_else(|_| {
-        String::from("ghcr.io/timescale/dev_promscale_extension:develop-ts2-pg14")
+        String::from("ghcr.io/timescale/dev_promscale_extension:master-ts2-pg14")
     })
 }
 
