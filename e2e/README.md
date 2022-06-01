@@ -9,7 +9,7 @@ Run the tests with `cargo test -p e2e`. The tests are run against a docker image
 the `TS_DOCKER_IMAGE` env var to override the default docker image, e.g.:
 
 ```
-TS_DOCKER_IMAGE=ghcr.io/timescale/dev_promscale_extension:develop-ts2-pg13 cargo test -p e2e
+TS_DOCKER_IMAGE=ghcr.io/timescale/dev_promscale_extension:master-ts2-pg13 cargo test -p e2e
 ```
 
 ## Rust tests

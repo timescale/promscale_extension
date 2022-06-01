@@ -135,7 +135,7 @@ fn output_operators(connection: &mut Client) {
 
 fn run_postgres(client: &Cli) -> Container<Cli, GenericImage> {
     let docker_image = env::var("TS_DOCKER_IMAGE").unwrap_or(String::from(
-        "ghcr.io/timescale/dev_promscale_extension:develop-ts2-pg14",
+        "ghcr.io/timescale/dev_promscale_extension:master-ts2-pg14",
     ));
 
     let src = concat!(env!("CARGO_MANIFEST_DIR"), "/testdata");
