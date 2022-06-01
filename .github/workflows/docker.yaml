@@ -15,6 +15,8 @@ on:
 jobs:
   docker:
     runs-on: ubuntu-latest
+    outputs:
+      branch_name: ${{steps.metadata.outputs.branch_name}}
     strategy:
       matrix:
         pgversion:
@@ -104,3 +106,12 @@ jobs:
       - name: Mark the job as a failure
         if: needs.docker.result != 'success'
         run: exit 1
+
+  call-connector-e2e:
+    name: call connector e2e test
+    needs:
+      - docker
+    if: needs.docker.result == 'success'
+    uses: timescale/promscale/.github/workflows/go-e2e.yml@add_workflow_call
+    with:
+      docker_image_prefix:  ${{ needs.docker.outputs.branch_name }}-ts2
