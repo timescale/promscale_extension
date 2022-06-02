@@ -36,10 +36,25 @@ Execute maintenance tasks like dropping data according to retention policy. This
 ```
 procedure void **prom_api.execute_maintenance**(IN log_verbose boolean DEFAULT false)
 ```
+### prom_api.get_default_metric_retention_period
+get the default retention period for all metrics
+```
+function interval **prom_api.get_default_metric_retention_period**()
+```
 ### prom_api.get_metric_metadata
 
 ```
 function TABLE(metric_family text, type text, unit text, help text) **prom_api.get_metric_metadata**(metric_family_name text)
+```
+### prom_api.get_metric_retention_period
+get the retention period for a specific metric
+```
+function interval **prom_api.get_metric_retention_period**(metric_name text)
+```
+### prom_api.get_metric_retention_period
+get the retention period for a specific metric
+```
+function interval **prom_api.get_metric_retention_period**(metric_schema text, metric_name text)
 ```
 ### prom_api.get_multiple_metric_metadata
 
