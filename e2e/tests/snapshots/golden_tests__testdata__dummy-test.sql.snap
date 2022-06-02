@@ -1,0 +1,19 @@
+---
+source: e2e/tests/tap-tests.rs
+expression: query_result
+---
+ plan 
+------
+ 1..1
+(1 row)
+
+      is      
+--------------
+ ok 1 - 1 = 1
+(1 row)
+
+ finish 
+--------
+(0 rows)
+
+
