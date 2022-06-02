@@ -40,7 +40,7 @@ pub fn connect(node: &Container<Cli, GenericImage>) -> Client {
         DB
     );
 
-    postgres::Client::connect(connection_string, postgres::NoTls).unwrap()
+    Client::connect(connection_string, postgres::NoTls).unwrap()
 }
 
 #[allow(dead_code)]
