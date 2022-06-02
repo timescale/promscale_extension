@@ -1569,7 +1569,40 @@ $func$
 LANGUAGE SQL;
 COMMENT ON FUNCTION prom_api.set_metric_retention_period(TEXT, INTERVAL)
 IS 'set a retention period for a specific raw metric in default schema (this overrides the default)';
-GRANT EXECUTE ON FUNCTION prom_api.set_metric_retention_period(TEXT, INTERVAL)TO prom_admin;
+GRANT EXECUTE ON FUNCTION prom_api.set_metric_retention_period(TEXT, INTERVAL) TO prom_admin;
+
+CREATE OR REPLACE FUNCTION prom_api.get_metric_retention_period(metric_schema TEXT, metric_name TEXT)
+    RETURNS INTERVAL
+    SET search_path = pg_catalog, pg_temp
+AS $func$
+    SELECT _prom_catalog.get_metric_retention_period(metric_schema, metric_name);
+$func$
+LANGUAGE SQL;
+COMMENT ON FUNCTION prom_api.get_metric_retention_period(TEXT, TEXT)
+IS 'get the retention period for a specific metric';
+GRANT EXECUTE ON FUNCTION prom_api.get_metric_retention_period(TEXT, TEXT) TO prom_reader;
+
+CREATE OR REPLACE FUNCTION prom_api.get_metric_retention_period(metric_name TEXT)
+    RETURNS INTERVAL
+    SET search_path = pg_catalog, pg_temp
+AS $func$
+    SELECT _prom_catalog.get_metric_retention_period('prom_data', metric_name);
+$func$
+LANGUAGE SQL;
+COMMENT ON FUNCTION prom_api.get_metric_retention_period(TEXT)
+IS 'get the retention period for a specific metric';
+GRANT EXECUTE ON FUNCTION prom_api.get_metric_retention_period(TEXT) TO prom_reader;
+
+CREATE OR REPLACE FUNCTION prom_api.get_default_metric_retention_period()
+    RETURNS INTERVAL
+    SET search_path = pg_catalog, pg_temp
+AS $func$
+SELECT _prom_catalog.get_default_retention_period();
+$func$
+LANGUAGE SQL;
+COMMENT ON FUNCTION prom_api.get_default_metric_retention_period()
+IS 'get the default retention period for all metrics';
+GRANT EXECUTE ON FUNCTION prom_api.get_default_metric_retention_period() TO prom_reader;
 
 CREATE OR REPLACE FUNCTION prom_api.reset_metric_retention_period(schema_name TEXT, metric_name TEXT)
     RETURNS BOOLEAN

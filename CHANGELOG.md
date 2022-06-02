@@ -16,6 +16,8 @@ We use the following categories for changes:
 
 ### Added
 
+- Added public API to get metric retention period [#331]
+
 ### Changed
 
 ### Deprecated
