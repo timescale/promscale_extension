@@ -12,7 +12,7 @@ test-generator = "0.3.0"
 similar = "2.1.0"
 regex = "1.5.5"
 md-5 = "0.10.1"
-hex-literal = "0.3.4"
+hex = "0.4.3"
 
 [build-dependencies]
 build-deps = "^0.1"

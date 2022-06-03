@@ -1,4 +1,4 @@
-use hex_literal::hex;
+use hex;
 use md5::{Digest, Md5};
 use std::path::PathBuf;
 use std::{env, fs};
@@ -21,83 +21,65 @@ fn incremental_freeze_test() {
 
     let frozen_files = [
         // ↓↓↓ frozen in 0.5.0 ↓↓↓
-        (
-            "001-extension.sql",
-            hex!("8a9534cf8534c0cb6b2f939aa8df32c2"),
-        ),
-        ("002-utils.sql", hex!("2450a0291c64f48e80bd4d4638f3bba0")),
-        ("003-users.sql", hex!("ca921c533531d5715bfeb688f569325f")),
-        ("004-schemas.sql", hex!("f2785b92611bd621c8fb64f2a5403b47")),
-        (
-            "005-tag-operators.sql",
-            hex!("93025aa25ca16e8d9902bf48cda2e77c"),
-        ),
-        ("006-tables.sql", hex!("706234b562dc5eb3649474b2869f271c")),
+        ("001-extension.sql", "8a9534cf8534c0cb6b2f939aa8df32c2"),
+        ("002-utils.sql", "2450a0291c64f48e80bd4d4638f3bba0"),
+        ("003-users.sql", "ca921c533531d5715bfeb688f569325f"),
+        ("004-schemas.sql", "f2785b92611bd621c8fb64f2a5403b47"),
+        ("005-tag-operators.sql", "93025aa25ca16e8d9902bf48cda2e77c"),
+        ("006-tables.sql", "706234b562dc5eb3649474b2869f271c"),
         (
             "007-matcher-operators.sql",
-            hex!("a3905324b05dbb6d46ba76ac43da0ca0"),
+            "a3905324b05dbb6d46ba76ac43da0ca0",
         ),
-        (
-            "008-install-uda.sql",
-            hex!("b3fcd9187382028987bac0f64678e849"),
-        ),
-        (
-            "009-tables-ha.sql",
-            hex!("fc7c60b8e911ce454961690d8a30c610"),
-        ),
+        ("008-install-uda.sql", "b3fcd9187382028987bac0f64678e849"),
+        ("009-tables-ha.sql", "fc7c60b8e911ce454961690d8a30c610"),
         (
             "010-tables-metadata.sql",
-            hex!("69d8b3e2a587078dbc71a17d7cedbf65"),
+            "69d8b3e2a587078dbc71a17d7cedbf65",
         ),
         (
             "011-tables-exemplar.sql",
-            hex!("9036070888f0cc3d8e545a479d864d28"),
+            "9036070888f0cc3d8e545a479d864d28",
         ),
-        ("012-tracing.sql", hex!("fd639f016094c370f368c5c4358e935a")),
+        ("012-tracing.sql", "fd639f016094c370f368c5c4358e935a"),
         (
             "013-tracing-well-known-tags.sql",
-            hex!("f6dafc2ddc0c5e2db32fcdce5c67a193"),
+            "f6dafc2ddc0c5e2db32fcdce5c67a193",
         ),
-        (
-            "014-telemetry.sql",
-            hex!("69eb61e653d23a37ecdbe0d8f24deb99"),
-        ),
+        ("014-telemetry.sql", "69eb61e653d23a37ecdbe0d8f24deb99"),
         (
             "015-tracing-redesign.sql",
-            hex!("485e1d3aa79be276ae5867e9eff0482e"),
+            "485e1d3aa79be276ae5867e9eff0482e",
         ),
         (
             "016-remove-ee-schemas.sql",
-            hex!("0409432e7261233f2626ea0d0389a6de"),
+            "0409432e7261233f2626ea0d0389a6de",
         ),
         (
             "017-set-search-path.sql",
-            hex!("3fd771a6ae751bc55deab6014b6ccdda"),
+            "3fd771a6ae751bc55deab6014b6ccdda",
         ),
         (
             "018-grant-prom-roles.sql",
-            hex!("bcd9b321566bab2af3354df595405536"),
+            "bcd9b321566bab2af3354df595405536",
         ),
         (
             "019-prom-installation-info.sql",
-            hex!("23910dee4eb761c86985b1d656b0860a"),
+            "23910dee4eb761c86985b1d656b0860a",
         ),
         (
             "020-series-partitions.sql",
-            hex!("ff05bb62a8a4ddfb459ec4a720476f5b"),
+            "ff05bb62a8a4ddfb459ec4a720476f5b",
         ),
         (
             "021-initial-default.sql",
-            hex!("be4e6f023382878d432ac9438cb0e407"),
+            "be4e6f023382878d432ac9438cb0e407",
         ),
-        ("022-jit-off.sql", hex!("4ebda0b60a31332cad5f0b8fb2d05d7c")),
-        (
-            "023-privileges.sql",
-            hex!("7a810fe5538653ce6e06674dbbdf7451"),
-        ),
+        ("022-jit-off.sql", "4ebda0b60a31332cad5f0b8fb2d05d7c"),
+        ("023-privileges.sql", "7a810fe5538653ce6e06674dbbdf7451"),
         (
             "024-adjust_autovacuum.sql",
-            hex!("0fe28659efa74be9663cc158f84294cb"),
+            "0fe28659efa74be9663cc158f84294cb",
         ),
         // ↓↓↓ frozen in x.x.x ↓↓↓
     ];
@@ -105,10 +87,9 @@ fn incremental_freeze_test() {
         let body = fs::read_to_string(incremental_dir.join(filename)).expect("failed to read file");
         let mut hasher = Md5::new();
         hasher.update(body);
-        let actual = hasher.finalize();
+        let actual = hex::encode(hasher.finalize());
         assert_eq!(
-            actual[..],
-            expected[..],
+            actual, expected,
             "migration/incremental/{} is frozen but appears to have been modified",
             filename
         );
