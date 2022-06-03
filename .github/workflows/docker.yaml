@@ -115,3 +115,4 @@ jobs:
     uses: timescale/promscale/.github/workflows/go-e2e.yml@add_workflow_call
     with:
       docker_image_prefix:  ${{ needs.docker.outputs.branch_name }}-ts2
+      ref: master
