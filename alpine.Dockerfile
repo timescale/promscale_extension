@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.3-labs
 ARG PG_VERSION=14
-ARG TIMESCALEDB_VERSION_FULL=2.6.1
+ARG TIMESCALEDB_VERSION_FULL=2.7.0
 ARG PREVIOUS_IMAGE=timescaledev/promscale-extension:latest-ts2-pg${PG_VERSION}
 FROM timescale/timescaledb:${TIMESCALEDB_VERSION_FULL}-pg${PG_VERSION} as builder
 
