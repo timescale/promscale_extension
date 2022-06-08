@@ -20,11 +20,18 @@ We use the following categories for changes:
 
 ### Changed
 
+- Stop all background workers for the duration of the upgrade [#290]
+
 ### Deprecated
 
 ### Removed
 
 ### Fixed
+
+- Use `TEXT` instead of `NAME` for function args [#310]
+- Fix storage type for `tag_map` and `tag_v` types [#314]
+- Drop old versions of func/proc where signature changed [#323]
+- Remove some code paths for deprecated versions [#326]
 
 ## [0.3.0] - 2021-12-01
 
