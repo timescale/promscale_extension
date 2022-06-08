@@ -14,6 +14,8 @@ We use the following categories for changes:
 
 ## [Unreleased]
 
+## [0.5.1] - 2021-06-08
+
 ### Added
 
 - Added public API to get metric retention period [#331]
@@ -21,10 +23,6 @@ We use the following categories for changes:
 ### Changed
 
 - Stop all background workers for the duration of the upgrade [#290]
-
-### Deprecated
-
-### Removed
 
 ### Fixed
 
