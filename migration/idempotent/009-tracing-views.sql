@@ -1,4 +1,4 @@
-CREATE VIEW ps_trace.span AS
+CREATE OR REPLACE VIEW ps_trace.span AS
 SELECT
     s.trace_id,
     s.span_id,
