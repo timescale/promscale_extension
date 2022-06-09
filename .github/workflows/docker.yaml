@@ -138,8 +138,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Mark the job as a success
-        if: needs.docker.result == 'success'
+        if: needs.docker.result == 'success' && needs.call-connector-e2e.result == 'success'
         run: exit 0
       - name: Mark the job as a failure
-        if: needs.docker.result != 'success'
+        if: needs.docker.result != 'success' || needs.call-connector-e2e.result != 'success'
         run: exit 1
