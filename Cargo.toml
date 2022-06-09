@@ -3,7 +3,7 @@ members = ["e2e", "gendoc"]
 
 [package]
 name = "promscale"
-version = "0.5.1"
+version = "0.5.2-dev"
 edition = "2018"
 
 [lib]
