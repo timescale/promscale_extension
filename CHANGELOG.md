@@ -30,6 +30,7 @@ We use the following categories for changes:
 - Fix storage type for `tag_map` and `tag_v` types [#314]
 - Drop old versions of func/proc where signature changed [#323]
 - Remove some code paths for deprecated versions [#326]
+- Fix upgrade path from 0.5.0 to 0.5.1 [#347]
 
 ## [0.3.0] - 2021-12-01
 
