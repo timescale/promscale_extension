@@ -91,6 +91,25 @@ jobs:
           make gendoc
           git diff --exit-code
 
+      - name: Login to Dockerhub
+        uses: docker/login-action@v1
+        # A dash indicates prerelease in SemVer
+        if: ${{ startsWith(github.ref, 'refs/tags') && !contains(github.ref, '-') && matrix.base == 'alpine' }}
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Publish alpine images to Docker Hub
+        uses: akhilerm/tag-push-action@v2.0.0
+        # A dash indicates prerelease in SemVer
+        if: ${{ startsWith(github.ref, 'refs/tags') && !contains(github.ref, '-') && matrix.base == 'alpine' }}
+        with:
+          src: ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
+          dst: |
+            timescaledev/promscale-extension:${{steps.metadata.outputs.branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}
+            timescaledev/promscale-extension:latest-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}
+
+
   pick-connector-branch:
     name: picking connector's repo branch
     runs-on: ubuntu-latest
