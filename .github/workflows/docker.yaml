@@ -122,7 +122,7 @@ jobs:
       - docker
       - pick-connector-branch
     if: needs.docker.result == 'success'
-    uses: timescale/promscale/.github/workflows/go-e2e.yml@add_workflow_call
+    uses: timescale/promscale/.github/workflows/go-e2e.yml@master
     with:
       docker_image_prefix:  ${{ needs.docker.outputs.branch_name }}-ts2
       ref: ${{ needs.pick-connector-branch.outputs.branch }}
