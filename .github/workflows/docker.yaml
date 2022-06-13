@@ -15,6 +15,8 @@ on:
 jobs:
   docker:
     runs-on: ubuntu-latest
+    outputs:
+      branch_name: ${{steps.metadata.outputs.branch_name}}
     strategy:
       matrix:
         pgversion:
@@ -89,6 +91,42 @@ jobs:
           make gendoc
           git diff --exit-code
 
+  pick-connector-branch:
+    name: picking connector's repo branch
+    runs-on: ubuntu-latest
+    needs:
+      - docker
+    outputs:
+      branch:  ${{ steps.curl.outputs.branch }}
+    steps:
+     - name: curl check matching branch
+       id: curl
+       run: |
+          branch_name=${{ needs.docker.outputs.branch_name }}
+          res=$(curl \
+                  -sw'%{http_code}\n' \
+                  -H "Accept: application/vnd.github.v3+json" \
+                  https://api.github.com/repos/timescale/promscale/branches/${branch_name} | tail -1)
+          if [[ "$res" = "200" ]]; then
+            echo "::set-output name=branch::${branch_name}"
+          elif [[ "$res" == "404" ]]; then
+            echo "::set-output name=branch::master"
+          else
+            echo "Unexpected HTTP response: $res"
+            exit 1
+          fi;
+
+  call-connector-e2e:
+    name: call connector e2e test
+    needs:
+      - docker
+      - pick-connector-branch
+    if: needs.docker.result == 'success'
+    uses: timescale/promscale/.github/workflows/go-e2e.yml@add_workflow_call
+    with:
+      docker_image_prefix:  ${{ needs.docker.outputs.branch_name }}-ts2
+      ref: ${{ needs.pick-connector-branch.outputs.branch }}
+
   # This allows us to set a single job which must pass in GitHub's branch protection rules,
   # otherwise we have to keep updating them as we add or remove postgres versions etc.
   docker-result:
@@ -96,11 +134,12 @@ jobs:
     if: always()
     needs:
       - docker
+      - call-connector-e2e
     runs-on: ubuntu-latest
     steps:
       - name: Mark the job as a success
-        if: needs.docker.result == 'success'
+        if: needs.docker.result == 'success' && needs.call-connector-e2e.result == 'success'
         run: exit 0
       - name: Mark the job as a failure
-        if: needs.docker.result != 'success'
+        if: needs.docker.result != 'success' || needs.call-connector-e2e.result != 'success'
         run: exit 1
