@@ -9,7 +9,7 @@ The packages can be found in the Timescale [repository](https://packagecloud.io/
 While the extension declares a dependency on Postgres 12-14, it can be run on TimescaleDB 2.x as well, which fulfills the requirement
 on Postgres indirectly. You can find the installation instructions for TimescaleDB [here](https://docs.timescale.com/install/latest/self-hosted/)
 
-#### Debian Derivatives
+### Debian Derivatives
 
 1. Install Postgres or TimescaleDB
    Instructions for installing TimescaleDB and Postgres can be found [here](https://docs.timescale.com/install/latest/self-hosted/installation-debian/#install-self-hosted-timescaledb-on-debian-based-systems), and [here](https://www.postgresql.org/download/) respectively. 
@@ -21,7 +21,7 @@ on Postgres indirectly. You can find the installation instructions for Timescale
     apt install promscale-extension-postgresql-14
     ```
 
-#### RHEL/CentOS
+### RHEL/CentOS
 
 See the Postgres [documentation](https://www.postgresql.org/download/linux/redhat/) for more information.
 
@@ -55,9 +55,6 @@ See the Postgres [documentation](https://www.postgresql.org/download/linux/redha
 - `quick` and package building images are not published anywhere and are used for local development and building packages 
 
 ## Compile From Source
-
-The extension is installed by default on the
-[`timescaledev/promscale-extension:latest-pg12`](https://hub.docker.com/r/timescaledev/promscale-extension) docker image.
 
 For bare-metal installations, the full instructions for setting up PostgreSQL, TimescaleDB, and the Promscale Extension are:
 

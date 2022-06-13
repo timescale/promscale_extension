@@ -1,12 +1,12 @@
 # Promscale Extension
 
-From Promscale version 0.11.0 this [Postgres extension](https://www.postgresql.org/docs/12/extend-extensions.html)
+From Promscale version 0.11.0, this [Postgres extension](https://www.postgresql.org/docs/12/extend-extensions.html)
 is an integral part of Promscale. It is required to be installed.
-Check the [release notes](https://github.com/timescale/promscale/releases/)
+Check the [release notes](https://github.com/timescale/promscale/releases/tag/0.11.0)
 for more details.
 
 The extension plays two important roles: 
-1. It manages schema and [migrations](migration/README.md) that manipulate it.
+1. It manages the SQL data schema and [migrations](migration/README.md) that manipulate it.
 2. It encompasses code that runs within a database instance, both PL/pgSQL and native.
 
 ## Motivation
@@ -23,7 +23,7 @@ optimizations for both PromQL and SQL users. Let's have a look at two examples.
 Custom aggregates like `prom_rate`, `prom_delta` and a few others are implemented in Rust
 and enable Promscale to push corresponding PromQL down to native code that is executed
 within PostgreSQL. The alternatives are either transferring all the data to the Promscale
-application and doing aggregation there, or a PL/pgSQL stored procedure. Both are much slower.
+application and doing aggregation there, or a PL/pgSQL stored procedure. Both are substantially slower.
 
 [Support functions](https://www.postgresql.org/docs/current/xfunc-optimization.html) that
 transparently rewrite some queries to reduce the amount of computation required or take
@@ -37,9 +37,9 @@ SELECT trace_id
         AND resource_tags -> 'service.name' = '"generator"';
 ```
 
-will have an additional `InitPlan` stage that precomputes a set of matching tags
-using a GIN index on a private `_ps_trace.tag` table. While the naive version can 
-only evaluate matching tags for every row.
+will have an additional `InitPlan` stage that precomputes a set of matching tags,
+then uses a GIN index on a private `_ps_trace.span` table. While the naive version
+can only evaluate matching tags per row.
 
 ## Requirements
 
