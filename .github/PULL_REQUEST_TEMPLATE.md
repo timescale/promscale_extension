@@ -1,10 +1,20 @@
+<!-- 
+Changelog entry
+
+We are using GitHub to generate changelog in each release note. This method takes PR title and uses it as a changelog line. For this reason we ask you to use meaningful PR titles.
+-->
+
 ## Description
 
-<!--Describe the big picture of your changes here to communicate to the maintainers why we should accept this pull request. If it fixes a bug or resolves a feature request, be sure to link to that issue.-->
+<!-- Describe the big picture of your changes here to communicate to the maintainers why we should accept this pull request.
+-->
 
-## Merge requirements
+## Type of change
 
-Please take into account the following non-code changes that you may need to make with your PR:
+*What type of changes does your code introduce to tobs? Put an `x` in the box that apply.*
 
-- [ ] CHANGELOG entry for user-facing changes
-- [ ] Updated the relevant documentation
+- [ ] `CHANGE` (fix or feature that would cause existing functionality to not work as expected)
+- [ ] `FEATURE` (non-breaking change which adds functionality)
+- [ ] `BUGFIX` (non-breaking change which fixes an issue)
+- [ ] `ENHANCEMENT` (non-breaking change which improves existing functionality)
+- [ ] `NONE` (if none of the other choices apply. Example, tooling, build system, CI, docs, etc.)
