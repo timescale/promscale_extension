@@ -21,12 +21,12 @@ Yet, developer convenience is not the main reason this extension exists. It enab
 optimizations for both PromQL and SQL users. Let's have a look at two examples.
 
 Custom aggregates like `prom_rate`, `prom_delta` and a few others are implemented in Rust
-and enable Promscale to push-down corresponding PromQL down to native code that is executed
+and enable Promscale to push corresponding PromQL down to native code that is executed
 within PostgreSQL. The alternatives are either transferring all the data to the Promscale
-application and doing aggregation there or a PL/pgSQL stored procedure. Both are much slower.
+application and doing aggregation there, or a PL/pgSQL stored procedure. Both are much slower.
 
 [Support functions](https://www.postgresql.org/docs/current/xfunc-optimization.html) that
-transparently rewrite some queries to reduce the amount of computation required or take an
+transparently rewrite some queries to reduce the amount of computation required or take
 advantage of indices and tables specific to Promscale. For instance, the following query:
 
 ```SQL
