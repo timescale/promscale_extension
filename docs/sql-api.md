@@ -1026,6 +1026,11 @@ aggregate double precision[] **_prom_ext.prom_rate**(lowest_time timestamp with 
 ```
 function internal **_prom_ext.prom_rate_transition**(state internal, lowest_time timestamp with time zone, greatest_time timestamp with time zone, step_size bigint, range bigint, sample_time timestamp with time zone, sample_value double precision)
 ```
+### _prom_ext.re2_match
+
+```
+function boolean **_prom_ext.re2_match**(string text, pattern text)
+```
 ### _prom_ext.rewrite_fn_call_to_subquery
 
 ```

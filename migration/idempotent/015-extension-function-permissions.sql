@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION _prom_ext.re2_match(TEXT, TEXT) TO prom_reader;
