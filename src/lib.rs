@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate lazy_static;
+
 use pgx::pg_sys::AsPgCStr;
 use pgx::*;
 
@@ -8,6 +11,7 @@ mod jsonb_digest;
 mod palloc;
 mod pg_imports;
 mod raw;
+mod regex;
 mod schema;
 mod support;
 mod type_builder;
