@@ -110,7 +110,7 @@ jobs:
           if [[ "$res" = "200" ]]; then
             echo "::set-output name=branch::${branch_name}"
           elif [[ "$res" == "404" ]]; then
-            echo "::set-output name=branch::master"
+            echo "::set-output name=branch::jg/autoupdate-timescaledb"
           else
             echo "Unexpected HTTP response: $res"
             exit 1
