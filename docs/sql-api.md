@@ -262,22 +262,29 @@ This function supports the !=~ operator.
 function tag_op_regexp_not_matches **ps_tag.tag_op_regexp_not_matches**(_tag_key text, _value text)
 ```
 ### ps_trace.delete_all_traces
-WARNING: this function deletes all spans and related tracing data in the system and restores it to a "just installed" state.
+WARNING: this function deletes all spans and related tracing data in the system and restores
+it to a "just installed" state.
 ```
 function void **ps_trace.delete_all_traces**()
 ```
 ### ps_trace.downstream_spans
-
+For a given trace_id and span_id this function returns a set that consists of the all spans starting
+from the specified span and down to the leaves of the trace. Each span is annotated with parent_span_id,
+a distance from the specified span (the span itself has the distance of 0) and a path from the specified span 
+towards the root. Optional third argument allows to limit the span tree traversal to a certain distance from 
+the specified span_id.
 ```
 function TABLE(trace_id trace_id, parent_span_id bigint, span_id bigint, dist integer, path bigint[]) **ps_trace.downstream_spans**(_trace_id trace_id, _span_id bigint, _max_dist integer DEFAULT NULL::integer)
 ```
 ### ps_trace.event_tag_type
-
+This function returns tag_type with the event tag bit.
 ```
 function tag_type **ps_trace.event_tag_type**()
 ```
 ### ps_trace.get_tag_map
-
+For a given jsonb object cosisting of key-value pairs, representing tags and their values,
+this funciton returns a jsonb object of corresponding ids -- the primary keys in
+_ps_trace.tag_key and _ps_trace.tag tables.
 ```
 function tag_map **ps_trace.get_tag_map**(_tags jsonb)
 ```
@@ -287,62 +294,69 @@ get the retention period for trace data
 function interval **ps_trace.get_trace_retention_period**()
 ```
 ### ps_trace.is_event_tag_type
-
+This function checks whether a tag_type value has the event tag bit set.
 ```
 function boolean **ps_trace.is_event_tag_type**(_tag_type tag_type)
 ```
 ### ps_trace.is_link_tag_type
-
+This function checks whether a tag_type value has the link tag bit set.
 ```
 function boolean **ps_trace.is_link_tag_type**(_tag_type tag_type)
 ```
 ### ps_trace.is_resource_tag_type
-
+This function checks whether a tag_type value has the resource tag bit set.
 ```
 function boolean **ps_trace.is_resource_tag_type**(_tag_type tag_type)
 ```
 ### ps_trace.is_span_tag_type
-
+This function checks whether a tag_type value has the span tag bit set.
 ```
 function boolean **ps_trace.is_span_tag_type**(_tag_type tag_type)
 ```
 ### ps_trace.link_tag_type
-
+This function returns tag_type with the link tag bit.
 ```
 function tag_type **ps_trace.link_tag_type**()
 ```
 ### ps_trace.operation_calls
-
+This function counts the number of parent -> child pairs (aka calls) within a specified
+time window and their operation ids.
 ```
 function TABLE(parent_operation_id bigint, child_operation_id bigint, cnt bigint) **ps_trace.operation_calls**(_start_time_min timestamp with time zone, _start_time_max timestamp with time zone)
 ```
 ### ps_trace.put_instrumentation_lib
-
+This function creates an entry in the _ps_trace.instrumentation_lib table if it doesn't exit and returns its id.
+It is meant to be used during span creation, to obtain a valid value for mandatory instrumentation_lib_id attribute.
 ```
 function bigint **ps_trace.put_instrumentation_lib**(_name text, _version text, _schema_url_id bigint)
 ```
 ### ps_trace.put_operation
-
+This function creates an operation record and a necessary service.name tag, if either doesn't exist 
+and returns the operation's id (a key in the _ps_tag.opertaions table). It is meant to be used during
+span creation, to obtain a valid value for mandatory operation_id attribute.
 ```
 function bigint **ps_trace.put_operation**(_service_name text, _span_name text, _span_kind span_kind)
 ```
 ### ps_trace.put_schema_url
-
+This function creates an entry in the _ps_trace.schema_url table if it doesn't exit and returns its id.
+It is meant to be used during span creation, to obtain a valid value for mandatory resource_schema_url_id attribute.
 ```
 function bigint **ps_trace.put_schema_url**(_schema_url text)
 ```
 ### ps_trace.put_tag
-
+This function inserts a new tag with the specified value and returns its id (a key in _ps_trace.tag table).
+The specified tag key must exist for the specified resource type.
 ```
 function bigint **ps_trace.put_tag**(_key tag_k, _value _ps_trace.tag_v, _tag_type tag_type)
 ```
 ### ps_trace.put_tag_key
-
+This function creates a new tag key and associates it with the specified tag type and returns
+its id (a key in _ps_trace.tag_key table)
 ```
 function bigint **ps_trace.put_tag_key**(_key tag_k, _tag_type tag_type)
 ```
 ### ps_trace.resource_tag_type
-
+This function returns tag_type with the resource tag bit.
 ```
 function tag_type **ps_trace.resource_tag_type**()
 ```
@@ -352,97 +366,108 @@ set the retention period for trace data
 function boolean **ps_trace.set_trace_retention_period**(_trace_retention_period interval)
 ```
 ### ps_trace.sibling_spans
-
+For a given trace_id and span_id this function returns spans sharing the same parent_span_id.
 ```
 function TABLE(trace_id trace_id, parent_span_id bigint, span_id bigint) **ps_trace.sibling_spans**(_trace_id trace_id, _span_id bigint)
 ```
 ### ps_trace.span_tag_type
-
+This function returns tag_type with the span tag bit.
 ```
 function tag_type **ps_trace.span_tag_type**()
 ```
 ### ps_trace.span_tree
-
+For a given pair of trace_id and span_id, this function returns a union of
+downstream_spans and upstream_spans.
 ```
 function TABLE(trace_id trace_id, parent_span_id bigint, span_id bigint, dist integer, is_upstream boolean, is_downstream boolean, path bigint[]) **ps_trace.span_tree**(_trace_id trace_id, _span_id bigint, _max_dist integer DEFAULT NULL::integer)
 ```
 ### ps_trace.tag_map_in
-
+This function is a part of custom ps_trace.tag_map type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.
 ```
 function tag_map **ps_trace.tag_map_in**(cstring)
 ```
 ### ps_trace.tag_map_object_field
-
+This function is a part of custom ps_trace.tag_map type which is a wrapper for 
+the built-in jsonb. It is the same as its jsonb_ namesake, but returns _ps_trace.tag_v.
 ```
 function _ps_trace.tag_v **ps_trace.tag_map_object_field**(tag_map, text)
 ```
 ### ps_trace.tag_map_out
-
+This function is a part of custom ps_trace.tag_map type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.
 ```
 function cstring **ps_trace.tag_map_out**(tag_map)
 ```
 ### ps_trace.tag_map_recv
-
+This function is a part of custom ps_trace.tag_map type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.
 ```
 function tag_map **ps_trace.tag_map_recv**(internal)
 ```
 ### ps_trace.tag_map_send
-
+This function is a part of custom ps_trace.tag_map type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.
 ```
 function bytea **ps_trace.tag_map_send**(tag_map)
 ```
 ### ps_trace.tag_map_subscript_handler
-
+This function is a part of custom ps_trace.tag_map type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.
 ```
 function internal **ps_trace.tag_map_subscript_handler**(internal)
 ```
 ### ps_trace.tag_v_eq
-
+This function is a part of custom _ps_trace.tag_v type which is a wrapper for 
+the built-in jsonb. It is the same as its jsonb_ namesake, but has a support function attached.
 ```
 function boolean **ps_trace.tag_v_eq**(_ps_trace.tag_v, _ps_trace.tag_v)
 ```
 ### ps_trace.tag_v_eq
-
+This function is a part of custom _ps_trace.tag_v type which is a wrapper for 
+the built-in jsonb. It is the same as its jsonb_ namesake, but has a support function attached.
 ```
 function boolean **ps_trace.tag_v_eq**(_ps_trace.tag_v, jsonb)
 ```
 ### ps_trace.tag_v_ge
-
+This function is a part of custom _ps_trace.tag_v type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.
 ```
 function boolean **ps_trace.tag_v_ge**(_ps_trace.tag_v, _ps_trace.tag_v)
 ```
 ### ps_trace.tag_v_gt
-
+This function is a part of custom _ps_trace.tag_v type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.
 ```
 function boolean **ps_trace.tag_v_gt**(_ps_trace.tag_v, _ps_trace.tag_v)
 ```
 ### ps_trace.tag_v_le
-
+This function is a part of custom _ps_trace.tag_v type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.
 ```
 function boolean **ps_trace.tag_v_le**(_ps_trace.tag_v, _ps_trace.tag_v)
 ```
 ### ps_trace.tag_v_lt
-
+This function is a part of custom _ps_trace.tag_v type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.
 ```
 function boolean **ps_trace.tag_v_lt**(_ps_trace.tag_v, _ps_trace.tag_v)
 ```
 ### ps_trace.tag_v_ne
-
+This function is a part of custom _ps_trace.tag_v type which is a wrapper for 
+the built-in jsonb. It is the same as its jsonb_ namesake, but has a support function attached.
 ```
 function boolean **ps_trace.tag_v_ne**(_ps_trace.tag_v, _ps_trace.tag_v)
 ```
 ### ps_trace.tag_v_ne
-
+This function is a part of custom _ps_trace.tag_v type which is a wrapper for 
+the built-in jsonb. It is the same as its jsonb_ namesake, but has a support function attached.
 ```
 function boolean **ps_trace.tag_v_ne**(_ps_trace.tag_v, jsonb)
 ```
 ### ps_trace.trace_tree
-
+This function returns a set of all spans for a given trace_id. Additionally, parent span,
+nesting level and a path (as an array of span_id) are supplied for each span in the set.
 ```
 function TABLE(trace_id trace_id, parent_span_id bigint, span_id bigint, lvl integer, path bigint[]) **ps_trace.trace_tree**(_trace_id trace_id)
 ```
 ### ps_trace.upstream_spans
-
+For a given trace_id and span_id this function returns a set that consists of the all spans starting
+from the specified span and up to the root of the trace. Each span is annotated with parent_span_id,
+a distance from the specified span (the span itself has the distance of 0) and a path from the specified span 
+towards the root. Optional third argument allows to limit the span tree traversal to a certain distance from 
+the specified span_id.
 ```
 function TABLE(trace_id trace_id, parent_span_id bigint, span_id bigint, dist integer, path bigint[]) **ps_trace.upstream_spans**(_trace_id trace_id, _span_id bigint, _max_dist integer DEFAULT NULL::integer)
 ```
@@ -1062,22 +1087,23 @@ function void **_ps_catalog.promscale_sql_telemetry**()
 function boolean **_ps_catalog.promscale_telemetry_housekeeping**(telemetry_sync_duration interval DEFAULT '01:00:00'::interval)
 ```
 ### _ps_trace.drop_event_chunks
-
+This procedure drops chunks of _ps_trace.event hypertable that are older than a specified timestamp.
 ```
 procedure void **_ps_trace.drop_event_chunks**(IN _older_than timestamp with time zone)
 ```
 ### _ps_trace.drop_link_chunks
-
+This procedure drops chunks of _ps_trace.link hypertable that are older than a specified timestamp.
 ```
 procedure void **_ps_trace.drop_link_chunks**(IN _older_than timestamp with time zone)
 ```
 ### _ps_trace.drop_span_chunks
-
+This procedure drops chunks of _ps_trace.span hypertable that are older than a specified timestamp.
 ```
 procedure void **_ps_trace.drop_span_chunks**(IN _older_than timestamp with time zone)
 ```
 ### _ps_trace.ensure_trace_ingest_temp_table
-
+Creates a temporary table (if it doesn't exist), suitable for tracing data ingestion. 
+Supresses corresponding DDL logging, otherwise PG log may get unnecessarily verbose.
 ```
 function void **_ps_trace.ensure_trace_ingest_temp_table**(_temp_table_name text, _proto_table_name text)
 ```
@@ -1097,107 +1123,113 @@ procedure void **_ps_trace.execute_tracing_compression**(IN hypertable_name text
 procedure void **_ps_trace.execute_tracing_compression_job**(IN job_id integer, IN config jsonb)
 ```
 ### _ps_trace.tag_map_denormalize
-
+Given a json object of (ps_trace.tag_key.id, ps_trace.tag.id) this function
+performs necessary lookups and returns a reconstructed set of open telemetry tags
+as a tag_map.
 ```
 function tag_map **_ps_trace.tag_map_denormalize**(_map tag_map)
 ```
 ### _ps_trace.tag_v_cmp
-
+This function is a part of custom _ps_trace.tag_v type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.
 ```
 function integer **_ps_trace.tag_v_cmp**(_ps_trace.tag_v, _ps_trace.tag_v)
 ```
 ### _ps_trace.tag_v_eq_matching_tags
-
+This function is a part of custom _ps_trace.tag_v type which is a wrapper for 
+the built-in jsonb. The tag_map_rewrite support function, attached to tag_v_eq,
+will use this function instead, if it can.
 ```
 function jsonb **_ps_trace.tag_v_eq_matching_tags**(_tag_key text, _value jsonb)
 ```
 ### _ps_trace.tag_v_in
-
+This function is a part of custom _ps_trace.tag_v type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.
 ```
 function _ps_trace.tag_v **_ps_trace.tag_v_in**(cstring)
 ```
 ### _ps_trace.tag_v_ne_matching_tags
-
+This function is a part of custom _ps_trace.tag_v type which is a wrapper for 
+the built-in jsonb. The tag_map_rewrite support function, attached to tag_v_ne,
+will use this function instead, if it can.
 ```
 function jsonb[] **_ps_trace.tag_v_ne_matching_tags**(_tag_key text, _value jsonb)
 ```
 ### _ps_trace.tag_v_out
-
+This function is a part of custom _ps_trace.tag_v type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.
 ```
 function cstring **_ps_trace.tag_v_out**(_ps_trace.tag_v)
 ```
 ### _ps_trace.tag_v_recv
-
+This function is a part of custom _ps_trace.tag_v type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.
 ```
 function _ps_trace.tag_v **_ps_trace.tag_v_recv**(internal)
 ```
 ### _ps_trace.tag_v_send
-
+This function is a part of custom _ps_trace.tag_v type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.
 ```
 function bytea **_ps_trace.tag_v_send**(_ps_trace.tag_v)
 ```
 ### _ps_trace.tag_v_subscript_handler
-
+This function is a part of custom _ps_trace.tag_v type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.
 ```
 function internal **_ps_trace.tag_v_subscript_handler**(internal)
 ```
 ### _ps_trace.trace_id_cmp
-
+This function is a part of custom ps_trace.tag_traceid type which is a wrapper for the built-in uuid. It is the same as its uuid_ namesake.
 ```
 function integer **_ps_trace.trace_id_cmp**(trace_id, trace_id)
 ```
 ### _ps_trace.trace_id_eq
-
+This function is a part of custom ps_trace.tag_traceid type which is a wrapper for the built-in uuid. It is the same as its uuid_ namesake.
 ```
 function boolean **_ps_trace.trace_id_eq**(trace_id, trace_id)
 ```
 ### _ps_trace.trace_id_ge
-
+This function is a part of custom ps_trace.tag_traceid type which is a wrapper for the built-in uuid. It is the same as its uuid_ namesake.
 ```
 function boolean **_ps_trace.trace_id_ge**(trace_id, trace_id)
 ```
 ### _ps_trace.trace_id_gt
-
+This function is a part of custom ps_trace.tag_traceid type which is a wrapper for the built-in uuid. It is the same as its uuid_ namesake.
 ```
 function boolean **_ps_trace.trace_id_gt**(trace_id, trace_id)
 ```
 ### _ps_trace.trace_id_hash
-
+This function is a part of custom ps_trace.tag_traceid type which is a wrapper for the built-in uuid. It is the same as its uuid_ namesake.
 ```
 function integer **_ps_trace.trace_id_hash**(trace_id)
 ```
 ### _ps_trace.trace_id_in
-
+This function is a part of custom ps_trace.tag_traceid type which is a wrapper for the built-in uuid. It is the same as its uuid_ namesake.
 ```
 function trace_id **_ps_trace.trace_id_in**(cstring)
 ```
 ### _ps_trace.trace_id_le
-
+This function is a part of custom ps_trace.tag_traceid type which is a wrapper for the built-in uuid. It is the same as its uuid_ namesake.
 ```
 function boolean **_ps_trace.trace_id_le**(trace_id, trace_id)
 ```
 ### _ps_trace.trace_id_lt
-
+This function is a part of custom ps_trace.tag_traceid type which is a wrapper for the built-in uuid. It is the same as its uuid_ namesake.
 ```
 function boolean **_ps_trace.trace_id_lt**(trace_id, trace_id)
 ```
 ### _ps_trace.trace_id_ne
-
+This function is a part of custom ps_trace.tag_traceid type which is a wrapper for the built-in uuid. It is the same as its uuid_ namesake.
 ```
 function boolean **_ps_trace.trace_id_ne**(trace_id, trace_id)
 ```
 ### _ps_trace.trace_id_out
-
+This function is a part of custom ps_trace.tag_traceid type which is a wrapper for the built-in uuid. It is the same as its uuid_ namesake.
 ```
 function cstring **_ps_trace.trace_id_out**(trace_id)
 ```
 ### _ps_trace.trace_id_recv
-
+This function is a part of custom ps_trace.tag_traceid type which is a wrapper for the built-in uuid. It is the same as its uuid_ namesake.
 ```
 function trace_id **_ps_trace.trace_id_recv**(internal)
 ```
 ### _ps_trace.trace_id_send
-
+This function is a part of custom ps_trace.tag_traceid type which is a wrapper for the built-in uuid. It is the same as its uuid_ namesake.
 ```
 function bytea **_ps_trace.trace_id_send**(trace_id)
 ```
@@ -1341,91 +1373,99 @@ __Function:__ tag_op_jsonb_path_exists
 
 __Schema:__ ps_tag
 ### tag_map -> text → _ps_trace.tag_v
-
+This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
+the built-in jsonb. It is the same as its jsonb_ namesake, but returns _ps_trace.tag_v.
 
 __Function:__ tag_map_object_field
 
 __Schema:__ ps_trace
 ### _ps_trace.tag_v < _ps_trace.tag_v → boolean
-
+This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
+the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.
 
 __Function:__ tag_v_lt
 
 __Schema:__ ps_trace
 ### trace_id < trace_id → boolean
-
+This function is a part of custom ps_trace.tag_traceid type which is a wrapper for the built-in uuid. It is the same as its uuid_ namesake.
 
 __Function:__ _ps_trace.trace_id_lt
 
 __Schema:__ ps_trace
 ### _ps_trace.tag_v <= _ps_trace.tag_v → boolean
-
+This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
+the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.
 
 __Function:__ tag_v_le
 
 __Schema:__ ps_trace
 ### trace_id <= trace_id → boolean
-
+This function is a part of custom ps_trace.tag_traceid type which is a wrapper for the built-in uuid. It is the same as its uuid_ namesake.
 
 __Function:__ _ps_trace.trace_id_le
 
 __Schema:__ ps_trace
 ### _ps_trace.tag_v <> _ps_trace.tag_v → boolean
-
+This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
+the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.
 
 __Function:__ ps_trace.tag_v_ne
 
 __Schema:__ ps_trace
 ### _ps_trace.tag_v <> jsonb → boolean
-
+This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
+the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.
 
 __Function:__ ps_trace.tag_v_ne
 
 __Schema:__ ps_trace
 ### trace_id <> trace_id → boolean
-
+This function is a part of custom ps_trace.tag_traceid type which is a wrapper for the built-in uuid. It is the same as its uuid_ namesake.
 
 __Function:__ _ps_trace.trace_id_ne
 
 __Schema:__ ps_trace
 ### _ps_trace.tag_v = _ps_trace.tag_v → boolean
-
+This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
+the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.
 
 __Function:__ ps_trace.tag_v_eq
 
 __Schema:__ ps_trace
 ### _ps_trace.tag_v = jsonb → boolean
-
+This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
+the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.
 
 __Function:__ ps_trace.tag_v_eq
 
 __Schema:__ ps_trace
 ### trace_id = trace_id → boolean
-
+This function is a part of custom ps_trace.tag_traceid type which is a wrapper for the built-in uuid. It is the same as its uuid_ namesake.
 
 __Function:__ _ps_trace.trace_id_eq
 
 __Schema:__ ps_trace
 ### _ps_trace.tag_v > _ps_trace.tag_v → boolean
-
+This function is a part of custom _ps_trace.tag_v type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.
 
 __Function:__ tag_v_gt
 
 __Schema:__ ps_trace
 ### trace_id > trace_id → boolean
-
+This function is a part of custom ps_trace.tag_traceid type which is a wrapper for the built-in uuid. It is the same as its uuid_ namesake.
 
 __Function:__ _ps_trace.trace_id_gt
 
 __Schema:__ ps_trace
 ### _ps_trace.tag_v >= _ps_trace.tag_v → boolean
-
+This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
+the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.
 
 __Function:__ tag_v_ge
 
 __Schema:__ ps_trace
 ### trace_id >= trace_id → boolean
-
+This function is a part of custom ps_trace.tag_traceid type which is a wrapper for the built-in uuid. It is the same as its uuid_ namesake.
 
 __Function:__ _ps_trace.trace_id_ge
 

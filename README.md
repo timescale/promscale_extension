@@ -61,4 +61,4 @@ To compile the extension (see instructions below):
 ## Development
 
 To understand more about how to write SQL migration files for this extension, consult [this](migration/README.md) guide.
-To get a better understanding of our CI pipeline see [this document](.github/README.md).
+To get a better understanding of our CI pipeline see [this document](.github/workflows/README.md).

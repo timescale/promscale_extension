@@ -10,6 +10,8 @@ AS $sql$
 $sql$
 LANGUAGE SQL IMMUTABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.span_tag_type() TO prom_reader;
+COMMENT ON FUNCTION ps_trace.span_tag_type
+IS 'This function returns tag_type with the span tag bit.';
 
 CREATE OR REPLACE FUNCTION ps_trace.resource_tag_type()
 RETURNS ps_trace.tag_type
@@ -19,6 +21,8 @@ AS $sql$
 $sql$
 LANGUAGE SQL IMMUTABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.resource_tag_type() TO prom_reader;
+COMMENT ON FUNCTION ps_trace.resource_tag_type
+IS 'This function returns tag_type with the resource tag bit.';
 
 CREATE OR REPLACE FUNCTION ps_trace.event_tag_type()
 RETURNS ps_trace.tag_type
@@ -28,6 +32,8 @@ AS $sql$
 $sql$
 LANGUAGE SQL IMMUTABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.event_tag_type() TO prom_reader;
+COMMENT ON FUNCTION ps_trace.event_tag_type 
+IS 'This function returns tag_type with the event tag bit.';
 
 CREATE OR REPLACE FUNCTION ps_trace.link_tag_type()
 RETURNS ps_trace.tag_type
@@ -37,6 +43,8 @@ AS $sql$
 $sql$
 LANGUAGE SQL IMMUTABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.link_tag_type() TO prom_reader;
+COMMENT ON FUNCTION ps_trace.link_tag_type
+IS 'This function returns tag_type with the link tag bit.';
 
 CREATE OR REPLACE FUNCTION ps_trace.is_span_tag_type(_tag_type ps_trace.tag_type)
 RETURNS BOOLEAN
@@ -46,6 +54,8 @@ AS $sql$
 $sql$
 LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.is_span_tag_type(ps_trace.tag_type) TO prom_reader;
+COMMENT ON FUNCTION ps_trace.is_span_tag_type
+IS 'This function checks whether a tag_type value has the span tag bit set.';
 
 CREATE OR REPLACE FUNCTION ps_trace.is_resource_tag_type(_tag_type ps_trace.tag_type)
 RETURNS BOOLEAN
@@ -55,6 +65,8 @@ AS $sql$
 $sql$
 LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.is_resource_tag_type(ps_trace.tag_type) TO prom_reader;
+COMMENT ON FUNCTION ps_trace.is_resource_tag_type
+IS 'This function checks whether a tag_type value has the resource tag bit set.';
 
 CREATE OR REPLACE FUNCTION ps_trace.is_event_tag_type(_tag_type ps_trace.tag_type)
 RETURNS BOOLEAN
@@ -64,6 +76,8 @@ AS $sql$
 $sql$
 LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.is_event_tag_type(ps_trace.tag_type) TO prom_reader;
+COMMENT ON FUNCTION ps_trace.is_event_tag_type
+IS 'This function checks whether a tag_type value has the event tag bit set.';
 
 CREATE OR REPLACE FUNCTION ps_trace.is_link_tag_type(_tag_type ps_trace.tag_type)
 RETURNS BOOLEAN
@@ -73,6 +87,8 @@ AS $sql$
 $sql$
 LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.is_link_tag_type(ps_trace.tag_type) TO prom_reader;
+COMMENT ON FUNCTION ps_trace.is_link_tag_type
+IS 'This function checks whether a tag_type value has the link tag bit set.';
 
 -------------------------------------------------------------------------------
 -- trace tree functions
@@ -124,6 +140,9 @@ AS $func$
     FROM x
 $func$ LANGUAGE sql STABLE STRICT PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.trace_tree(ps_trace.trace_id) TO prom_reader;
+COMMENT ON FUNCTION ps_trace.trace_tree
+IS 'This function returns a set of all spans for a given trace_id. Additionally, parent span,
+nesting level and a path (as an array of span_id) are supplied for each span in the set.';
 
 CREATE OR REPLACE FUNCTION ps_trace.upstream_spans(_trace_id ps_trace.trace_id, _span_id bigint, _max_dist int default null)
 RETURNS TABLE
@@ -173,6 +192,12 @@ AS $func$
     FROM x
 $func$ LANGUAGE sql STABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.upstream_spans(ps_trace.trace_id, bigint, int) TO prom_reader;
+COMMENT ON FUNCTION ps_trace.upstream_spans
+IS 'For a given trace_id and span_id this function returns a set that consists of the all spans starting
+from the specified span and up to the root of the trace. Each span is annotated with parent_span_id,
+a distance from the specified span (the span itself has the distance of 0) and a path from the specified span 
+towards the root. Optional third argument allows to limit the span tree traversal to a certain distance from 
+the specified span_id.';
 
 CREATE OR REPLACE FUNCTION ps_trace.downstream_spans(_trace_id ps_trace.trace_id, _span_id bigint, _max_dist int default null)
 RETURNS TABLE
@@ -220,6 +245,12 @@ AS $func$
     FROM x
 $func$ LANGUAGE sql STABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.downstream_spans(ps_trace.trace_id, bigint, int) TO prom_reader;
+COMMENT ON FUNCTION ps_trace.downstream_spans
+IS 'For a given trace_id and span_id this function returns a set that consists of the all spans starting
+from the specified span and down to the leaves of the trace. Each span is annotated with parent_span_id,
+a distance from the specified span (the span itself has the distance of 0) and a path from the specified span 
+towards the root. Optional third argument allows to limit the span tree traversal to a certain distance from 
+the specified span_id.';
 
 CREATE OR REPLACE FUNCTION ps_trace.sibling_spans(_trace_id ps_trace.trace_id, _span_id bigint)
 RETURNS TABLE
@@ -245,6 +276,8 @@ AS $func$
     )
 $func$ LANGUAGE sql STABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.sibling_spans(ps_trace.trace_id, bigint) TO prom_reader;
+COMMENT ON FUNCTION ps_trace.sibling_spans
+IS 'For a given trace_id and span_id this function returns spans sharing the same parent_span_id.';
 
 CREATE OR REPLACE FUNCTION ps_trace.operation_calls(_start_time_min timestamptz, _start_time_max timestamptz)
 RETURNS TABLE
@@ -275,6 +308,9 @@ $func$ LANGUAGE sql
 SET  enable_nestloop = off
 STABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.operation_calls(timestamptz, timestamptz) TO prom_reader;
+COMMENT ON FUNCTION ps_trace.operation_calls
+IS 'This function counts the number of parent -> child pairs (aka calls) within a specified
+time window and their operation ids.';
 
 CREATE OR REPLACE FUNCTION ps_trace.span_tree(_trace_id ps_trace.trace_id, _span_id bigint, _max_dist int default null)
 RETURNS TABLE
@@ -311,6 +347,9 @@ AS $func$
     FROM ps_trace.downstream_spans(_trace_id, _span_id, _max_dist) d
 $func$ LANGUAGE sql STABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.span_tree(ps_trace.trace_id, bigint, int) TO prom_reader;
+COMMENT ON FUNCTION ps_trace.span_tree
+IS 'For a given pair of trace_id and span_id, this function returns a union of
+downstream_spans and upstream_spans.';
 
 -------------------------------------------------------------------------------
 -- get / put functions
@@ -349,6 +388,9 @@ END;
 $func$
 LANGUAGE plpgsql;
 GRANT EXECUTE ON FUNCTION ps_trace.put_tag_key(ps_trace.tag_k, ps_trace.tag_type) TO prom_writer;
+COMMENT ON FUNCTION ps_trace.put_tag_key
+IS 'This function creates a new tag key and associates it with the specified tag type and returns
+its id (a key in _ps_trace.tag_key table)';
 
 CREATE OR REPLACE FUNCTION ps_trace.put_tag(_key ps_trace.tag_k, _value _ps_trace.tag_v, _tag_type ps_trace.tag_type)
     RETURNS BIGINT
@@ -402,6 +444,9 @@ END;
 $func$
 LANGUAGE plpgsql;
 GRANT EXECUTE ON FUNCTION ps_trace.put_tag(ps_trace.tag_k, _ps_trace.tag_v, ps_trace.tag_type) TO prom_writer;
+COMMENT ON FUNCTION ps_trace.put_tag
+IS 'This function inserts a new tag with the specified value and returns its id (a key in _ps_trace.tag table).
+The specified tag key must exist for the specified resource type.';
 
 CREATE OR REPLACE FUNCTION ps_trace.get_tag_map(_tags jsonb)
 RETURNS ps_trace.tag_map
@@ -421,6 +466,10 @@ AS $func$
 $func$
 LANGUAGE SQL STABLE PARALLEL SAFE STRICT;
 GRANT EXECUTE ON FUNCTION ps_trace.get_tag_map(jsonb) TO prom_reader;
+COMMENT ON FUNCTION ps_trace.get_tag_map
+IS 'For a given jsonb object cosisting of key-value pairs, representing tags and their values,
+this funciton returns a jsonb object of corresponding ids -- the primary keys in
+_ps_trace.tag_key and _ps_trace.tag tables.';
 
 CREATE OR REPLACE FUNCTION ps_trace.put_operation(_service_name text, _span_name text, _span_kind ps_trace.span_kind)
     RETURNS bigint
@@ -497,6 +546,10 @@ END;
 $func$
 LANGUAGE plpgsql;
 GRANT EXECUTE ON FUNCTION ps_trace.put_operation(text, text, ps_trace.span_kind) TO prom_writer;
+COMMENT ON FUNCTION ps_trace.put_operation
+IS 'This function creates an operation record and a necessary service.name tag, if either doesn''t exist 
+and returns the operation''s id (a key in the _ps_tag.opertaions table). It is meant to be used during
+span creation, to obtain a valid value for mandatory operation_id attribute.';
 
 CREATE OR REPLACE FUNCTION ps_trace.put_schema_url(_schema_url text)
     RETURNS bigint
@@ -528,6 +581,9 @@ END;
 $func$
 LANGUAGE plpgsql;
 GRANT EXECUTE ON FUNCTION ps_trace.put_schema_url(text) TO prom_writer;
+COMMENT ON FUNCTION ps_trace.put_schema_url
+IS 'This function creates an entry in the _ps_trace.schema_url table if it doesn''t exit and returns its id.
+It is meant to be used during span creation, to obtain a valid value for mandatory resource_schema_url_id attribute.';
 
 CREATE OR REPLACE FUNCTION ps_trace.put_instrumentation_lib(_name text, _version text, _schema_url_id bigint)
     RETURNS bigint
@@ -568,6 +624,9 @@ END;
 $func$
 LANGUAGE plpgsql;
 GRANT EXECUTE ON FUNCTION ps_trace.put_instrumentation_lib(text, text, bigint) TO prom_writer;
+COMMENT ON FUNCTION ps_trace.put_instrumentation_lib
+IS 'This function creates an entry in the _ps_trace.instrumentation_lib table if it doesn''t exit and returns its id.
+It is meant to be used during span creation, to obtain a valid value for mandatory instrumentation_lib_id attribute.';
 
 -- Creates a temporary table (if it doesn't exist), suitable for tracing data ingestion.
 -- Supresses corresponding DDL logging, otherwise PG log may get unnecessarily verbose.
@@ -593,6 +652,9 @@ $func$
 LANGUAGE plpgsql;
 REVOKE ALL ON FUNCTION _ps_trace.ensure_trace_ingest_temp_table(text, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION _ps_trace.ensure_trace_ingest_temp_table(text, text) TO prom_writer;
+COMMENT ON FUNCTION _ps_trace.ensure_trace_ingest_temp_table
+IS 'Creates a temporary table (if it doesn''t exist), suitable for tracing data ingestion. 
+Supresses corresponding DDL logging, otherwise PG log may get unnecessarily verbose.';
 
 CREATE OR REPLACE FUNCTION ps_trace.delete_all_traces()
     RETURNS void
@@ -612,8 +674,9 @@ AS $func$
 $func$
 LANGUAGE sql;
 GRANT EXECUTE ON FUNCTION ps_trace.delete_all_traces() TO prom_admin;
-COMMENT ON FUNCTION ps_trace.delete_all_traces IS
-$$WARNING: this function deletes all spans and related tracing data in the system and restores it to a "just installed" state.$$;
+COMMENT ON FUNCTION ps_trace.delete_all_traces
+IS 'WARNING: this function deletes all spans and related tracing data in the system and restores
+it to a "just installed" state.';
 
 CREATE OR REPLACE FUNCTION ps_trace.tag_map_in(cstring)
 RETURNS ps_trace.tag_map
@@ -621,6 +684,8 @@ LANGUAGE internal
 IMMUTABLE PARALLEL SAFE STRICT
 AS $function$jsonb_in$function$
 ;
+COMMENT ON FUNCTION ps_trace.tag_map_in
+IS 'This function is a part of custom ps_trace.tag_map type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.';
 
 CREATE OR REPLACE FUNCTION ps_trace.tag_map_out(ps_trace.tag_map)
 RETURNS cstring
@@ -628,6 +693,8 @@ LANGUAGE internal
 IMMUTABLE PARALLEL SAFE STRICT
 AS $function$jsonb_out$function$
 ;
+COMMENT ON FUNCTION ps_trace.tag_map_out
+IS 'This function is a part of custom ps_trace.tag_map type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.';
 
 CREATE OR REPLACE FUNCTION ps_trace.tag_map_send(ps_trace.tag_map)
 RETURNS bytea
@@ -635,6 +702,8 @@ LANGUAGE internal
 IMMUTABLE PARALLEL SAFE STRICT
 AS $function$jsonb_send$function$
 ;
+COMMENT ON FUNCTION ps_trace.tag_map_send
+IS 'This function is a part of custom ps_trace.tag_map type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.';
 
 CREATE OR REPLACE FUNCTION ps_trace.tag_map_recv(internal)
 RETURNS ps_trace.tag_map
@@ -642,6 +711,8 @@ LANGUAGE internal
 IMMUTABLE PARALLEL SAFE STRICT
 AS $function$jsonb_recv$function$
 ;
+COMMENT ON FUNCTION ps_trace.tag_map_recv
+IS 'This function is a part of custom ps_trace.tag_map type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.';
 
 DO
 $do$
@@ -660,6 +731,8 @@ BEGIN
                 IMMUTABLE PARALLEL SAFE STRICT
                 AS $f$jsonb_subscript_handler$f$;
 
+        COMMENT ON FUNCTION ps_trace.tag_map_subscript_handler
+        IS 'This function is a part of custom ps_trace.tag_map type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.';
         /* Add subscript handler in case of a prior PG13 -> PG14 upgrade that
          * didn't take care of this
          */
@@ -680,6 +753,8 @@ LANGUAGE internal
 IMMUTABLE PARALLEL SAFE STRICT
 AS $function$jsonb_in$function$
 ;
+COMMENT ON FUNCTION _ps_trace.tag_v_in
+IS 'This function is a part of custom _ps_trace.tag_v type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.';
 
 CREATE OR REPLACE FUNCTION _ps_trace.tag_v_out(_ps_trace.tag_v)
 RETURNS cstring
@@ -687,6 +762,8 @@ LANGUAGE internal
 IMMUTABLE PARALLEL SAFE STRICT
 AS $function$jsonb_out$function$
 ;
+COMMENT ON FUNCTION _ps_trace.tag_v_out
+IS 'This function is a part of custom _ps_trace.tag_v type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.';
 
 CREATE OR REPLACE FUNCTION _ps_trace.tag_v_send(_ps_trace.tag_v)
 RETURNS bytea
@@ -694,6 +771,8 @@ LANGUAGE internal
 IMMUTABLE PARALLEL SAFE STRICT
 AS $function$jsonb_send$function$
 ;
+COMMENT ON FUNCTION _ps_trace.tag_v_send
+IS 'This function is a part of custom _ps_trace.tag_v type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.';
 
 CREATE OR REPLACE FUNCTION _ps_trace.tag_v_recv(internal)
 RETURNS _ps_trace.tag_v
@@ -701,6 +780,8 @@ LANGUAGE internal
 IMMUTABLE PARALLEL SAFE STRICT
 AS $function$jsonb_recv$function$
 ;
+COMMENT ON FUNCTION _ps_trace.tag_v_recv
+IS 'This function is a part of custom _ps_trace.tag_v type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.';
 
 DO
 $do$
@@ -718,6 +799,8 @@ BEGIN
                 LANGUAGE internal
                 IMMUTABLE PARALLEL SAFE STRICT
                 AS $f$jsonb_subscript_handler$f$;
+        COMMENT ON FUNCTION _ps_trace.tag_v_subscript_handler
+        IS 'This function is a part of custom _ps_trace.tag_v type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.';
         /* Add subscript handler in case of a prior PG13 -> PG14 upgrade that
          * didn't take care of this
          */
