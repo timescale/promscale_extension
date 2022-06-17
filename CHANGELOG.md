@@ -14,6 +14,10 @@ We use the following categories for changes:
 
 ## [Unreleased]
 
+### Changed
+
+- Correct storage type for attributes deriving from `tag_map` and `tag_v` [#365]
+
 ## [0.5.1] - 2021-06-08
 
 ### Added
