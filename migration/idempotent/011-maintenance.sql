@@ -231,6 +231,8 @@ LANGUAGE PLPGSQL;
 --redundant given schema settings but extra caution for security definers
 REVOKE ALL ON PROCEDURE _ps_trace.drop_span_chunks(timestamptz) FROM PUBLIC;
 GRANT EXECUTE ON PROCEDURE _ps_trace.drop_span_chunks(timestamptz) TO prom_maintenance;
+COMMENT ON PROCEDURE _ps_trace.drop_span_chunks
+IS 'This procedure drops chunks of _ps_trace.span hypertable that are older than a specified timestamp.';
 
 CREATE OR REPLACE PROCEDURE _ps_trace.drop_link_chunks(_older_than timestamptz)
 --security definer to add jobs as the logged-in user
@@ -261,6 +263,8 @@ LANGUAGE PLPGSQL;
 --redundant given schema settings but extra caution for security definers
 REVOKE ALL ON PROCEDURE _ps_trace.drop_link_chunks(timestamptz) FROM PUBLIC;
 GRANT EXECUTE ON PROCEDURE _ps_trace.drop_link_chunks(timestamptz) TO prom_maintenance;
+COMMENT ON PROCEDURE _ps_trace.drop_link_chunks
+IS 'This procedure drops chunks of _ps_trace.link hypertable that are older than a specified timestamp.';
 
 CREATE OR REPLACE PROCEDURE _ps_trace.drop_event_chunks(_older_than timestamptz)
 --security definer to add jobs as the logged-in user
@@ -291,6 +295,8 @@ LANGUAGE PLPGSQL;
 --redundant given schema settings but extra caution for security definers
 REVOKE ALL ON PROCEDURE _ps_trace.drop_event_chunks(timestamptz) FROM PUBLIC;
 GRANT EXECUTE ON PROCEDURE _ps_trace.drop_event_chunks(timestamptz) TO prom_maintenance;
+COMMENT ON PROCEDURE _ps_trace.drop_event_chunks
+IS 'This procedure drops chunks of _ps_trace.event hypertable that are older than a specified timestamp.';
 
 CREATE OR REPLACE FUNCTION ps_trace.set_trace_retention_period(_trace_retention_period INTERVAL)
     RETURNS BOOLEAN
