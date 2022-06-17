@@ -11,7 +11,7 @@ $sql$
 LANGUAGE SQL IMMUTABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.span_tag_type() TO prom_reader;
 COMMENT ON FUNCTION ps_trace.span_tag_type
-IS 'This function returns tag_type with the span tag bit.';
+IS 'This function returns tag_type with the span tag bit set.';
 
 CREATE OR REPLACE FUNCTION ps_trace.resource_tag_type()
 RETURNS ps_trace.tag_type
@@ -22,7 +22,7 @@ $sql$
 LANGUAGE SQL IMMUTABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.resource_tag_type() TO prom_reader;
 COMMENT ON FUNCTION ps_trace.resource_tag_type
-IS 'This function returns tag_type with the resource tag bit.';
+IS 'This function returns tag_type with the resource tag bit set.';
 
 CREATE OR REPLACE FUNCTION ps_trace.event_tag_type()
 RETURNS ps_trace.tag_type
@@ -33,7 +33,7 @@ $sql$
 LANGUAGE SQL IMMUTABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.event_tag_type() TO prom_reader;
 COMMENT ON FUNCTION ps_trace.event_tag_type 
-IS 'This function returns tag_type with the event tag bit.';
+IS 'This function returns tag_type with the event tag bit set.';
 
 CREATE OR REPLACE FUNCTION ps_trace.link_tag_type()
 RETURNS ps_trace.tag_type
@@ -44,7 +44,7 @@ $sql$
 LANGUAGE SQL IMMUTABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION ps_trace.link_tag_type() TO prom_reader;
 COMMENT ON FUNCTION ps_trace.link_tag_type
-IS 'This function returns tag_type with the link tag bit.';
+IS 'This function returns tag_type with the link tag bit set.';
 
 CREATE OR REPLACE FUNCTION ps_trace.is_span_tag_type(_tag_type ps_trace.tag_type)
 RETURNS BOOLEAN
@@ -467,8 +467,8 @@ $func$
 LANGUAGE SQL STABLE PARALLEL SAFE STRICT;
 GRANT EXECUTE ON FUNCTION ps_trace.get_tag_map(jsonb) TO prom_reader;
 COMMENT ON FUNCTION ps_trace.get_tag_map
-IS 'For a given jsonb object cosisting of key-value pairs, representing tags and their values,
-this funciton returns a jsonb object of corresponding ids -- the primary keys in
+IS 'For a given jsonb object consisting of key-value pairs, representing tags and their values,
+this function returns a jsonb object of corresponding ids -- the primary keys in
 _ps_trace.tag_key and _ps_trace.tag tables.';
 
 CREATE OR REPLACE FUNCTION ps_trace.put_operation(_service_name text, _span_name text, _span_kind ps_trace.span_kind)
