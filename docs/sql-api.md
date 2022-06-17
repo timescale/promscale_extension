@@ -277,13 +277,13 @@ the specified span_id.
 function TABLE(trace_id trace_id, parent_span_id bigint, span_id bigint, dist integer, path bigint[]) **ps_trace.downstream_spans**(_trace_id trace_id, _span_id bigint, _max_dist integer DEFAULT NULL::integer)
 ```
 ### ps_trace.event_tag_type
-This function returns tag_type with the event tag bit.
+This function returns tag_type with the event tag bit set.
 ```
 function tag_type **ps_trace.event_tag_type**()
 ```
 ### ps_trace.get_tag_map
-For a given jsonb object cosisting of key-value pairs, representing tags and their values,
-this funciton returns a jsonb object of corresponding ids -- the primary keys in
+For a given jsonb object consisting of key-value pairs, representing tags and their values,
+this function returns a jsonb object of corresponding ids -- the primary keys in
 _ps_trace.tag_key and _ps_trace.tag tables.
 ```
 function tag_map **ps_trace.get_tag_map**(_tags jsonb)
@@ -314,7 +314,7 @@ This function checks whether a tag_type value has the span tag bit set.
 function boolean **ps_trace.is_span_tag_type**(_tag_type tag_type)
 ```
 ### ps_trace.link_tag_type
-This function returns tag_type with the link tag bit.
+This function returns tag_type with the link tag bit set.
 ```
 function tag_type **ps_trace.link_tag_type**()
 ```
@@ -356,7 +356,7 @@ its id (a key in _ps_trace.tag_key table)
 function bigint **ps_trace.put_tag_key**(_key tag_k, _tag_type tag_type)
 ```
 ### ps_trace.resource_tag_type
-This function returns tag_type with the resource tag bit.
+This function returns tag_type with the resource tag bit set.
 ```
 function tag_type **ps_trace.resource_tag_type**()
 ```
@@ -371,7 +371,7 @@ For a given trace_id and span_id this function returns spans sharing the same pa
 function TABLE(trace_id trace_id, parent_span_id bigint, span_id bigint) **ps_trace.sibling_spans**(_trace_id trace_id, _span_id bigint)
 ```
 ### ps_trace.span_tag_type
-This function returns tag_type with the span tag bit.
+This function returns tag_type with the span tag bit set.
 ```
 function tag_type **ps_trace.span_tag_type**()
 ```
