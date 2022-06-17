@@ -182,13 +182,13 @@ mod tests {
     fn test_jsonb_digest_prop_based() {
         // Notice: it's advisable to increase the number of cases 10x when making changes
         proptest!(ProptestConfig::with_cases(1000), |(j1 in arb_json(), j2 in arb_json())|{
-            let (cmp, d1, d2) = jsonb_digest_cmp_json_run(j1, j2);
-            if cmp { prop_assert_eq!(d1, d2) }
+            let (j12_are_equal, d1, d2) = compare_inside_postgres(j1, j2);
+            if j12_are_equal { prop_assert_eq!(d1, d2) }
             else { prop_assert_ne!(d1, d2) }
         })
     }
 
-    fn jsonb_digest_cmp_json_run(j1: Value, j2: Value) -> (bool, String, String) {
+    fn compare_inside_postgres(j1: Value, j2: Value) -> (bool, String, String) {
         let (cmp, d1, d2) = Spi::get_three_with_args::<bool, String, String>(
             r#"
             SELECT (j1 = j2), jsonb_digest(j1)::text, jsonb_digest(j2)::text
@@ -203,23 +203,30 @@ mod tests {
     }
 
     fn arb_json() -> impl Strategy<Value = serde_json::Value> {
+        // The base case: JSON primitives
         let leaf = prop_oneof![
+            // `Just` is the strategy for constants
             Just(Value::Null),
             any::<bool>().prop_map(Value::Bool),
             any::<f64>().prop_map(|v| json!(v)),
-            "[\\w\\s]*".prop_map(Value::String),
+            // We aren't interested in enumerating all possible strings,
+            // hence the regex constraint.
+            "[A-Za-z\\s]*".prop_map(Value::String),
         ];
+        // The recursive case
         let expected_max_collection_size = 10u32;
         let sz_range = 0..expected_max_collection_size as usize;
         leaf.prop_recursive(
-            8,   // levels deep
+            8,   // up to 8 levels deep
             256, // Shoot for maximum size of 256 nodes
             expected_max_collection_size,
             move |inner| {
+                // inner is the leaf or the previous recursion level
                 prop_oneof![
-                    // Take the inner strategy and make the two recursive cases.
+                    // Either a Vec of `inner`
                     prop::collection::vec(inner.clone(), sz_range.clone()).prop_map(Value::Array),
-                    prop::collection::hash_map("\\w+", inner, sz_range.clone())
+                    // Or a Map of `\\w+` keys to `inner` values
+                    prop::collection::hash_map("[A-Za-z]+", inner, sz_range.clone())
                         .prop_map(|kvs| Value::Object(serde_json::Map::from_iter(kvs.into_iter()))),
                 ]
             },
