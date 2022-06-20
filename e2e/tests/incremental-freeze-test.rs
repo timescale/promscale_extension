@@ -21,7 +21,7 @@ fn incremental_freeze_test() {
 
     let frozen_files = [
         // ↓↓↓ frozen in 0.5.0 ↓↓↓
-        ("001-extension.sql", "02e2c197308a0d495bac48ce7f30dc04"),
+        ("001-extension.sql", "80774ee806662753d605908ca449c8b4"),
         ("002-utils.sql", "2450a0291c64f48e80bd4d4638f3bba0"),
         ("003-users.sql", "ca921c533531d5715bfeb688f569325f"),
         ("004-schemas.sql", "f2785b92611bd621c8fb64f2a5403b47"),
@@ -80,6 +80,19 @@ fn incremental_freeze_test() {
         (
             "024-adjust_autovacuum.sql",
             "0fe28659efa74be9663cc158f84294cb",
+        ),
+        // ↓↓↓ frozen in 0.5.2 ↓↓↓
+        (
+            "025-tag-map-storage-type.sql",
+            "864f4e138ff04bc835d82f1bf5168f0e",
+        ),
+        (
+            "026-remove-name-param.sql",
+            "6a824c25362765c61f58165db8651700",
+        ),
+        (
+            "027-tag-map-storage-views.sql",
+            "d3c1772e6da5deaa49e3fa2fb09b03c6",
         ),
         // ↓↓↓ frozen in x.x.x ↓↓↓
     ];
