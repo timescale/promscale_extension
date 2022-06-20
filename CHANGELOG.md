@@ -14,9 +14,15 @@ We use the following categories for changes:
 
 ## [Unreleased]
 
+## [0.5.2] - 2021-06-20
+
 ### Changed
 
 - Correct storage type for attributes deriving from `tag_map` and `tag_v` [#365]
+
+### Fixed
+
+- Fix permissions set in `make install` [#355]
 
 ## [0.5.1] - 2021-06-08
 
