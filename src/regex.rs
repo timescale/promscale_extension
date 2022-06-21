@@ -2,10 +2,9 @@ use pgx::*;
 
 #[pg_schema]
 mod _prom_ext {
-
     use pgx::*;
     use regex::Regex;
-    use std::sync::Mutex;
+    use std::cell::RefCell;
     use uluru::LRUCache;
 
     // On caching: Creating a new Regex instance is expensive, so we keep a
@@ -33,9 +32,8 @@ mod _prom_ext {
     // Note: The chosen size is the same as Postgres' internal regex cache
     const CACHE_SIZE: usize = 32;
 
-    lazy_static! {
-        static ref CACHE: Mutex<LRUCache<CompiledRegex, CACHE_SIZE>> =
-            Mutex::new(LRUCache::default());
+    thread_local! {
+        static CACHE: RefCell<LRUCache<CompiledRegex, CACHE_SIZE>> = RefCell::default();
     }
 
     /// re2_match matches `string` against `pattern` using an [RE2-like][re2]
@@ -43,32 +41,24 @@ mod _prom_ext {
     /// [re2]: https://github.com/google/re2
     #[pg_extern(immutable, parallel_safe)]
     fn re2_match(string: &str, pattern: &str) -> bool {
-        match CACHE.lock() {
-            Ok(mut cache) => {
-                match cache.find(|i| i.pattern == pattern) {
-                    Some(compiled) => compiled.matcher.is_match(string),
-                    None => {
-                        match Regex::new(pattern) {
-                            Ok(matcher) => {
-                                cache.insert(CompiledRegex {
-                                    pattern: String::from(pattern),
-                                    matcher: matcher.clone(),
-                                });
-                                matcher.is_match(string)
-                            }
-                            Err(e) => {
-                                // Drop lock on Mutex in order to panic, otherwise it is poisoned
-                                drop(cache);
-                                pgx::error!("unable to compile regular expression: {}", e)
-                            }
-                        }
+        CACHE.with(|cache| {
+            let mut cache = cache.borrow_mut();
+            match cache.find(|i| i.pattern == pattern) {
+                Some(compiled) => compiled.matcher.is_match(string),
+                None => match Regex::new(pattern) {
+                    Ok(matcher) => {
+                        cache.insert(CompiledRegex {
+                            pattern: String::from(pattern),
+                            matcher: matcher.clone(),
+                        });
+                        matcher.is_match(string)
                     }
-                }
+                    Err(e) => {
+                        pgx::error!("unable to compile regular expression: {}", e)
+                    }
+                },
             }
-            Err(e) => {
-                pgx::error!("unable to access regex cache: {}", e)
-            }
-        }
+        })
     }
 }
 
@@ -94,8 +84,20 @@ mod tests {
         assert_eq!(result, true);
     }
 
-    #[pg_test(error = "unable to compile regular expression: Compiled regex exceeds size limit of 10485760 bytes.")]
+    #[pg_test(
+        error = "unable to compile regular expression: Compiled regex exceeds size limit of 10485760 bytes."
+    )]
     fn test_regex_too_large() {
         Spi::get_one::<bool>(r#"SELECT re2_match('a', 'a'||repeat('.?', 10000));"#);
+    }
+
+    #[pg_test]
+    fn test_regex_too_large_does_not_kill_session() {
+        let _ = pg_try(|| {
+            Spi::run(r#"SELECT re2_match('a', 'a'||repeat('.?', 10000));"#);
+        });
+        let result =
+            Spi::get_one::<bool>(r#"SELECT re2_match('a', 'a');"#).expect("SQL query failed");
+        assert_eq!(result, true);
     }
 }
