@@ -14,6 +14,10 @@ We use the following categories for changes:
 
 ## [Unreleased]
 
+### Fixed
+
+- Correctly identify and drop `prom_schema_migrations` [#372]
+
 ## [0.5.2] - 2021-06-20
 
 ### Changed
