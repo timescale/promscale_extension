@@ -17,7 +17,19 @@ BEGIN
 END;
 $stop_bgw$;
 
-DROP TABLE public.prom_schema_migrations;
+DO
+$drop_prom_schema_migrations$
+DECLARE
+    schema TEXT;
+BEGIN
+    -- The prom_schema_migrations table was not schema-qualified on creation,
+    -- so it could be in any schema. Find out the schema it's in and drop.
+    SELECT schemaname INTO STRICT schema FROM pg_catalog.pg_tables WHERE tablename = 'prom_schema_migrations';
+    IF schema IS NOT NULL THEN
+        EXECUTE format('DROP TABLE %I.prom_schema_migrations', schema);
+    END IF;
+END;
+$drop_prom_schema_migrations$;
 
 REVOKE EXECUTE ON FUNCTION ps_trace.delete_all_traces() FROM prom_writer;
 REVOKE EXECUTE ON PROCEDURE prom_api.add_prom_node(TEXT, BOOLEAN) FROM prom_writer;
