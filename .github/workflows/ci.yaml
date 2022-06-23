@@ -1,11 +1,6 @@
 name: ci
 on:
   pull_request:
-    paths-ignore:
-    - '.github/workflows/release.yaml'
-    - '*.md'
-    - 'dist/*'
-    - 'tools/package'
 
 jobs:
   test:

@@ -2,9 +2,6 @@ name: docker
 on:
   pull_request:
     paths-ignore:
-    - '.github/workflows/release.yaml'
-    - 'dist/*'
-    - 'tools/*'
   push:
     branches:
       - develop
