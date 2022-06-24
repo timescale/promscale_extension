@@ -18,6 +18,7 @@ We use the following categories for changes:
 
 - Correctly identify and drop `prom_schema_migrations` [#372]
 - Use `cluster` label from `_prom_catalog.label` to report about HA setup [#398]
+- Optimize `promscale_sql_telemetry()` by removing `metric_bytes_total` and `traces_spans_bytes_total` metrics [#388]
 
 ## [0.5.2] - 2021-06-20
 
