@@ -24,10 +24,11 @@ DECLARE
 BEGIN
     -- The prom_schema_migrations table was not schema-qualified on creation,
     -- so it could be in any schema. Find out the schema it's in and drop.
-    SELECT schemaname INTO STRICT schema FROM pg_catalog.pg_tables WHERE tablename = 'prom_schema_migrations';
-    IF schema IS NOT NULL THEN
-        EXECUTE format('DROP TABLE %I.prom_schema_migrations', schema);
+    SELECT schemaname INTO schema FROM pg_catalog.pg_tables WHERE tablename = 'prom_schema_migrations';
+    IF schema IS NULL THEN
+        RAISE EXCEPTION 'the prom_schema_migrations table was not found.';
     END IF;
+    EXECUTE format('DROP TABLE %I.prom_schema_migrations', schema);
 END;
 $drop_prom_schema_migrations$;
 
