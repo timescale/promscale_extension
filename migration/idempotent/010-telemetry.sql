@@ -76,9 +76,6 @@ $$
         SELECT count(*)::TEXT INTO result FROM _prom_catalog.metric;
         PERFORM _ps_catalog.apply_telemetry('metrics_total', result);
 
-        SELECT sum(public.hypertable_size(format('prom_data.%I', table_name)))::TEXT INTO result FROM _prom_catalog.metric;
-        PERFORM _ps_catalog.apply_telemetry('metrics_bytes_total', result);
-
         SELECT public.approximate_row_count('_prom_catalog.series')::TEXT INTO result;
         PERFORM _ps_catalog.apply_telemetry('metrics_series_total_approx', result);
 
@@ -118,9 +115,6 @@ $$
 
         SELECT public.approximate_row_count('_ps_trace.span')::TEXT INTO result;
         PERFORM _ps_catalog.apply_telemetry('traces_spans_total_approx', result);
-
-        SELECT public.hypertable_size('_ps_trace.span')::TEXT INTO result;
-        PERFORM _ps_catalog.apply_telemetry('traces_spans_bytes_total', result);
 
         -- Others.
         -- The -1 is to ignore the row summing deleted rows i.e., the counter reset row. 
