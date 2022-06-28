@@ -68,6 +68,10 @@ jobs:
             ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
             ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.branch_name}}-ts${{steps.metadata.outputs.tsmajor}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
             ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.branch_name}}-ts${{steps.metadata.outputs.tsmajmin}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
+          labels: |
+            org.opencontainers.image.source=
+            org.opencontainers.image.revision=
+            org.opencontainers.image.created=
           # Note: it's necessary to use a different cache scope to achieve caching for both Ubuntu and Alpine images
           cache-from: type=gha,scope=${{matrix.base}}-${{matrix.pgversion}}-${{matrix.tsversion}}
           cache-to: type=gha,mode=max,scope=${{matrix.base}}-${{matrix.pgversion}}-${{matrix.tsversion}}
