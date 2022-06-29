@@ -628,6 +628,7 @@ COMMENT ON FUNCTION ps_trace.put_instrumentation_lib
 IS 'This function creates an entry in the _ps_trace.instrumentation_lib table if it doesn''t exit and returns its id.
 It is meant to be used during span creation, to obtain a valid value for mandatory instrumentation_lib_id attribute.';
 
+-- Note: This function is getting deprecated. New versions of connector will use _prom_catalog.create_ingest_temp_table.
 -- Creates a temporary table (if it doesn't exist), suitable for tracing data ingestion.
 -- Supresses corresponding DDL logging, otherwise PG log may get unnecessarily verbose.
 CREATE OR REPLACE FUNCTION _ps_trace.ensure_trace_ingest_temp_table(_temp_table_name text, _proto_table_name text)
@@ -653,7 +654,8 @@ LANGUAGE plpgsql;
 REVOKE ALL ON FUNCTION _ps_trace.ensure_trace_ingest_temp_table(text, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION _ps_trace.ensure_trace_ingest_temp_table(text, text) TO prom_writer;
 COMMENT ON FUNCTION _ps_trace.ensure_trace_ingest_temp_table
-IS 'Creates a temporary table (if it doesn''t exist), suitable for tracing data ingestion. 
+IS 'Note: This function is getting deprecated. New versions of connector will use _prom_catalog.create_ingest_temp_table.
+Creates a temporary table (if it doesn''t exist), suitable for tracing data ingestion. 
 Supresses corresponding DDL logging, otherwise PG log may get unnecessarily verbose.';
 
 CREATE OR REPLACE FUNCTION ps_trace.delete_all_traces()

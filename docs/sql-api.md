@@ -501,6 +501,13 @@ function integer **_prom_catalog.count_jsonb_keys**(j jsonb)
 ```
 function boolean **_prom_catalog.create_exemplar_table_if_not_exists**(metric_name text)
 ```
+### _prom_catalog.create_ingest_temp_table
+Creates a temporary table (if it doesn't exist) used for ingestion of metrics or traces.
+Temporary table is created using supplied table and schema as prototype.
+Suppresses corresponding DDL logging, otherwise PG log may get unnecessarily verbose.Returns temporary table name
+```
+function text **_prom_catalog.create_ingest_temp_table**(table_name text, schema_name text)
+```
 ### _prom_catalog.create_label_key
 
 ```
@@ -1102,6 +1109,7 @@ This procedure drops chunks of _ps_trace.span hypertable that are older than a s
 procedure void **_ps_trace.drop_span_chunks**(IN _older_than timestamp with time zone)
 ```
 ### _ps_trace.ensure_trace_ingest_temp_table
+Note: This function is getting deprecated. New versions of connector will use _prom_catalog.create_ingest_temp_table.
 Creates a temporary table (if it doesn't exist), suitable for tracing data ingestion. 
 Supresses corresponding DDL logging, otherwise PG log may get unnecessarily verbose.
 ```
