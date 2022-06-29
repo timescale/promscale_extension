@@ -3370,3 +3370,31 @@ END;
 $$
 LANGUAGE PLPGSQL;
 GRANT EXECUTE ON FUNCTION _prom_catalog.insert_metric_row(TEXT, TIMESTAMPTZ[], DOUBLE PRECISION[], BIGINT[]) TO prom_writer;
+
+-- Creates a temporary table (if it doesn't exist) used for ingestion of metrics and traces
+-- Suppresses corresponding DDL logging, otherwise PG log may get unnecessarily verbose.
+-- Temporary table is created using supplied table and schema as prototype.
+-- Returns temporary table name
+CREATE OR REPLACE FUNCTION _prom_catalog.create_ingest_temp_table(table_name TEXT, schema_name TEXT)
+    RETURNS TEXT
+    SECURITY DEFINER
+    VOLATILE
+    SET search_path = pg_catalog, pg_temp
+AS $func$             
+BEGIN
+    SET LOCAL log_statement = 'none';
+    EXECUTE format($sql$CREATE TEMPORARY TABLE IF NOT EXISTS %I (LIKE %I.%I) ON COMMIT DELETE ROWS$sql$,
+                 table_name, schema_name, table_name);
+    EXECUTE format($sql$GRANT SELECT, INSERT ON TABLE %I TO prom_writer$sql$,
+                 table_name);
+    RETURN table_name;
+END;
+$func$
+LANGUAGE plpgsql;
+REVOKE ALL ON FUNCTION _prom_catalog.create_ingest_temp_table(TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION _prom_catalog.create_ingest_temp_table(TEXT, TEXT) TO prom_writer;
+COMMENT ON FUNCTION _prom_catalog.create_ingest_temp_table
+IS 'Creates a temporary table (if it doesn''t exist) used for ingestion of metrics or traces.
+Temporary table is created using supplied table and schema as prototype.
+Suppresses corresponding DDL logging, otherwise PG log may get unnecessarily verbose.'
+'Returns temporary table name';
