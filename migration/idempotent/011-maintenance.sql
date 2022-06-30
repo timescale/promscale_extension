@@ -31,7 +31,7 @@ $$
 LANGUAGE PLPGSQL STABLE;
 GRANT EXECUTE ON FUNCTION _prom_catalog.get_metrics_that_need_drop_chunk() TO prom_reader;
 
---drop chunks from metrics tables and delete the appropriate series.
+-- drop chunks from schema_name.metric_name containing data older than older_than.
 CREATE OR REPLACE FUNCTION _prom_catalog.drop_metric_chunk_data(
     schema_name TEXT, metric_name TEXT, older_than TIMESTAMPTZ
 )
@@ -62,19 +62,10 @@ BEGIN
     END IF;
 
     IF _prom_catalog.is_timescaledb_installed() THEN
-        IF _prom_catalog.get_timescale_major_version() >= 2 THEN
-            PERFORM public.drop_chunks(
-                relation=>format('%I.%I', metric_schema, metric_table),
-                older_than=>older_than
-            );
-        ELSE
-            PERFORM public.drop_chunks(
-                table_name=>metric_table,
-                schema_name=> metric_schema,
-                older_than=>older_than,
-                cascade_to_materializations=>FALSE
-            );
-        END IF;
+        PERFORM public.drop_chunks(
+            relation=>format('%I.%I', metric_schema, metric_table),
+            older_than=>older_than
+        );
     ELSE
         EXECUTE format($$ DELETE FROM %I.%I WHERE time < %L $$, metric_schema, metric_table, older_than);
     END IF;
@@ -209,19 +200,10 @@ SET search_path = pg_catalog, pg_temp
 AS $func$
 BEGIN
     IF _prom_catalog.is_timescaledb_installed() THEN
-        IF _prom_catalog.get_timescale_major_version() >= 2 THEN
-            PERFORM public.drop_chunks(
-                relation=>'_ps_trace.span',
-                older_than=>_older_than
-            );
-        ELSE
-            PERFORM public.drop_chunks(
-                table_name=>'span',
-                schema_name=> '_ps_trace',
-                older_than=>_older_than,
-                cascade_to_materializations=>FALSE
-            );
-        END IF;
+        PERFORM public.drop_chunks(
+            relation=>'_ps_trace.span',
+            older_than=>_older_than
+        );
     ELSE
         DELETE FROM _ps_trace.span WHERE start_time < _older_than;
     END IF;
@@ -241,19 +223,10 @@ SET search_path = pg_catalog, pg_temp
 AS $func$
 BEGIN
     IF _prom_catalog.is_timescaledb_installed() THEN
-        IF _prom_catalog.get_timescale_major_version() >= 2 THEN
-            PERFORM public.drop_chunks(
-                relation=>'_ps_trace.link',
-                older_than=>_older_than
-            );
-        ELSE
-            PERFORM public.drop_chunks(
-                table_name=>'link',
-                schema_name=> '_ps_trace',
-                older_than=>_older_than,
-                cascade_to_materializations=>FALSE
-            );
-        END IF;
+        PERFORM public.drop_chunks(
+            relation=>'_ps_trace.link',
+            older_than=>_older_than
+        );
     ELSE
         DELETE FROM _ps_trace.link WHERE span_start_time < _older_than;
     END IF;
@@ -273,19 +246,10 @@ SET search_path = pg_catalog, pg_temp
 AS $func$
 BEGIN
     IF _prom_catalog.is_timescaledb_installed() THEN
-        IF _prom_catalog.get_timescale_major_version() >= 2 THEN
-            PERFORM public.drop_chunks(
-                relation=>'_ps_trace.event',
-                older_than=>_older_than
-            );
-        ELSE
-            PERFORM public.drop_chunks(
-                table_name=>'event',
-                schema_name=> '_ps_trace',
-                older_than=>_older_than,
-                cascade_to_materializations=>FALSE
-            );
-        END IF;
+        PERFORM public.drop_chunks(
+            relation=>'_ps_trace.event',
+            older_than=>_older_than
+        );
     ELSE
         DELETE FROM _ps_trace.event WHERE time < _older_than;
     END IF;
@@ -505,7 +469,7 @@ BEGIN
     CALL _prom_catalog.execute_data_retention_policy(log_verbose=>log_verbose);
     CALL _ps_trace.execute_data_retention_policy(log_verbose=>log_verbose);
 
-    IF NOT _prom_catalog.is_timescaledb_oss() AND _prom_catalog.get_timescale_major_version() >= 2 THEN
+    IF NOT _prom_catalog.is_timescaledb_oss() THEN
         IF log_verbose THEN
             RAISE LOG 'promscale maintenance: compression: starting';
         END IF;

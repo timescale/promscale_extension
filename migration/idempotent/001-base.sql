@@ -1917,6 +1917,10 @@ COMMENT ON FUNCTION _prom_catalog.epoch_abort(BIGINT)
 IS 'ABORT an INSERT transaction due to the ID epoch being out of date';
 GRANT EXECUTE ON FUNCTION _prom_catalog.epoch_abort TO prom_writer;
 
+-- Given a metric_schema, metric_table, and series_table, this function returns
+-- all elements in potential_series_ids which are not referenced by data in any
+-- metric table.
+-- TODO(james): what is the purpose of check_time?
 CREATE OR REPLACE FUNCTION _prom_catalog.get_confirmed_unused_series(
     metric_schema TEXT, metric_table TEXT, series_table TEXT, potential_series_ids BIGINT[], check_time TIMESTAMPTZ
 )
@@ -1927,36 +1931,40 @@ DECLARE
     r RECORD;
     check_time_condition TEXT;
 BEGIN
+    -- Note: when using TimescaleDB's Continuous Aggregates to downsample, a
+    -- materialized metric view may contain rows which reference one of the
+    -- series ids in potential_series_ids. So we look through all metric
+    -- entries which have declared a dependency on the series table.
     FOR r IN
         SELECT *
         FROM _prom_catalog.metric m
         WHERE m.series_table = get_confirmed_unused_series.series_table
     LOOP
 
-    check_time_condition := '';
-    IF r.table_schema = metric_schema::NAME AND r.table_name = metric_table::NAME THEN
-        check_time_condition := FORMAT('AND time >= %L', check_time);
-    END IF;
+        check_time_condition := '';
+        IF r.table_schema = metric_schema::NAME AND r.table_name = metric_table::NAME THEN
+            check_time_condition := FORMAT('AND time >= %L', check_time);
+        END IF;
 
-    --at each iteration of the loop filter potential_series_ids to only
-    --have those series ids that don't exist in the metric tables.
-    EXECUTE format(
-    $query$
-        SELECT array_agg(potential_series.series_id)
-        FROM unnest($1) as potential_series(series_id)
-        LEFT JOIN LATERAL(
-            SELECT 1
-            FROM  %1$I.%2$I data_exists
-            WHERE data_exists.series_id = potential_series.series_id
-            %3$s
-            --use chunk append + more likely to find something starting at earliest time
-            ORDER BY time ASC
-            LIMIT 1
-        ) as lateral_exists(indicator) ON (true)
-        WHERE lateral_exists.indicator IS NULL
-    $query$, r.table_schema, r.table_name, check_time_condition)
-		USING potential_series_ids
-    INTO potential_series_ids;
+        --at each iteration of the loop filter potential_series_ids to only
+        --have those series ids that don't exist in the metric tables.
+        EXECUTE format(
+        $query$
+            SELECT array_agg(potential_series.series_id)
+            FROM unnest($1) as potential_series(series_id)
+            LEFT JOIN LATERAL(
+                SELECT 1
+                FROM  %1$I.%2$I data_exists
+                WHERE data_exists.series_id = potential_series.series_id
+                %3$s
+                --use chunk append + more likely to find something starting at earliest time
+                ORDER BY time ASC
+                LIMIT 1
+            ) as lateral_exists(indicator) ON (true)
+            WHERE lateral_exists.indicator IS NULL
+        $query$, r.table_schema, r.table_name, check_time_condition)
+            USING potential_series_ids
+        INTO potential_series_ids;
 
     END LOOP;
 
@@ -2116,7 +2124,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.set_app_name(full_name text)
     VOLATILE
     SET search_path = pg_catalog, pg_temp
 AS $func$
-    --setting a name that's too long create surpurflous NOTICE messages in the log
+    --setting a name that's too long creates superfluous NOTICE messages in the log
     SELECT set_config('application_name', substring(full_name for 63), false);
 $func$
 LANGUAGE SQL PARALLEL SAFE;
@@ -2450,7 +2458,7 @@ BEGIN
     AND    table_name   = register_metric_view.view_name;
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'cannot register non-existant metric view in specified schema';
+        RAISE EXCEPTION 'cannot register non-existent metric view in specified schema';
     END IF;
 
     -- cannot register view in data schema
