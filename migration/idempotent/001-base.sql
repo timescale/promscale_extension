@@ -1917,12 +1917,12 @@ COMMENT ON FUNCTION _prom_catalog.epoch_abort(BIGINT)
 IS 'ABORT an INSERT transaction due to the ID epoch being out of date';
 GRANT EXECUTE ON FUNCTION _prom_catalog.epoch_abort TO prom_writer;
 
--- Given a metric_schema, metric_table, and series_table, this function returns
--- all elements in potential_series_ids which are not referenced by data in any
--- metric table.
--- TODO(james): what is the purpose of check_time?
+-- Given a `metric_schema`, `metric_table`, and `series_table`, this function
+-- returns all series ids in `potential_series_ids` which are not referenced by
+-- data newer than `newer_than` in any metric table.
+-- Note: See _prom_catalog.mark_series_to_be_dropped_as_unused for context.
 CREATE OR REPLACE FUNCTION _prom_catalog.get_confirmed_unused_series(
-    metric_schema TEXT, metric_table TEXT, series_table TEXT, potential_series_ids BIGINT[], check_time TIMESTAMPTZ
+    metric_schema TEXT, metric_table TEXT, series_table TEXT, potential_series_ids BIGINT[], newer_than TIMESTAMPTZ
 )
     RETURNS BIGINT[]
     SET search_path = pg_catalog, pg_temp
@@ -1943,7 +1943,7 @@ BEGIN
 
         check_time_condition := '';
         IF r.table_schema = metric_schema::NAME AND r.table_name = metric_table::NAME THEN
-            check_time_condition := FORMAT('AND time >= %L', check_time);
+            check_time_condition := FORMAT('AND time >= %L', newer_than);
         END IF;
 
         --at each iteration of the loop filter potential_series_ids to only
@@ -1973,9 +1973,24 @@ END
 $func$
 LANGUAGE PLPGSQL STABLE PARALLEL SAFE;
 GRANT EXECUTE ON FUNCTION _prom_catalog.get_confirmed_unused_series(TEXT, TEXT, TEXT, BIGINT[], TIMESTAMPTZ) TO prom_maintenance;
+COMMENT ON FUNCTION _prom_catalog.get_confirmed_unused_series(TEXT, TEXT, TEXT, BIGINT[], TIMESTAMPTZ)
+    IS
+'
+Given a `metric_schema`, `metric_table`, and `series_table`, this function
+returns all series ids in `potential_series_ids` which are not referenced by
+data newer than `newer_than` in any metric table.
+Note: See _prom_catalog.mark_series_to_be_dropped_as_unused for context.
+';
 
-CREATE OR REPLACE FUNCTION _prom_catalog.mark_unused_series(
-    metric_schema TEXT, metric_table TEXT, metric_series_table TEXT, older_than TIMESTAMPTZ, check_time TIMESTAMPTZ
+-- Marks series which we will drop soon as unused.
+-- A series is unused if there is no data newer than `drop_point` which
+-- references that series.
+-- Note: This function can only mark a series as unused if there is still
+-- data which references that series.
+-- This function is designed to be used in the context of dropping metric
+-- chunks, see `_prom_catalog.drop_metric_chunks`.
+CREATE OR REPLACE FUNCTION _prom_catalog.mark_series_to_be_dropped_as_unused(
+    metric_schema TEXT, metric_table TEXT, metric_series_table TEXT, drop_point TIMESTAMPTZ
 )
     RETURNS VOID
     --security definer to add jobs as the logged-in user
@@ -1984,10 +1999,30 @@ CREATE OR REPLACE FUNCTION _prom_catalog.mark_unused_series(
     SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
+    check_time TIMESTAMPTZ;
 BEGIN
-    --chances are that the hour after the drop point will have the most similar
-    --series to what is dropped, so first filter by all series that have been dropped
-    --but that aren't in that first hour and then make sure they aren't in the dataset
+
+    -- We determine if a series is unused by "looking back" over data older
+    -- than `drop_point` and getting all distinct series ids in the data.
+    -- This set of series will likely contain some series which are not unused.
+    -- We will need to eliminate all of the series which are not unused by
+    -- looking through all of the data. Before we do that, we can perform a
+    -- simple optimisation: any series which are also referenced between
+    -- `drop_point` and (`drop_point` + 1 hour) are not unused, so we can
+    -- discard those from the candidate list, and do a full check on the rest.
+    --
+    --                   drop_point     check_time
+    --                       v              v
+    --     time ------------------------------->
+    --   series   (S1,S2,S3) |    (S3,S4)   |
+    --
+    -- In the example above, we find series (S1,S2,S3) referenced in the data
+    -- older than `drop_point`. We also find series (S3,S4) in the data between
+    -- `drop_point` and `check_time`. We can discard S3 from the set of series
+    -- that we will check.
+    SELECT drop_point OPERATOR(pg_catalog.+) pg_catalog.interval '1 hour'
+    INTO check_time;
+
     EXECUTE format(
     $query$
         WITH potentially_drop_series AS (
@@ -2006,13 +2041,24 @@ BEGIN
         FROM _prom_catalog.ids_epoch
         WHERE delete_epoch IS NULL
             AND id IN (SELECT unnest(ids) FROM confirmed_drop_series)
-    $query$, metric_schema, metric_table, metric_series_table, older_than, check_time);
+    $query$, metric_schema, metric_table, metric_series_table, drop_point, check_time);
 END
 $func$
 LANGUAGE PLPGSQL;
 --redundant given schema settings but extra caution for security definers
-REVOKE ALL ON FUNCTION _prom_catalog.mark_unused_series(text, text, text, timestamptz, timestamptz) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION _prom_catalog.mark_unused_series(text, text, text, timestamptz, timestamptz) TO prom_maintenance;
+REVOKE ALL ON FUNCTION _prom_catalog.mark_series_to_be_dropped_as_unused(text, text, text, timestamptz) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION _prom_catalog.mark_series_to_be_dropped_as_unused(text, text, text, timestamptz) TO prom_maintenance;
+COMMENT ON FUNCTION _prom_catalog.mark_series_to_be_dropped_as_unused(text, text, text, timestamptz)
+    IS
+'
+Marks series which we will drop soon as unused.
+A series is unused if there is no data newer than `drop_point` which
+references that series.
+Note: This function can only mark a series as unused if there is still
+data which references that series.
+This function is designed to be used in the context of dropping metric
+chunks, see `_prom_catalog.drop_metric_chunks`.
+';
 
 CREATE OR REPLACE FUNCTION _prom_catalog.delete_expired_series(
     metric_schema TEXT, metric_table TEXT, metric_series_table TEXT, ran_at TIMESTAMPTZ, present_epoch BIGINT, last_updated_epoch TIMESTAMPTZ

@@ -562,7 +562,7 @@ function bigint **_prom_catalog.delete_series_from_metric**(name text, series_id
 procedure void **_prom_catalog.do_decompress_chunks_after**(IN metric_table text, IN min_time timestamp with time zone, IN transactional boolean DEFAULT false)
 ```
 ### _prom_catalog.drop_metric_chunk_data
-
+drop chunks from schema_name.metric_name containing data older than older_than.
 ```
 function void **_prom_catalog.drop_metric_chunk_data**(schema_name text, metric_name text, older_than timestamp with time zone)
 ```
@@ -618,8 +618,13 @@ function record **_prom_catalog.get_cagg_info**(metric_schema text, metric_table
 ```
 ### _prom_catalog.get_confirmed_unused_series
 
+Given a `metric_schema`, `metric_table`, and `series_table`, this function
+returns all series ids in `potential_series_ids` which are not referenced by
+data newer than `newer_than` in any metric table.
+Note: See _prom_catalog.mark_series_to_be_dropped_as_unused for context.
+
 ```
-function bigint[] **_prom_catalog.get_confirmed_unused_series**(metric_schema text, metric_table text, series_table text, potential_series_ids bigint[], check_time timestamp with time zone)
+function bigint[] **_prom_catalog.get_confirmed_unused_series**(metric_schema text, metric_table text, series_table text, potential_series_ids bigint[], newer_than timestamp with time zone)
 ```
 ### _prom_catalog.get_default_chunk_interval
 
@@ -886,10 +891,18 @@ function boolean **_prom_catalog.lock_metric_for_maintenance**(metric_id integer
 ```
 function trigger **_prom_catalog.make_metric_table**()
 ```
-### _prom_catalog.mark_unused_series
+### _prom_catalog.mark_series_to_be_dropped_as_unused
+
+Marks series which we will drop soon as unused.
+A series is unused if there is no data newer than `drop_point` which
+references that series.
+Note: This function can only mark a series as unused if there is still
+data which references that series.
+This function is designed to be used in the context of dropping metric
+chunks, see `_prom_catalog.drop_metric_chunks`.
 
 ```
-function void **_prom_catalog.mark_unused_series**(metric_schema text, metric_table text, metric_series_table text, older_than timestamp with time zone, check_time timestamp with time zone)
+function void **_prom_catalog.mark_series_to_be_dropped_as_unused**(metric_schema text, metric_table text, metric_series_table text, drop_point timestamp with time zone)
 ```
 ### _prom_catalog.match_equals
 
