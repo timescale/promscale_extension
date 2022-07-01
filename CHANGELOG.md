@@ -17,6 +17,7 @@ We use the following categories for changes:
 ### Fixed
 
 - Correctly identify and drop `prom_schema_migrations` [#372]
+- Use `cluster` label from `_prom_catalog.label` to report about HA setup [#393]
 
 ## [0.5.2] - 2021-06-20
 
