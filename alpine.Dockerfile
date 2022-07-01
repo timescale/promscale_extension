@@ -78,7 +78,7 @@ RUN --mount=type=secret,uid=70,gid=70,id=AWS_ACCESS_KEY_ID --mount=type=secret,u
 
 # Build extension
 COPY --chown=postgres:postgres Cargo.* /build/promscale/
-COPY --chown=postgres:postgres Makefile build.rs create-upgrade-symlinks.sh /build/promscale/
+COPY --chown=postgres:postgres Makefile build.rs create-upgrade-symlinks.sh extract-extension-version.sh /build/promscale/
 COPY --chown=postgres:postgres .cargo/ /build/promscale/.cargo/
 COPY --chown=postgres:postgres e2e/ /build/promscale/e2e/
 COPY --chown=postgres:postgres src/ /build/promscale/src/
