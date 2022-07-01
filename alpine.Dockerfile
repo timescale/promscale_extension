@@ -5,7 +5,7 @@ ARG PREVIOUS_IMAGE=timescaledev/promscale-extension:latest-ts2-pg${PG_VERSION}
 FROM timescale/timescaledb:${TIMESCALEDB_VERSION_FULL}-pg${PG_VERSION} as builder
 
 MAINTAINER Timescale https://www.timescale.com
-ARG RUST_VERSION=1.58.1
+ARG RUST_VERSION=1.63.0
 ARG PG_VERSION
 
 RUN \
