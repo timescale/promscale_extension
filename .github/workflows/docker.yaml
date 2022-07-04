@@ -13,7 +13,7 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     outputs:
-      branch_name: ${{steps.metadata.outputs.branch_name}}
+      image_branch_name: ${{steps.metadata.outputs.image_branch_name}}
     strategy:
       matrix:
         pgversion:
@@ -43,11 +43,11 @@ jobs:
         run: |
           tsmajor=$(echo ${{ matrix.tsversion }} | cut -d. -f1)
           tsmajmin=$(echo ${{ matrix.tsversion }} | cut -d. -f1,2)
-          branch_name=$(echo ${{github.head_ref || github.ref_name}} | sed 's#/#-#')
+          image_branch_name=$(echo ${{github.head_ref || github.ref_name}} | sed 's#/#-#')
           build_type_suffix=$(echo "-${{matrix.base}}" | sed 's/-ha//')
           echo "::set-output name=tsmajor::${tsmajor}"
           echo "::set-output name=tsmajmin::${tsmajmin}"
-          echo "::set-output name=branch_name::${branch_name}"
+          echo "::set-output name=image_branch_name::${image_branch_name}"
           echo "::set-output name=build_type_suffix::${build_type_suffix}"
 
       - name: Build and push
@@ -65,9 +65,9 @@ jobs:
           file: ${{matrix.base}}.Dockerfile
           push: true
           tags: |
-            ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
-            ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.branch_name}}-ts${{steps.metadata.outputs.tsmajor}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
-            ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.branch_name}}-ts${{steps.metadata.outputs.tsmajmin}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
+            ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.image_branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
+            ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.image_branch_name}}-ts${{steps.metadata.outputs.tsmajor}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
+            ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.image_branch_name}}-ts${{steps.metadata.outputs.tsmajmin}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
           labels: |
             org.opencontainers.image.source=
             org.opencontainers.image.revision=
@@ -82,12 +82,12 @@ jobs:
           command: test
           args: -p e2e
         env:
-          TS_DOCKER_IMAGE: ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
+          TS_DOCKER_IMAGE: ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.image_branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
 
       - name: Check SQL Documentation
         if: ${{ matrix.pgversion == 14 && matrix.base == 'ha' }}
         env:
-          TS_DOCKER_IMAGE: ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
+          TS_DOCKER_IMAGE: ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.image_branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
         run: |
           make gendoc
           git diff --exit-code
@@ -105,47 +105,22 @@ jobs:
         # A dash indicates prerelease in SemVer
         if: ${{ startsWith(github.ref, 'refs/tags') && !contains(github.ref, '-') && matrix.base == 'alpine' }}
         with:
-          src: ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
+          src: ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.image_branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
           dst: |
-            timescaledev/promscale-extension:${{steps.metadata.outputs.branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}
+            timescaledev/promscale-extension:${{steps.metadata.outputs.image_branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}
             timescaledev/promscale-extension:latest-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}
-
-
-  pick-connector-branch:
-    name: picking connector's repo branch
-    runs-on: ubuntu-latest
-    needs:
-      - docker
-    outputs:
-      branch:  ${{ steps.curl.outputs.branch }}
-    steps:
-     - name: curl check matching branch
-       id: curl
-       run: |
-          branch_name=${{ needs.docker.outputs.branch_name }}
-          res=$(curl \
-                  -sw'%{http_code}\n' \
-                  -H "Accept: application/vnd.github.v3+json" \
-                  https://api.github.com/repos/timescale/promscale/branches/${branch_name} | tail -1)
-          if [[ "$res" = "200" ]]; then
-            echo "::set-output name=branch::${branch_name}"
-          elif [[ "$res" == "404" ]]; then
-            echo "::set-output name=branch::master"
-          else
-            echo "Unexpected HTTP response: $res"
-            exit 1
-          fi;
 
   call-connector-e2e:
     name: call connector e2e test
     needs:
       - docker
-      - pick-connector-branch
     if: needs.docker.result == 'success'
     uses: timescale/promscale/.github/workflows/go-e2e.yml@master
     with:
-      docker_image_prefix:  ${{ needs.docker.outputs.branch_name }}-ts2
-      ref: ${{ needs.pick-connector-branch.outputs.branch }}
+      # The intention here is to always run extention against connector's master
+      # branch. This way we make sure extension doesn't accidentally break compatibility.
+      docker_image_prefix:  ${{ needs.docker.outputs.image_branch_name }}-ts2
+      ref: master
 
   # This allows us to set a single job which must pass in GitHub's branch protection rules,
   # otherwise we have to keep updating them as we add or remove postgres versions etc.
