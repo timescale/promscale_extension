@@ -14,6 +14,10 @@ We use the following categories for changes:
 
 ## [Unreleased]
 
+### Added
+
+- Configure `epoch_duration` for Promscale series cache via `_prom_catalog.default` [#396]
+
 ### Fixed
 
 - Correctly identify and drop `prom_schema_migrations` [#372]

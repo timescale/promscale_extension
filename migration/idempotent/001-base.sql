@@ -11,7 +11,8 @@ FROM
     ('metric_compression'       , (exists(select 1 from pg_catalog.pg_proc where proname = 'compress_chunk')::text)),
     ('trace_retention_period'   , (30 * INTERVAL '1 days')::text),
     ('ha_lease_timeout'         , '1m'),
-    ('ha_lease_refresh'         , '10s')
+    ('ha_lease_refresh'         , '10s'),
+    ('epoch_duration'           , (INTERVAL '12 hours')::text)
 ) d(key, value)
 ;
 GRANT SELECT ON _prom_catalog.initial_default TO prom_reader;
@@ -2073,14 +2074,17 @@ DECLARE
     label_array int[];
     next_epoch BIGINT;
     deletion_epoch BIGINT;
+    epoch_duration INTERVAL;
 BEGIN
     next_epoch := present_epoch + 1;
     -- technically we can delete any ID <= current_epoch - 1
     -- but it's always safe to leave them around for a bit longer
     deletion_epoch := present_epoch - 4;
 
+    SELECT _prom_catalog.get_default_value('epoch_duration')::INTERVAL INTO STRICT epoch_duration;
+
     -- we don't want to delete too soon
-    IF ran_at < last_updated_epoch + '1 hour' THEN
+    IF ran_at < last_updated_epoch + epoch_duration THEN
         RETURN;
     END IF;
 
