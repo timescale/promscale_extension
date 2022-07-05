@@ -18,13 +18,9 @@ development. The resulting images are pushed to `ghcr.io/timescale/dev_promscale
 Then each image is validated by running [`e2e` suite](../e2e/README.md) of this repository.
 And the last step of the `docker` job validates that there are no undocumented API changes.
 
-The next job is a helper that determines whether `timescale/promscale` repo has a branch
-with the same name as the current branch, or defaults to `master`.
-
 `call-connector-e2e` job embeds and executes the `go-e2e.yml` workflow from
-`timescale/promscale` repo. The workflow checks out `promscale` repo and branch, picked
-by the previous job, then executes `promscale` `e2e` suite against the HA image built
-by `docker` job.
+`timescale/promscale` repo. The workflow checks out `promscale` repo on master branch,
+then executes `promscale` `e2e` suite against the HA image built by `docker` job.
 
 Finally, `docker-result` job aggregates the results of all other jobs and is used to
 signal the overall status of this workflow to GitHub checks.
