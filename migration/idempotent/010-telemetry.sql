@@ -85,7 +85,7 @@ $$
         SELECT count(*)::TEXT INTO result FROM _prom_catalog.label WHERE key = '__tenant__';
         PERFORM _ps_catalog.apply_telemetry('metrics_multi_tenancy_tenant_count', result);
 
-        SELECT count(*)::TEXT INTO result FROM _prom_catalog.label_key WHERE key = '__cluster__';
+        SELECT count(*)::TEXT INTO result FROM _prom_catalog.label WHERE key = 'cluster';
         PERFORM _ps_catalog.apply_telemetry('metrics_ha_cluster_count', result);
 
         SELECT count(*)::TEXT INTO result FROM _prom_catalog.metric WHERE is_view IS true;
