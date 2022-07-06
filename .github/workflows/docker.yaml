@@ -63,7 +63,8 @@ jobs:
             "AWS_SECRET_ACCESS_KEY=${{ secrets.PROMSCALE_EXTENSION_SCCACHE_AWS_SECRET_ACCESS_KEY }}"
           context: .
           file: ${{matrix.base}}.Dockerfile
-          push: true
+          load: true
+          push: ${{ github.event.pull_request.head.repo.owner.login == 'timescale' }} # Don't run docker push when PR is from not timescale github repo
           tags: |
             ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.image_branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
             ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.image_branch_name}}-ts${{steps.metadata.outputs.tsmajor}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
