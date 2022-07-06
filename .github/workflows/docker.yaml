@@ -76,6 +76,9 @@ jobs:
           cache-from: type=gha,scope=${{matrix.base}}-${{matrix.pgversion}}-${{matrix.tsversion}}
           cache-to: type=gha,mode=max,scope=${{matrix.base}}-${{matrix.pgversion}}-${{matrix.tsversion}}
 
+      - name: Docker images
+        run: docker images
+        
       - name: Run end-to-end tests
         uses: actions-rs/cargo@v1
         with:
