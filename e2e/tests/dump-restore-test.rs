@@ -5,22 +5,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::vec::Vec;
-use testcontainers::clients::Cli;
-use testcontainers::images::generic::{GenericImage, WaitFor};
-use testcontainers::{clients, Container};
-use testcontainers::{images, Docker};
-
-/// A docker container running Postgres
-type PostgresContainer<'d> = Container<'d, Cli, GenericImage>;
-
-/// Returns the name of the docker image to use for Postgres containers.
-/// If the `TS_DOCKER_IMAGE` environment variable is set, it will return that value.
-/// Otherwise, it returns a default image.
-fn postgres_image() -> String {
-    env::var("TS_DOCKER_IMAGE").unwrap_or_else(|_| {
-        String::from("ghcr.io/timescale/dev_promscale_extension:master-ts2-pg14")
-    })
-}
+use test_common::testcontainers::clients::Cli;
+use test_common::testcontainers::images::generic::WaitFor;
+use test_common::testcontainers::{images, Docker};
+use test_common::PostgresContainer;
 
 /// Creates and runs a docker container running Postgres
 fn run_postgres<'a>(
@@ -147,7 +135,7 @@ fn psql_cmd(container: &PostgresContainer, db: &str, username: &str, cmd: &str) 
 /// * `src` - the path to the file on the host to copy
 /// * `dest` - the path on the container to copy the file to
 ///
-fn copy_in(container: &Container<Cli, GenericImage>, src: &Path, dest: &Path) {
+fn copy_in(container: &PostgresContainer, src: &Path, dest: &Path) {
     let exit = Command::new("docker")
         .arg("cp")
         .arg(src.to_str().unwrap())
@@ -172,7 +160,7 @@ fn copy_in(container: &Container<Cli, GenericImage>, src: &Path, dest: &Path) {
 /// * `dest` - the path on the host to copy the file to
 ///
 #[allow(dead_code)]
-fn copy_out(container: &Container<Cli, GenericImage>, src: &Path, dest: &Path) {
+fn copy_out(container: &PostgresContainer, src: &Path, dest: &Path) {
     if dest.exists() {
         fs::remove_file(dest).expect("failed to remove existing dest file");
     }
@@ -479,8 +467,8 @@ fn are_snapshots_equal(snapshot0: String, snapshot1: String) -> bool {
 /// Tests the process of dumping and restoring a database using pg_dump
 #[test]
 fn dump_restore_test() {
-    let docker = clients::Cli::default();
-    let postgres_image = postgres_image();
+    let docker = test_common::init_docker();
+    let postgres_image = test_common::postgres_image();
     let volumes = vec![(concat!(env!("CARGO_MANIFEST_DIR"), "/scripts"), "/scripts")];
 
     let dir = &env::temp_dir().join("promscale-dump-restore-test");

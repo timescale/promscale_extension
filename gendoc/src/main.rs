@@ -1,13 +1,6 @@
 use postgres::{Client, Config};
 use rand::Rng;
 use std::env;
-use testcontainers::clients::Cli;
-use testcontainers::images::generic::{GenericImage, WaitFor};
-use testcontainers::{Container, Docker};
-
-pub const DB: &str = "postgres-db-test";
-pub const USER: &str = "postgres-user-test";
-pub const PASSWORD: &str = "postgres-password-test";
 
 const FN_QUERY: &str = r#"
 WITH schema_visibility AS (
@@ -102,9 +95,9 @@ fn in_docker_db<F>(f: F)
 where
     F: Fn(&mut Client),
 {
-    let docker = Cli::default();
-    let node = run_postgres(&docker);
-    let mut connection = connect_docker(&node);
+    let docker = test_common::init_docker();
+    let node = test_common::run_postgres(&docker);
+    let mut connection = test_common::connect(&node);
     f(&mut connection);
 }
 
@@ -175,26 +168,6 @@ fn output_operators(connection: &mut Client) {
     }
 }
 
-fn run_postgres(client: &Cli) -> Container<Cli, GenericImage> {
-    let docker_image = env::var("TS_DOCKER_IMAGE").unwrap_or(String::from(
-        "ghcr.io/timescale/dev_promscale_extension:master-ts2-pg14",
-    ));
-
-    let src = concat!(env!("CARGO_MANIFEST_DIR"), "/testdata");
-    let dest = "/testdata";
-
-    let generic_postgres = GenericImage::new(docker_image)
-        .with_wait_for(WaitFor::message_on_stderr(
-            "database system is ready to accept connections",
-        ))
-        .with_env_var("POSTGRES_DB", DB)
-        .with_env_var("POSTGRES_USER", USER)
-        .with_env_var("POSTGRES_PASSWORD", PASSWORD)
-        .with_volume(src, dest);
-
-    client.run(generic_postgres)
-}
-
 fn connect_local(database: &str) -> Client {
     let config = match env::var("POSTGRES_URL") {
         Ok(url) => {
@@ -215,15 +188,4 @@ fn connect_local(database: &str) -> Client {
     };
 
     config.connect(postgres::NoTls).unwrap()
-}
-
-fn connect_docker(node: &Container<Cli, GenericImage>) -> Client {
-    let connection_string = &format!(
-        "postgres://{}:{}@localhost:{}/{}",
-        USER,
-        PASSWORD,
-        node.get_host_port(5432).unwrap(),
-        DB
-    );
-    Client::connect(connection_string, postgres::NoTls).unwrap()
 }
