@@ -3375,26 +3375,31 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.insert_metric_row(TEXT, TIMESTAMPTZ[], D
 -- Suppresses corresponding DDL logging, otherwise PG log may get unnecessarily verbose.
 -- Temporary table is created using supplied table and schema as prototype.
 -- Returns temporary table name
-CREATE OR REPLACE FUNCTION _prom_catalog.create_ingest_temp_table(table_name TEXT, schema_name TEXT)
+CREATE OR REPLACE FUNCTION _prom_catalog.create_ingest_temp_table(table_name TEXT, schema_name TEXT, table_prefix TEXT)
     RETURNS TEXT
     SECURITY DEFINER
     VOLATILE
     SET search_path = pg_catalog, pg_temp
-AS $func$             
+AS $func$
+DECLARE
+    temp_table TEXT;         
 BEGIN
     SET LOCAL log_statement = 'none';
-    EXECUTE format($sql$CREATE TEMPORARY TABLE IF NOT EXISTS %I (LIKE %I.%I) ON COMMIT DELETE ROWS$sql$,
-                 table_name, schema_name, table_name);
+    temp_table := left(CONCAT(table_prefix, table_name), 62);
+    EXECUTE format($sql$CREATE TEMPORARY TABLE IF NOT EXISTS %I (LIKE %I.%I) ON COMMIT DROP$sql$,
+                 temp_table, schema_name, table_name);
     EXECUTE format($sql$GRANT SELECT, INSERT ON TABLE %I TO prom_writer$sql$,
-                 table_name);
-    RETURN table_name;
+                 temp_table);
+    RETURN temp_table;
 END;
 $func$
 LANGUAGE plpgsql;
-REVOKE ALL ON FUNCTION _prom_catalog.create_ingest_temp_table(TEXT, TEXT) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION _prom_catalog.create_ingest_temp_table(TEXT, TEXT) TO prom_writer;
+REVOKE ALL ON FUNCTION _prom_catalog.create_ingest_temp_table(TEXT, TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION _prom_catalog.create_ingest_temp_table(TEXT, TEXT, TEXT) TO prom_writer;
 COMMENT ON FUNCTION _prom_catalog.create_ingest_temp_table
 IS 'Creates a temporary table (if it doesn''t exist) used for ingestion of metrics or traces.
 Temporary table is created using supplied table and schema as prototype.
-Suppresses corresponding DDL logging, otherwise PG log may get unnecessarily verbose.'
-'Returns temporary table name';
+Suppresses corresponding DDL logging, otherwise PG log may get unnecessarily verbose.
+Api user has to make sure that table_prefix is unique per session/connection.
+This is to prevent different truncated table names having same temp table.
+Returns temporary table name';

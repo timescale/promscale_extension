@@ -504,9 +504,12 @@ function boolean **_prom_catalog.create_exemplar_table_if_not_exists**(metric_na
 ### _prom_catalog.create_ingest_temp_table
 Creates a temporary table (if it doesn't exist) used for ingestion of metrics or traces.
 Temporary table is created using supplied table and schema as prototype.
-Suppresses corresponding DDL logging, otherwise PG log may get unnecessarily verbose.Returns temporary table name
+Suppresses corresponding DDL logging, otherwise PG log may get unnecessarily verbose.
+Api user has to make sure that table_prefix is unique per session/connection.
+This is to prevent different truncated table names having same temp table.
+Returns temporary table name
 ```
-function text **_prom_catalog.create_ingest_temp_table**(table_name text, schema_name text)
+function text **_prom_catalog.create_ingest_temp_table**(table_name text, schema_name text, table_prefix text)
 ```
 ### _prom_catalog.create_label_key
 
