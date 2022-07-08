@@ -95,9 +95,9 @@ fn in_docker_db<F>(f: F)
 where
     F: Fn(&mut Client),
 {
-    let docker = test_common::init_docker();
-    let node = test_common::run_postgres(&docker);
-    let mut connection = test_common::connect(&node);
+    let pg_harness = test_common::PostgresTestHarness::new();
+    let node = pg_harness.run();
+    let mut connection = test_common::connect(&pg_harness, &node);
     f(&mut connection);
 }
 

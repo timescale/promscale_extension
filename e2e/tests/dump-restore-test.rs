@@ -4,37 +4,8 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::vec::Vec;
-use test_common::testcontainers::clients::Cli;
-use test_common::testcontainers::images::generic::WaitFor;
-use test_common::testcontainers::{images, Docker};
 use test_common::PostgresContainer;
-
-/// Creates and runs a docker container running Postgres
-fn run_postgres<'a>(
-    docker: &'a Cli,
-    docker_image: &str,
-    db: &str,
-    username: &str,
-    volumes: Option<&Vec<(&str, &str)>>,
-) -> PostgresContainer<'a> {
-    let mut generic_postgres = images::generic::GenericImage::new(docker_image)
-        .with_wait_for(WaitFor::message_on_stderr(
-            "database system is ready to accept connections",
-        ))
-        .with_env_var("POSTGRES_DB", db)
-        .with_env_var("POSTGRES_USER", username)
-        .with_env_var("POSTGRES_HOST_AUTH_METHOD", "trust")
-        .with_env_var("POSTGRES_PASSWORD", "password");
-
-    if let Some(volumes) = volumes {
-        for volume in volumes.iter() {
-            generic_postgres = generic_postgres.with_volume(volume.0, volume.1);
-        }
-    }
-
-    docker.run(generic_postgres)
-}
+use test_common::PostgresTestHarness;
 
 /// Runs a SQL script file in the docker container
 ///
@@ -385,14 +356,8 @@ fn make_working_dir(dir: &Path) {
 /// 5. stops the container
 /// 6. returns the snapshot
 ///
-fn first_db(
-    docker: &Cli,
-    postgres_image: &str,
-    volumes: Option<&Vec<(&str, &str)>>,
-    dir: &Path,
-    dump: &Path,
-) -> String {
-    let container = run_postgres(docker, postgres_image, "db", "postgres", volumes);
+fn first_db(pg_harness: &PostgresTestHarness, dir: &Path, dump: &Path) -> String {
+    let container = pg_harness.run();
     after_create(&container);
     pre_dump(&container);
     let snapshot0 = snapshot_db(
@@ -418,14 +383,8 @@ fn first_db(
 /// 7. stops the container
 /// 8. returns the snapshot
 ///
-fn second_db(
-    docker: &Cli,
-    postgres_image: &str,
-    volumes: Option<&Vec<(&str, &str)>>,
-    dir: &Path,
-    dump: &Path,
-) -> String {
-    let container = run_postgres(docker, postgres_image, "db", "postgres", volumes);
+fn second_db(pg_harness: &PostgresTestHarness, dir: &Path, dump: &Path) -> String {
+    let container = pg_harness.run();
     after_create(&container);
     pre_restore(&container);
     restore_db(&container, "db", "tsdbadmin", dump);
@@ -467,19 +426,20 @@ fn are_snapshots_equal(snapshot0: String, snapshot1: String) -> bool {
 /// Tests the process of dumping and restoring a database using pg_dump
 #[test]
 fn dump_restore_test() {
-    let docker = test_common::init_docker();
-    let postgres_image = test_common::postgres_image();
-    let volumes = vec![(concat!(env!("CARGO_MANIFEST_DIR"), "/scripts"), "/scripts")];
+    let postgres_test_harness = PostgresTestHarness::new()
+        .with_volume(concat!(env!("CARGO_MANIFEST_DIR"), "/scripts"), "/scripts")
+        .with_db("db")
+        .with_user("postgres");
 
     let dir = &env::temp_dir().join("promscale-dump-restore-test");
     make_working_dir(dir);
     let dump = dir.join("dump.sql");
 
     // create the first container, load it with data, snapshot it, and dump it
-    let snapshot0 = first_db(&docker, &postgres_image, Some(&volumes), dir, &dump);
+    let snapshot0 = first_db(&postgres_test_harness, dir, &dump);
 
     // create the second container, restore into it, snapshot it, add more data
-    let snapshot1 = second_db(&docker, &postgres_image, Some(&volumes), dir, &dump);
+    let snapshot1 = second_db(&postgres_test_harness, dir, &dump);
 
     // don't do `assert_eq!(snapshot0, snapshot1);`
     // it prints both entire snapshots and is impossible to read

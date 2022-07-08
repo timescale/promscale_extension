@@ -2,10 +2,10 @@
 fn create_drop_promscale_extension() {
     let _ = pretty_env_logger::try_init();
 
-    let docker = test_common::init_docker();
-    let node = test_common::run_postgres(&docker);
+    let pg_harness = test_common::PostgresTestHarness::new();
+    let node = pg_harness.run();
 
-    let mut client = test_common::connect(&node);
+    let mut client = test_common::connect(&pg_harness, &node);
     let result = client.simple_query("CREATE EXTENSION promscale;").unwrap();
     assert_eq!(result.len(), 1);
 
@@ -20,10 +20,10 @@ fn create_drop_promscale_extension() {
 fn upgrade_promscale_extension_0_5_0_to_0_5_1() {
     let _ = pretty_env_logger::try_init();
 
-    let docker = test_common::init_docker();
-    let node = test_common::run_postgres(&docker);
+    let pg_harness = test_common::PostgresTestHarness::new();
+    let node = pg_harness.run();
 
-    let mut client = test_common::connect(&node);
+    let mut client = test_common::connect(&pg_harness, &node);
     let result = client
         .simple_query("CREATE EXTENSION promscale VERSION '0.5.0';")
         .unwrap();
