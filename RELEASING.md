@@ -7,6 +7,7 @@ The following are step-by-step instructions for releasing the Promscale extensio
 - [ ] Update `CHANGELOG.md` with release version and date.
 - [ ] Update the extension version in `Cargo.toml`, don't forget to fix the `.so` references in `incremental/001-extension.sql`, `idempotent/014-extension-type-functions.sql`, and `promscale--0.0.0.sql`.
 - [ ] Freeze the versions of SQL scripts in `incremental_freeze_test`
+- [ ] Update the extension tag in the _Compile From Source_ instructions.
 - [ ] Merge release commit.
 
 ## Release
