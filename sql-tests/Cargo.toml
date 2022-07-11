@@ -1,14 +1,11 @@
 [package]
-name = "e2e"
+name = "sql-tests"
 version = "0.1.0"
 edition = "2021"
 
 [dev-dependencies]
-pretty_env_logger = "0.4"
-similar = "2.1.0"
-regex = "1.5.5"
-md-5 = "0.10.1"
-hex = "0.4.3"
+insta = "1.14.0"
+test-generator = "0.3.0"
 test-common = "0.1.0"
 
 [build-dependencies]

@@ -62,6 +62,7 @@ COPY --chown=postgres:postgres Cargo.* /build/promscale/
 COPY --chown=postgres:postgres Makefile build.rs create-upgrade-symlinks.sh extract-extension-version.sh /build/promscale/
 COPY --chown=postgres:postgres .cargo/ /build/promscale/.cargo/
 COPY --chown=postgres:postgres test-common/ /build/promscale/test-common/
+COPY --chown=postgres:postgres sql-tests/ /build/promscale/sql-tests/
 COPY --chown=postgres:postgres e2e/ /build/promscale/e2e/
 COPY --chown=postgres:postgres src/ /build/promscale/src/
 COPY --chown=postgres:postgres gendoc/ /build/promscale/gendoc/
