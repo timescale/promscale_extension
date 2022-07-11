@@ -224,3 +224,26 @@ setup-buildx: ## Setup a Buildx builder
 
 promscale.control: ## A hack to boostrap the build, some pgx commands require this file. It gets re-generated later.
 	cp templates/promscale.control ./promscale.control
+
+CONTAINER_NAME=promscale-extension-devcontainer
+
+.PHONY: devcontainer
+devcontainer:
+	docker build -f dev.Dockerfile -t ${CONTAINER_NAME} .
+
+DEVENV_PG_VERSION?=14
+
+.PHONY: devenv
+devenv: VOLUME_NAME=promscale-extension-build-cache
+devenv: devcontainer
+	docker volume inspect ${VOLUME_NAME} 1>/dev/null 2>&1 || docker volume create ${VOLUME_NAME}
+	docker run --rm -v ${VOLUME_NAME}:/tmp/target ubuntu bash -c "chmod a+w /tmp/target"
+	docker run -ti -e DEVENV_PG_VERSION=${DEVENV_PG_VERSION} --rm -v ${VOLUME_NAME}:/tmp/target -p54321:288${DEVENV_PG_VERSION} -v$(shell pwd):/code ${CONTAINER_NAME}
+
+.PHONY: devenv-export-url
+devenv-export-url:
+	@echo "export POSTGRES_URL=$(make devenv-url)"
+
+.PHONY: devenv-url
+devenv-url:
+	@echo "postgres://ubuntu@localhost:54321/"
