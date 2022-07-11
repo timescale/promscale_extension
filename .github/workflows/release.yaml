@@ -27,12 +27,10 @@ jobs:
           distro: debian
           version: 11
           pkg_cloud_tags:
-            - debian/stretch
             - debian/buster
             - debian/bullseye
             - ubuntu/bionic
             - ubuntu/focal
-            - ubuntu/hirsute
             - ubuntu/jammy
             - ubuntu/impish
           pkg_type: deb
