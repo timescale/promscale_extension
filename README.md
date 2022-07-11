@@ -60,5 +60,10 @@ To compile the extension (see instructions below):
 
 ## Development
 
+To quickly setup a development environment, see [DEVELOPMENT.md](DEVELOPMENT.md)
 To understand more about how to write SQL migration files for this extension, consult [this](migration/README.md) guide.
 To get a better understanding of our CI pipeline see [this document](.github/workflows/README.md).
+
+## Releasing
+
+A full checklist of the steps necessary to release a new version of the extension is available in [RELEASING.md](RELEASING.md).
