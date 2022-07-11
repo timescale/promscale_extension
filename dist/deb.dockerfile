@@ -15,18 +15,12 @@ RUN <<EOF
 export OS_NAME="$(source /etc/os-release; echo "${ID}")"
 export OS_VERSION="$(source /etc/os-release; echo "${VERSION_ID}")"
 
-if [ "${OS_VERSION}" = "9" ]; then
-    echo "deb http://deb.debian.org/debian stretch-backports main" >> /etc/apt/sources.list.d/backports.list
-    echo "deb http://deb.debian.org/debian stretch-backports-sloppy main" >> /etc/apt/sources.list.d/backports.list
-    apt-get update -y
-    apt-get -t stretch-backports-sloppy install -y libarchive13
-    apt-get -t stretch-backports install -y cmake gcc make
-else
-    apt-get update -y
-    apt-get install -y cmake gcc make
-fi
+apt-get update -y
 
 apt-get install -y \
+    cmake \
+    gcc \
+    make \
     apt-transport-https \
     build-essential \
     software-properties-common \
