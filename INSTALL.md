@@ -121,7 +121,7 @@ For bare-metal installations, the full instructions for setting up PostgreSQL, T
     LATEST_VERSION=$(curl -s https://api.github.com/repos/timescale/promscale/releases/latest | grep "tag_name" | cut -d'"' -f4)
     curl -L -o promscale "https://github.com/timescale/promscale/releases/download/${LATEST_VERSION}/promscale_${LATEST_VERSION}_Linux_x86_64"
     chmod +x promscale
-    ./promscale --db.name promscale --db.password promscale --db.user promscale --db.ssl-mode allow --startup.install-extensions --startup.upgrade-prerelease-extensions
+    ./promscale --db.name promscale --db.password promscale --db.user promscale --db.ssl-mode allow --startup.install-extensions
     ```
 ## Compile From Source on MacOS(Darwin, ARM64)
 
