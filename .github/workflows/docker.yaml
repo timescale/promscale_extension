@@ -52,6 +52,8 @@ jobs:
 
       - name: Build and push
         uses: docker/build-push-action@v2
+        env:
+          DOCKER_PUSH_REQUIRED: ${{ github.event.type != 'PullRequestEvent' || github.event.pull_request.head.repo.owner.login == 'timescale' }} # Don't run docker push when this is a PR from a fork
         with:
           build-args: |
             PG_VERSION=${{ matrix.pgversion }}
@@ -63,8 +65,8 @@ jobs:
             "AWS_SECRET_ACCESS_KEY=${{ secrets.PROMSCALE_EXTENSION_SCCACHE_AWS_SECRET_ACCESS_KEY }}"
           context: .
           file: ${{matrix.base}}.Dockerfile
-          push: ${{ github.event.pull_request.head.repo.owner.login == 'timescale' }} # Don't run docker push when PR is from not timescale github repo
-          load: ${{ github.event.pull_request.head.repo.owner.login != 'timescale' }} # We can't load and push, so we load when we don't push
+          push: ${{ env.DOCKER_PUSH_REQUIRED == 'true' }}
+          load: ${{ env.DOCKER_PUSH_REQUIRED != 'true' }}
           tags: |
             ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.image_branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
             ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.image_branch_name}}-ts${{steps.metadata.outputs.tsmajor}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
