@@ -104,7 +104,7 @@ For bare-metal installations, the full instructions for setting up PostgreSQL, T
     sudo apt-get install -y git
     git clone https://github.com/timescale/promscale_extension
     cd promscale_extension
-    git checkout master
+    git checkout 0.5.0
     ```
 1) Compile and install
     ```bash
@@ -144,13 +144,13 @@ For bare-metal installations, the full instructions for setting up PostgreSQL, T
     ```
 1) Initialize the PGX framework using the PostgreSQL 14 installation
     ```bash
-    cargo pgx init --pg14=$(which pg_config)
+    cargo pgx init --pg14=/opt/homebrew/bin/pg_config
     ```
 1) Download this repo and change directory into it
     ```bash
     git clone https://github.com/timescale/promscale_extension
     cd promscale_extension
-    git checkout master
+    git checkout 0.5.0
     ```
 1) Compile and install
     ```bash
@@ -167,7 +167,7 @@ For bare-metal installations, the full instructions for setting up PostgreSQL, T
     LATEST_VERSION=$(curl -s https://api.github.com/repos/timescale/promscale/releases/latest | grep "tag_name" | cut -d'"' -f4)
     curl -L -o promscale "https://github.com/timescale/promscale/releases/download/${LATEST_VERSION}/promscale_${LATEST_VERSION}_Darwin_arm64"
     chmod +x promscale
-    ./promscale --db.name promscale --db.password promscale --db.user promscale --db.ssl-mode allow --startup.install-extensions --startup.upgrade-prerelease-extensions
+    ./promscale --db.name promscale --db.password promscale --db.user promscale --db.ssl-mode allow --startup.install-extensions
     ```
 
 This extension will be created via `CREATE EXTENSION` automatically by the Promscale connector and should not be created manually.
