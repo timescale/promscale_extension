@@ -1,5 +1,5 @@
 [workspace]
-members = ["e2e", "gendoc"]
+members = ["test-common", "e2e", "gendoc"]
 
 [package]
 name = "promscale"
@@ -18,7 +18,8 @@ codegen-units = 1
 
 [profile.dev]
 panic = "unwind"
-lto = "thin"
+# It's currently broken on Apple Silicon. 1.64 seems to include a fix.
+# lto = "thin"
 
 [features]
 default = ["pg14", "serde_json", "proptest"] # used by rust-analyzer in VSCode
@@ -52,3 +53,4 @@ pgx-tests = { git = "https://github.com/timescale/pgx", branch = "promscale-stag
 
 # from e2e workspace
 test-generator = { git = "https://github.com/JamesGuthrie/test-generator" }
+test-common = { path = "./test-common" }

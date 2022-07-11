@@ -66,6 +66,7 @@ USER postgres
 # Pre-build extension dependencies
 RUN cd ../ && cargo pgx new promscale && cd promscale
 COPY Cargo.* Makefile /build/promscale/
+COPY test-common /build/promscale/test-common
 COPY e2e /build/promscale/e2e
 COPY gendoc/ /build/promscale/gendoc/
 RUN --mount=type=secret,uid=70,gid=70,id=AWS_ACCESS_KEY_ID --mount=type=secret,uid=70,gid=70,id=AWS_SECRET_ACCESS_KEY \
