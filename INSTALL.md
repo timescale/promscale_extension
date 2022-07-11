@@ -127,10 +127,8 @@ For bare-metal installations, the full instructions for setting up PostgreSQL, T
 
 For bare-metal installations, the full instructions for setting up PostgreSQL, TimescaleDB, and the Promscale Extension are:
 
-1) Follow [this doc]([url](https://docs.timescale.com/install/latest/self-hosted/installation-macos/#install-self-hosted-timescaledb-using-homebrew)) and install Timescale(which also install Postgres)
-    ```bash
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    ```
+1) Follow [this doc](https://docs.timescale.com/install/latest/self-hosted/installation-macos/#install-self-hosted-timescaledb-using-homebrew) and install TimescaleDB(which also install Postgres)
+
 1) Restart Postgres after executing `timescaledb-tune` script
     ```bash
     pg_ctl -D /opt/homebrew/var/postgres restart
