@@ -155,7 +155,7 @@ For bare-metal installations, the full instructions for setting up PostgreSQL, T
 1) Compile and install
     ```bash
     make package
-    sudo cp -r ./target/release/promscale-pg14/* /
+    sudo make install
     ```
 1) Create a PostgreSQL user and database for promscale (use an appropriate password!)
     ```bash
