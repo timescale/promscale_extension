@@ -24,6 +24,7 @@ We use the following categories for changes:
 - Support cargo 1.62.0 pkgid format [#390]
 - Use `cluster` label from `_prom_catalog.label` to report about HA setup [#398]
 - Optimize `promscale_sql_telemetry()` by removing `metric_bytes_total` and `traces_spans_bytes_total` metrics [#388]
+- A minor bug in epoch_abort that caused a confusing message in RAISE [#417].
 
 ### Changed
 
