@@ -1907,7 +1907,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.epoch_abort(user_epoch BIGINT)
 AS $func$
 DECLARE db_epoch BIGINT;
 BEGIN
-    SELECT current_epoch FROM ids_epoch LIMIT 1
+    SELECT current_epoch FROM _prom_catalog.ids_epoch LIMIT 1
         INTO db_epoch;
     RAISE EXCEPTION 'epoch % to old to continue INSERT, current: %',
         user_epoch, db_epoch
