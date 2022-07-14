@@ -21,7 +21,7 @@ fn incremental_freeze_test() {
 
     let frozen_files = [
         // ↓↓↓ frozen in 0.5.0 ↓↓↓
-        ("001-extension.sql", "240674baa0d497b17a96a4fe1e043381"),
+        ("001-extension.sql", "ab13c7e5a13bac909c29e94cf1d4e73a"),
         ("002-utils.sql", "2450a0291c64f48e80bd4d4638f3bba0"),
         ("003-users.sql", "ca921c533531d5715bfeb688f569325f"),
         ("004-schemas.sql", "f2785b92611bd621c8fb64f2a5403b47"),
@@ -93,6 +93,15 @@ fn incremental_freeze_test() {
         (
             "027-tag-map-storage-views.sql",
             "d3c1772e6da5deaa49e3fa2fb09b03c6",
+        ),
+        // ↓↓↓ frozen in 0.5.3 ↓↓↓
+        (
+            "028-refactor-mark-unused-series.sql",
+            "3196b67a651569d33eacb9e3c2bd908c",
+        ),
+        (
+            "029-remove-unused-ingest-func.sql",
+            "a42d08b7425c11efe492dc6c70031781",
         ),
         // ↓↓↓ frozen in x.x.x ↓↓↓
     ];
