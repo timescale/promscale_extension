@@ -14,9 +14,13 @@ We use the following categories for changes:
 
 ## [Unreleased]
 
+## [0.5.3] - 2022-07-14
+
 ### Added
 
 - Configure `epoch_duration` for Promscale series cache via `_prom_catalog.default` [#396]
+- Support for RE2-based regex used in Prometheus for PromQL via `_prom_ext.re2_match(text, text)` function [#362]
+- Various improvements for development cycle
 
 ### Fixed
 
@@ -30,7 +34,7 @@ We use the following categories for changes:
 
 - Drop support for Debian Stretch and Ubuntu Hirsute [#404]
 
-## [0.5.2] - 2021-06-20
+## [0.5.2] - 2022-06-20
 
 ### Changed
 
@@ -40,7 +44,7 @@ We use the following categories for changes:
 
 - Fix permissions set in `make install` [#355]
 
-## [0.5.1] - 2021-06-08
+## [0.5.1] - 2022-06-08
 
 ### Added
 
