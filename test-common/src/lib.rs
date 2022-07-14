@@ -6,11 +6,12 @@ use std::rc::Rc;
 use std::str::from_utf8;
 use testcontainers::clients;
 use testcontainers::clients::Cli;
-use testcontainers::images::generic::{GenericImage, WaitFor};
-use testcontainers::{images, Container, Docker};
+use testcontainers::core::WaitFor;
+use testcontainers::images::generic::GenericImage;
+use testcontainers::{images, Container};
 
 /// A docker container running Postgres
-pub type PostgresContainer<'d> = Container<'d, Cli, GenericImage>;
+pub type PostgresContainer<'d> = Container<'d, GenericImage>;
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -69,9 +70,14 @@ impl PostgresTestHarness {
     }
 
     fn prepare_image(&self) -> GenericImage {
-        images::generic::GenericImage::new(self.image_uri()).with_wait_for(
-            WaitFor::message_on_stderr("database system is ready to accept connections"),
-        )
+        let img_uri = self.image_uri();
+        let (img_name, tag) = img_uri
+            .rsplit_once(":")
+            .unwrap_or_else(|| (img_uri, "latest"));
+
+        images::generic::GenericImage::new(img_name, tag).with_wait_for(WaitFor::message_on_stderr(
+            "database system is ready to accept connections",
+        ))
     }
 
     pub fn new() -> Self {
@@ -153,7 +159,7 @@ pub fn connect(pg_harness: &PostgresTestHarness, node: &PostgresContainer) -> Cl
         "postgres://{}:{}@localhost:{}/{}",
         pg_harness.user(),
         pg_harness.password(),
-        node.get_host_port(5432).unwrap(),
+        node.get_host_port_ipv4(5432),
         pg_harness.db()
     );
 

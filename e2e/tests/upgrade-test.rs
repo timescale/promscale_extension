@@ -272,7 +272,6 @@ fn baseline(
         )
     };
     container.stop();
-    container.rm();
 
     (first_version, last_version, prior_version, snapshot)
 }
@@ -306,7 +305,6 @@ fn upgrade(
         .as_path(),
     );
     container.stop();
-    container.rm();
     let are_equal = are_snapshots_equal(baseline_snapshot, snapshot);
     assert!(are_equal);
 }

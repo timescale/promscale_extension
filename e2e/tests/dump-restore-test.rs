@@ -367,8 +367,7 @@ fn first_db(pg_harness: &PostgresTestHarness, dir: &Path, dump: &Path) -> String
         dir.join("snapshot-0.txt").as_path(),
     );
     dump_db(&container, "db", "tsdbadmin", dump);
-    container.stop();
-    container.rm();
+    container.stop(); // container is removed by its Drop
     snapshot0
 }
 
@@ -396,8 +395,7 @@ fn second_db(pg_harness: &PostgresTestHarness, dir: &Path, dump: &Path) -> Strin
         dir.join("snapshot-1.txt").as_path(),
     );
     post_snapshot(&container);
-    container.stop();
-    container.rm();
+    container.stop(); // container is removed by its Drop
     snapshot1
 }
 
