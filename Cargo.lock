@@ -594,6 +594,7 @@ version = "0.1.0"
 dependencies = [
  "build-deps",
  "hex",
+ "log",
  "md-5",
  "pretty_env_logger",
  "regex",

@@ -90,6 +90,7 @@ jobs:
           args: -p e2e
         env:
           TS_DOCKER_IMAGE: ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.image_branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
+          RUST_LOG: info
 
       - name: Run SQL tests
         uses: actions-rs/cargo@v1

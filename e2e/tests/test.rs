@@ -1,3 +1,5 @@
+use log::info;
+
 #[test]
 fn create_drop_promscale_extension() {
     let _ = pretty_env_logger::try_init();
@@ -17,20 +19,77 @@ fn create_drop_promscale_extension() {
 }
 
 #[test]
-fn upgrade_promscale_extension_0_5_0_to_0_5_1() {
+fn upgrade_promscale_extension_all_versions() {
     let _ = pretty_env_logger::try_init();
-
     let pg_harness = test_common::PostgresTestHarness::new();
     let node = pg_harness.run();
 
     let mut client = test_common::connect(&pg_harness, &node);
-    let result = client
-        .simple_query("CREATE EXTENSION promscale VERSION '0.5.0';")
-        .unwrap();
-    assert_eq!(result.len(), 1);
 
-    let result = client
-        .simple_query("ALTER EXTENSION promscale UPDATE TO '0.5.1';")
+    // This query gets all possible upgrade paths for the extension. An upgrade
+    // path looks like: "0.1.0--0.2.0--0.2.1--0.3.0".
+    let path_rows = client
+        .query(r#"
+            SELECT path
+            FROM pg_extension_update_paths('promscale')
+            WHERE
+                path IS NOT NULL
+                -- We want to skip all versions before 0.5.0 because they can't be installed directly
+                AND NOT (
+                    split_part(source, '.', 1)::INT = 0
+                    AND
+                    split_part(source, '.', 2)::INT < 5
+                )
+            "#, &[])
         .unwrap();
-    assert_eq!(result.len(), 1);
+
+    let version_paths: Vec<Vec<String>> = path_rows
+        .iter()
+        .map(|r| {
+            let path = r.get::<&str, &str>("path");
+            // Split string "0.1.0--0.2.0" into vec ["0.1.0", "0.2.0"].
+            path.split("--")
+                .map(str::to_string)
+                .collect::<Vec<String>>()
+        })
+        .collect();
+
+    for version_path in version_paths {
+        let mut prev_version: Option<String> = None;
+        for version in version_path {
+            match prev_version {
+                None => {
+                    info!("Creating extension at version {}", version);
+                    let res = client.query(
+                        &format!("CREATE EXTENSION promscale VERSION '{}'", version),
+                        &[],
+                    );
+                    assert!(
+                        res.is_ok(),
+                        "cannot create extension at version {}",
+                        version
+                    );
+                }
+                Some(prev_version) => {
+                    info!(
+                        "Upgrading extension from version {} to {}",
+                        prev_version, version
+                    );
+                    let res = client.query(
+                        &format!("ALTER EXTENSION promscale UPDATE TO '{}'", version),
+                        &[],
+                    );
+                    assert!(
+                        res.is_ok(),
+                        "cannot upgrade extension from version {} to {}",
+                        prev_version,
+                        version
+                    );
+                }
+            }
+            prev_version = Some(version);
+        }
+        let res = client.simple_query("DROP EXTENSION promscale CASCADE;");
+        assert!(res.is_ok(), "cannot drop extension");
+    }
 }
