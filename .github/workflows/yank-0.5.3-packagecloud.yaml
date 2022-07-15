@@ -1,0 +1,56 @@
+name: yank
+on:
+  pull_request:
+
+jobs:
+  yank:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+        - cpu: x86_64
+          platform: amd64
+        os:
+        - name: linux
+          distro: debian
+          version: 11
+          pkg_cloud_tags:
+            - debian/buster
+            - debian/bullseye
+            - ubuntu/bionic
+            - ubuntu/focal
+            - ubuntu/jammy
+            - ubuntu/impish
+          pkg_type: deb
+        - name: linux
+          distro: centos
+          version: 7
+          pkg_cloud_tags:
+            - el/7
+          pkg_type: rpm
+        postgres:
+        - version: "12"
+        - version: "13"
+        - version: "14"
+
+    steps:
+    - name: Install PackageCloud
+      run: |
+        sudo gem install package_cloud --no-doc
+
+    - uses: actions/checkout@v2
+
+    - name: Yank package from PackageCloud
+      env:
+        PACKAGECLOUD_TOKEN: ${{ secrets.IO_PACKAGECLOUD_TOKEN }}
+        PACKAGE_SUFFIX: ${{ matrix.os.distro == 'debian' && '_amd64.deb' || '.x86_64.rpm' }}
+        BIND: ${{ matrix.os.distro == 'debian' && '_' || '-' }}
+        PG_VERSION: ${{matrix.postgres.version}}
+      run: |
+        for pkg_cloud_tag in ${{ join(matrix.os.pkg_cloud_tags, ' ') }}; do \
+          echo "# package_cloud yank timescale/timescaledb/${pkg_cloud_tag} promscale-extension-postgresql-${PG_VERSION}${BIND}0.5.3-1${PACKAGE_SUFFIX}"; \
+        done
+        
+        
+
