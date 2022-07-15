@@ -49,7 +49,8 @@ jobs:
         PG_VERSION: ${{matrix.postgres.version}}
       run: |
         for pkg_cloud_tag in ${{ join(matrix.os.pkg_cloud_tags, ' ') }}; do \
-          echo "# package_cloud yank timescale/timescaledb/${pkg_cloud_tag} promscale-extension-postgresql-${PG_VERSION}${BIND}0.5.3-1${PACKAGE_SUFFIX}"; \
+          echo "yanking timescale/timescaledb/${pkg_cloud_tag} promscale-extension-postgresql-${PG_VERSION}${BIND}0.5.3-1${PACKAGE_SUFFIX}"; \
+          package_cloud yank timescale/timescaledb/${pkg_cloud_tag} promscale-extension-postgresql-${PG_VERSION}${BIND}0.5.3-1${PACKAGE_SUFFIX}; \
         done
         
         
