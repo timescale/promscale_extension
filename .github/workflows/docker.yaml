@@ -121,6 +121,7 @@ jobs:
           dst: |
             timescaledev/promscale-extension:${{steps.metadata.outputs.image_branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}
             timescaledev/promscale-extension:latest-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}
+            timescaledev/promscale-extension:latest-ts${{steps.metadata.outputs.tsmajor}}-pg${{matrix.pgversion}}
 
   call-connector-e2e:
     name: call connector e2e test
