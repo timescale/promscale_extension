@@ -55,11 +55,15 @@ jobs:
         env:
           DOCKER_PUSH_REQUIRED: ${{ github.event.type != 'PullRequestEvent' || github.event.pull_request.head.repo.owner.login == 'timescale' }} # Don't run docker push when this is a PR from a fork
         with:
+          # Temporary affixing PREVIOUS_IMAGE because 0.5.2 image was never tagged as 
+          # timescaledev/promscale-extension:latest-ts2-pg<PGVER>
+          # This needs to go as soon as we get 0.5.3 out.
           build-args: |
             PG_VERSION=${{ matrix.pgversion }}
             TIMESCALEDB_VERSION_FULL=${{ matrix.tsversion }}
             TIMESCALEDB_VERSION_MAJOR=${{ steps.metadata.outputs.tsmajor }}
             TIMESCALEDB_VERSION_MAJMIN=${{ steps.metadata.outputs.tsmajmin }}
+            PREVIOUS_IMAGE=timescaledev/promscale-extension:0.5.2-ts${{ matrix.tsversion }}-pg${{ matrix.pgversion }}
           secrets: |
             "AWS_ACCESS_KEY_ID=${{ secrets.PROMSCALE_EXTENSION_SCCACHE_AWS_ACCESS_KEY_ID }}"
             "AWS_SECRET_ACCESS_KEY=${{ secrets.PROMSCALE_EXTENSION_SCCACHE_AWS_SECRET_ACCESS_KEY }}"
