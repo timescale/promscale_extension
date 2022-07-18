@@ -10,4 +10,4 @@ trusted = true
 {%-endif%}
 # comma-separated list of previous versions this version can be upgraded from
 # directly. This is used to generate upgrade scripts.
-# upgradeable_from = '0.0.0', '0.5.0', '0.5.1', '0.5.2'
+# upgradeable_from = '0.0.0', '0.5.0', '0.5.1', '0.5.2', '0.5.3'

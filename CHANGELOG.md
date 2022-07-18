@@ -14,6 +14,11 @@ We use the following categories for changes:
 
 ## [Unreleased]
 
+## [0.5.4] - 2022-07-18
+
+Due to critical bug with extension upgrade to 0.5.3, we're skipping version 0.5.3 and incorporating the fix into 0.5.4. If you have installed 0.5.3 fresh you should have no isssue upgrading to 0.5.4. Upgrade paths to 0.5.3 are thus being removed. Images holding Promscale Extension 0.5.3 were purged from sources we have countrol over and we strongly advice anyone who managed to create such images to purge them for good.
+With this release we've also made sure to improve our test suite to prevent such issues from happenning in the future.
+
 ## [0.5.3] - 2022-07-14
 
 ### Added

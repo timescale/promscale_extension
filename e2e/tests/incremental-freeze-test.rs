@@ -21,7 +21,7 @@ fn incremental_freeze_test() {
 
     let frozen_files = [
         // ↓↓↓ frozen in 0.5.0 ↓↓↓
-        ("001-extension.sql", "ab13c7e5a13bac909c29e94cf1d4e73a"),
+        ("001-extension.sql", "fec319dab1bf6010bdc25d8afed663e0"),
         ("002-utils.sql", "2450a0291c64f48e80bd4d4638f3bba0"),
         ("003-users.sql", "ca921c533531d5715bfeb688f569325f"),
         ("004-schemas.sql", "f2785b92611bd621c8fb64f2a5403b47"),
