@@ -5,7 +5,8 @@ use similar::{ChangeTag, TextDiff};
 use std::path::Path;
 use std::process::Command;
 use std::{env, fs};
-use test_common::{PostgresContainer, PostgresTestHarness};
+use test_common::postgres_container;
+use test_common::{PostgresContainer, PostgresContainerBlueprint};
 
 /// Removes the working directory if it exists, then creates it
 fn make_working_dir(dir: &Path) {
@@ -242,12 +243,12 @@ fn update_promscale_ext(client: &mut Client, version: &Version) {
 }
 
 fn baseline(
-    harness: &PostgresTestHarness,
+    blueprint: &PostgresContainerBlueprint,
     dir: &Path,
     with_data: bool,
 ) -> (Version, Version, Version, String) {
-    let container = harness.run();
-    let mut client = test_common::connect(&harness, &container);
+    let container = blueprint.run();
+    let mut client = postgres_container::connect(&blueprint, &container);
 
     let (first_version, last_version, prior_version) = available_extension_versions(&mut client);
 
@@ -277,15 +278,15 @@ fn baseline(
 }
 
 fn upgrade(
-    harness: &PostgresTestHarness,
+    blueprint: &PostgresContainerBlueprint,
     dir: &Path,
     first: &Version,
     second: &Version,
     with_data: bool,
     baseline_snapshot: String,
 ) {
-    let container = harness.run();
-    let mut client = test_common::connect(&harness, &container);
+    let container = blueprint.run();
+    let mut client = postgres_container::connect(&blueprint, &container);
     install_timescaledb_ext(&mut client);
     install_promscale_ext(&mut client, first);
     if with_data {
@@ -311,7 +312,7 @@ fn upgrade(
 
 #[test]
 fn upgrade_first_no_data_test() {
-    let harness = PostgresTestHarness::new()
+    let blueprint = PostgresContainerBlueprint::new()
         .with_volume(concat!(env!("CARGO_MANIFEST_DIR"), "/scripts"), "/scripts")
         .with_db("db")
         .with_user("postgres");
@@ -319,11 +320,11 @@ fn upgrade_first_no_data_test() {
     let dir = &env::temp_dir().join("promscale-upgrade-first-no-data-test");
     make_working_dir(dir);
 
-    let (first_version, last_version, _, snapshot) = baseline(&harness, dir, false);
+    let (first_version, last_version, _, snapshot) = baseline(&blueprint, dir, false);
 
     println!("upgrading from {} to {}", first_version, last_version);
     upgrade(
-        &harness,
+        &blueprint,
         dir,
         &first_version,
         &last_version,
@@ -334,7 +335,7 @@ fn upgrade_first_no_data_test() {
 
 #[test]
 fn upgrade_first_with_data_test() {
-    let harness = PostgresTestHarness::new()
+    let blueprint = PostgresContainerBlueprint::new()
         .with_volume(concat!(env!("CARGO_MANIFEST_DIR"), "/scripts"), "/scripts")
         .with_db("db")
         .with_user("postgres");
@@ -342,15 +343,22 @@ fn upgrade_first_with_data_test() {
     let dir = &env::temp_dir().join("promscale-upgrade-first-with-data-test");
     make_working_dir(dir);
 
-    let (first_version, last_version, _, snapshot) = baseline(&harness, dir, true);
+    let (first_version, last_version, _, snapshot) = baseline(&blueprint, dir, true);
 
     println!("upgrading from {} to {}", first_version, last_version);
-    upgrade(&harness, dir, &first_version, &last_version, true, snapshot);
+    upgrade(
+        &blueprint,
+        dir,
+        &first_version,
+        &last_version,
+        true,
+        snapshot,
+    );
 }
 
 #[test]
 fn upgrade_prior_no_data_test() {
-    let harness = PostgresTestHarness::new()
+    let blueprint = PostgresContainerBlueprint::new()
         .with_volume(concat!(env!("CARGO_MANIFEST_DIR"), "/scripts"), "/scripts")
         .with_db("db")
         .with_user("postgres");
@@ -358,11 +366,11 @@ fn upgrade_prior_no_data_test() {
     let dir = &env::temp_dir().join("promscale-upgrade-prior-no-data-test");
     make_working_dir(dir);
 
-    let (_, last_version, prior_version, snapshot) = baseline(&harness, dir, false);
+    let (_, last_version, prior_version, snapshot) = baseline(&blueprint, dir, false);
 
     println!("upgrading from {} to {}", prior_version, last_version);
     upgrade(
-        &harness,
+        &blueprint,
         dir,
         &prior_version,
         &last_version,
@@ -373,7 +381,7 @@ fn upgrade_prior_no_data_test() {
 
 #[test]
 fn upgrade_prior_with_data_test() {
-    let harness = PostgresTestHarness::new()
+    let blueprint = PostgresContainerBlueprint::new()
         .with_volume(concat!(env!("CARGO_MANIFEST_DIR"), "/scripts"), "/scripts")
         .with_db("db")
         .with_user("postgres");
@@ -381,8 +389,15 @@ fn upgrade_prior_with_data_test() {
     let dir = &env::temp_dir().join("promscale-upgrade-prior-with-data-test");
     make_working_dir(dir);
 
-    let (_, last_version, prior_version, snapshot) = baseline(&harness, dir, true);
+    let (_, last_version, prior_version, snapshot) = baseline(&blueprint, dir, true);
 
     println!("upgrading from {} to {}", prior_version, last_version);
-    upgrade(&harness, dir, &prior_version, &last_version, true, snapshot);
+    upgrade(
+        &blueprint,
+        dir,
+        &prior_version,
+        &last_version,
+        true,
+        snapshot,
+    );
 }

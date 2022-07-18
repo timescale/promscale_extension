@@ -1,6 +1,5 @@
-use postgres::{Client, Config};
-use rand::Rng;
-use std::env;
+use postgres::Client;
+use test_common::*;
 
 const FN_QUERY: &str = r#"
 WITH schema_visibility AS (
@@ -68,48 +67,11 @@ FROM pg_catalog.pg_operator o
 ORDER BY schema_visibility.public DESC, schema, name, left_arg_type, right_arg_type;
 "#;
 
-fn generate_random_db_name() -> String {
-    let mut rng = rand::thread_rng();
-    let n2: u16 = rng.gen();
-    format!("test_database_{}", n2)
-}
-
-fn in_temporary_local_db<F>(f: F)
-where
-    F: Fn(&mut Client),
-{
-    let db_name = generate_random_db_name();
-    let mut admin_conn = connect_local("template1");
-    admin_conn
-        .simple_query(format!("CREATE DATABASE {};", db_name).as_str())
-        .unwrap();
-    let mut db_conn = connect_local(db_name.as_str());
-    f(&mut db_conn);
-    drop(db_conn);
-    admin_conn
-        .simple_query(format!("DROP DATABASE {};", db_name).as_str())
-        .unwrap();
-}
-
-fn in_docker_db<F>(f: F)
-where
-    F: Fn(&mut Client),
-{
-    let pg_harness = test_common::PostgresTestHarness::new();
-    let node = pg_harness.run();
-    let mut connection = test_common::connect(&pg_harness, &node);
-    f(&mut connection);
-}
-
 fn main() {
-    let use_docker = env::var("GENDOC_USE_DOCKER")
-        .map(|val| val.to_ascii_lowercase() == "true")
-        .unwrap_or(false);
-    if use_docker {
-        in_docker_db(dump_sql_from_connection);
-    } else {
-        in_temporary_local_db(dump_sql_from_connection);
-    }
+    let pg_blueprint = PostgresContainerBlueprint::new();
+    let test_instance = test_common::new_test_instance_from_env(&pg_blueprint);
+    let mut test_connection = test_instance.connect();
+    dump_sql_from_connection(&mut test_connection.client);
 }
 
 fn dump_sql_from_connection(connection: &mut Client) {
@@ -166,26 +128,4 @@ fn output_operators(connection: &mut Client) {
         println!();
         println!("__Schema:__ {}", schema);
     }
-}
-
-fn connect_local(database: &str) -> Client {
-    let config = match env::var("POSTGRES_URL") {
-        Ok(url) => {
-            let mut config = url.parse::<Config>().unwrap();
-            config.dbname(database);
-            config
-        }
-        Err(_) => {
-            let connection_string = &format!(
-                "postgres://{}@{}:{}/{}",
-                env::var("POSTGRES_USER").unwrap_or(String::from("postgres")),
-                env::var("POSTGRES_HOST").unwrap_or(String::from("localhost")),
-                env::var("POSTGRES_PORT").unwrap_or(String::from("5432")),
-                database
-            );
-            connection_string.parse::<Config>().unwrap()
-        }
-    };
-
-    config.connect(postgres::NoTls).unwrap()
 }
