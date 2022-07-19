@@ -634,6 +634,7 @@ dependencies = [
  "semver 1.0.12",
  "similar",
  "test-common",
+ "testcontainers",
 ]
 
 [[package]]

@@ -424,7 +424,7 @@ fn are_snapshots_equal(snapshot0: String, snapshot1: String) -> bool {
 /// Tests the process of dumping and restoring a database using pg_dump
 #[test]
 fn dump_restore_test() {
-    let postgres_test_harness = PostgresContainerBlueprint::new()
+    let postgres_test_blueprint = PostgresContainerBlueprint::new()
         .with_volume(concat!(env!("CARGO_MANIFEST_DIR"), "/scripts"), "/scripts")
         .with_db("db")
         .with_user("postgres");
@@ -434,10 +434,10 @@ fn dump_restore_test() {
     let dump = dir.join("dump.sql");
 
     // create the first container, load it with data, snapshot it, and dump it
-    let snapshot0 = first_db(&postgres_test_harness, dir, &dump);
+    let snapshot0 = first_db(&postgres_test_blueprint, dir, &dump);
 
     // create the second container, restore into it, snapshot it, add more data
-    let snapshot1 = second_db(&postgres_test_harness, dir, &dump);
+    let snapshot1 = second_db(&postgres_test_blueprint, dir, &dump);
 
     // don't do `assert_eq!(snapshot0, snapshot1);`
     // it prints both entire snapshots and is impossible to read
