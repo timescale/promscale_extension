@@ -16,12 +16,10 @@ We use the following categories for changes:
 
 ## [0.5.4] - 2022-07-18
 
-Due to critical bug with extension upgrade to 0.5.3, we're skipping version 
-0.5.3 and incorporating the fix into 0.5.4. Images holding Promscale Extension
-0.5.3 were purged from sources we have countrol over and we strongly advice 
-anyone who managed to create such images to purge them for good.
-With this release we've also made sure to improve our test suite to prevent such 
-issues from happenning in the future.
+Due to a critical bug in upgrading to 0.5.3, we're skipping version 0.5.3 and
+incorporating the fix into 0.5.4. We have removed the build artifacts for
+Promscale Extension 0.5.3. We strongly advise anyone who used the 0.5.3 tag in
+our GitHub or DockerHub repositories to delete these artifacts.
 
 ## [0.5.3] - 2022-07-14
 
