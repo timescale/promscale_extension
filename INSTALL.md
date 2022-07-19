@@ -104,7 +104,7 @@ For bare-metal installations, the full instructions for setting up PostgreSQL, T
     sudo apt-get install -y git
     git clone https://github.com/timescale/promscale_extension
     cd promscale_extension
-    git checkout 0.5.3
+    git checkout 0.5.4
     ```
 1) Compile and install
     ```bash
