@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dev-dependencies]
+duct = "0.13.5"
 hex = "0.4.3"
 log = "0.4.17"
 md-5 = "0.10.1"

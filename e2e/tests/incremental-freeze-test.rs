@@ -6,6 +6,8 @@ use std::{env, fs};
 /// Ensures that released incremental migrations scripts are not modified.
 #[test]
 fn incremental_freeze_test() {
+    let _ = pretty_env_logger::try_init();
+
     // The sql scripts in migration/incremental/ are not idempotent. They are meant to be run once
     // and only once on any given promscale installation. We track whether or not these files have
     // been applied in the _ps_catalog.migration table. Once we have released a version of

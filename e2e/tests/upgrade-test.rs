@@ -66,7 +66,9 @@ use crate::config::{
     ALPINE_WITH_EXTENSION_LAST_RELEASED_PREFIX, HA_WITH_LAST_RELEASED_EXTENSION_PG12,
     HA_WITH_LAST_RELEASED_EXTENSION_PG13, HA_WITH_LAST_RELEASED_EXTENSION_PG14,
 };
-use log::{debug, info, warn};
+use crate::util::debug_lines;
+use duct::cmd;
+use log::{info, warn};
 use postgres::Client;
 use regex::Regex;
 use semver::Version;
@@ -82,6 +84,7 @@ use test_common::postgres_container::{connect, PgVersion};
 use test_common::{PostgresContainer, PostgresContainerBlueprint};
 
 mod config;
+mod util;
 
 enum FromVersion {
     First,
@@ -437,26 +440,29 @@ fn available_extension_versions(client: &mut Client) -> (Version, Version, Versi
 /// runs a SQL script file in the docker container
 fn psql_file(container: &PostgresContainer, db: &str, username: &str, path: &Path) {
     info!("executing psql script {}...", path.display());
-    let output = Command::new("docker")
-        .arg("exec")
-        .arg(container.id())
-        .arg("psql")
-        .args(["-U", username])
-        .args(["-d", db])
-        .arg("--no-password")
-        .arg("--no-psqlrc")
-        .arg("--no-readline")
-        .arg("--echo-all")
-        .args(["-v", "ON_ERROR_STOP=1"])
-        .args(["-f", path.to_str().unwrap()])
-        .output()
-        .unwrap();
-    String::from_utf8(output.stdout)
-        .unwrap()
-        .lines()
-        .for_each(|line| {
-            debug!("{}", line);
-        });
+    let output = cmd!(
+        "docker",
+        "exec",
+        container.id(),
+        "psql",
+        "-U",
+        username,
+        "-d",
+        db,
+        "--no-password",
+        "--no-psqlrc",
+        "--no-readline",
+        "--echo-all",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-f",
+        path.to_str().unwrap()
+    )
+    .stderr_to_stdout()
+    .stdout_capture()
+    .run()
+    .unwrap();
+    debug_lines(output.stdout);
     assert!(
         output.status.success(),
         "executing psql script {} failed: {}",
@@ -521,30 +527,32 @@ fn normalize_snapshot(path: &Path) -> String {
 fn snapshot_db(container_id: &str, db: &str, username: &str, path: &Path) -> String {
     let snapshot = Path::new("/tmp/snapshot.txt");
     info!("snapshotting database {} via {} user...", db, username);
-    let output = Command::new("docker")
-        .arg("exec")
-        .arg(&container_id)
-        .arg("psql")
-        .args(["-U", username])
-        .args(["-d", db])
-        .arg("--no-password")
-        .arg("--no-psqlrc")
-        .arg("--no-readline")
-        .arg("--echo-all")
-        // do not ON_ERROR_STOP=1. some meta commands will not find objects for some schemas
+    let output = cmd!(
+        "docker",
+        "exec",
+        &container_id,
+        "psql",
+        "-U",
+        username,
+        "-d",
+        db,
+        "--no-password",
+        "--no-psqlrc",
+        "--no-readline",
+        "--echo-all", // do not ON_ERROR_STOP=1. some meta commands will not find objects for some schemas
         // and psql treats this as an error. this is expected, and we don't want the snapshot to
         // fail because of it. eat the error and continue
         //.args(["-v", "ON_ERROR_STOP=1"]) don't uncomment me!
-        .args(["-o", snapshot.to_str().unwrap()])
-        .args(["-f", "/scripts/snapshot.sql"])
-        .output()
-        .unwrap();
-    String::from_utf8(output.stdout)
-        .unwrap()
-        .lines()
-        .for_each(|line| {
-            debug!("{}", line);
-        });
+        "-o",
+        snapshot.to_str().unwrap(),
+        "-f",
+        "/scripts/snapshot.sql"
+    )
+    .stderr_to_stdout()
+    .stdout_capture()
+    .run()
+    .unwrap();
+    debug_lines(output.stdout);
     assert!(
         output.status.success(),
         "snapshotting the database {} via {} user failed: {}",
