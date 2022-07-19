@@ -1,3 +1,6 @@
+use crate::util::debug_lines;
+use duct::cmd;
+use log::info;
 use regex::Regex;
 use similar::{ChangeTag, TextDiff};
 use std::env;
@@ -6,6 +9,34 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use test_common::PostgresContainer;
 use test_common::PostgresContainerBlueprint;
+
+mod util;
+
+/// Tests the process of dumping and restoring a database using pg_dump
+#[test]
+fn dump_restore_test() {
+    let _ = pretty_env_logger::try_init();
+
+    let postgres_test_harness = PostgresContainerBlueprint::new()
+        .with_volume(concat!(env!("CARGO_MANIFEST_DIR"), "/scripts"), "/scripts")
+        .with_db("db")
+        .with_user("postgres");
+
+    let dir = &env::temp_dir().join("promscale-dump-restore-test");
+    make_working_dir(dir);
+    let dump = dir.join("dump.sql");
+
+    // create the first container, load it with data, snapshot it, and dump it
+    let snapshot0 = first_db(&postgres_test_harness, dir, &dump);
+
+    // create the second container, restore into it, snapshot it, add more data
+    let snapshot1 = second_db(&postgres_test_harness, dir, &dump);
+
+    // don't do `assert_eq!(snapshot0, snapshot1);`
+    // it prints both entire snapshots and is impossible to read
+    let are_snapshots_equal = are_snapshots_equal(snapshot0, snapshot1);
+    assert!(are_snapshots_equal);
+}
 
 /// Runs a SQL script file in the docker container
 ///
@@ -19,28 +50,35 @@ use test_common::PostgresContainerBlueprint;
 /// * `path` - the path to the sql script on the host to execute using the `-f` flag
 ///
 fn psql_file(container: &PostgresContainer, db: &str, username: &str, path: &Path) {
-    println!("executing psql script {}...", path.display());
-    let exit = Command::new("docker")
-        .arg("exec")
-        .arg(container.id())
-        .arg("psql")
-        .args(["-U", username])
-        .args(["-d", db])
-        .arg("--no-password")
-        .arg("--no-psqlrc")
-        .arg("--no-readline")
-        .arg("--echo-all")
-        .args(["-v", "ON_ERROR_STOP=1"])
-        .args(["-f", path.to_str().unwrap()])
-        .spawn()
-        .unwrap()
-        .wait()
-        .unwrap();
+    info!("executing psql script {}...", path.display());
+    let output = cmd!(
+        "docker",
+        "exec",
+        container.id(),
+        "psql",
+        "-U",
+        username,
+        "-d",
+        db,
+        "--no-password",
+        "--no-psqlrc",
+        "--no-readline",
+        "--echo-all",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-f",
+        path.to_str().unwrap()
+    )
+    .stderr_to_stdout()
+    .stdout_capture()
+    .run()
+    .unwrap();
+    debug_lines(output.stdout);
     assert!(
-        exit.success(),
+        output.status.success(),
         "executing psql script {} failed: {}",
         path.display(),
-        exit
+        output.status
     );
 }
 
@@ -78,24 +116,36 @@ fn psql_script(container: &PostgresContainer, db: &str, username: &str, script: 
 /// * `cmd` - the sql command to execute using the `-c` flag
 #[allow(dead_code)]
 fn psql_cmd(container: &PostgresContainer, db: &str, username: &str, cmd: &str) {
-    println!("executing psql command: {}", cmd);
-    let exit = Command::new("docker")
-        .arg("exec")
-        .arg(container.id())
-        .arg("psql")
-        .args(["-U", username])
-        .args(["-d", db])
-        .arg("--no-password")
-        .arg("--no-psqlrc")
-        .arg("--no-readline")
-        .arg("--echo-all")
-        .args(["-v", "ON_ERROR_STOP=1"])
-        .args(["-c", cmd])
-        .spawn()
-        .unwrap()
-        .wait()
-        .unwrap();
-    assert!(exit.success(), "psql command '{}' failed: {}", cmd, exit);
+    info!("executing psql command: {}", cmd);
+    let output = cmd!(
+        "docker",
+        "exec",
+        container.id(),
+        "psql",
+        "-U",
+        username,
+        "-d",
+        db,
+        "--no-password",
+        "--no-psqlrc",
+        "--no-readline",
+        "--echo-all",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-c",
+        cmd
+    )
+    .stderr_to_stdout()
+    .stdout_capture()
+    .run()
+    .unwrap();
+    debug_lines(output.stdout);
+    assert!(
+        output.status.success(),
+        "psql command '{}' failed: {}",
+        cmd,
+        output.status
+    );
 }
 
 /// Copies a file from the host into the docker container
@@ -180,33 +230,40 @@ fn normalize_snapshot(path: &Path) -> String {
 ///
 fn snapshot_db(container: &PostgresContainer, db: &str, username: &str, path: &Path) -> String {
     let snapshot = Path::new("/tmp/snapshot.txt");
-    println!("snapshotting database {} via {} user...", db, username);
-    let exit = Command::new("docker")
-        .arg("exec")
-        .arg(container.id())
-        .arg("psql")
-        .args(["-U", username])
-        .args(["-d", db])
-        .arg("--no-password")
-        .arg("--no-psqlrc")
-        .arg("--no-readline")
-        .arg("--echo-all")
+    info!("snapshotting database {} via {} user...", db, username);
+    let output = cmd!(
+        "docker",
+        "exec",
+        container.id(),
+        "psql",
+        "-U",
+        username,
+        "-d",
+        db,
+        "--no-password",
+        "--no-psqlrc",
+        "--no-readline",
+        "--echo-all",
         // do not ON_ERROR_STOP=1. some meta commands will not find objects for some schemas
         // and psql treats this as an error. this is expected, and we don't want the snapshot to
         // fail because of it. eat the error and continue
         //.args(["-v", "ON_ERROR_STOP=1"]) don't uncomment me!
-        .args(["-o", snapshot.to_str().unwrap()])
-        .args(["-f", "/scripts/snapshot.sql"])
-        .spawn()
-        .unwrap()
-        .wait()
-        .unwrap();
+        "-o",
+        snapshot.to_str().unwrap(),
+        "-f",
+        "/scripts/snapshot.sql"
+    )
+    .stderr_to_stdout()
+    .stdout_capture()
+    .run()
+    .unwrap();
+    debug_lines(output.stdout);
     assert!(
-        exit.success(),
+        output.status.success(),
         "snapshotting the database {} via {} user failed: {}",
         db,
         username,
-        exit
+        output.status
     );
     copy_out(container, snapshot, path);
     normalize_snapshot(path)
@@ -223,25 +280,32 @@ fn snapshot_db(container: &PostgresContainer, db: &str, username: &str, path: &P
 ///
 fn dump_db(container: &PostgresContainer, db: &str, username: &str, path: &Path) {
     let dump = Path::new("/tmp/dump.sql");
-    let exit = Command::new("docker")
-        .arg("exec")
-        .arg(container.id())
-        .arg("pg_dump")
-        .args(["-U", username])
-        .args(["-d", db])
-        .arg("-v")
-        .args(["-F", "p"])
-        .args(["-f", dump.to_str().unwrap()])
-        .spawn()
-        .unwrap()
-        .wait()
-        .unwrap();
+    let output = cmd!(
+        "docker",
+        "exec",
+        container.id(),
+        "pg_dump",
+        "-U",
+        username,
+        "-d",
+        db,
+        "-v",
+        "-F",
+        "p",
+        "-f",
+        dump.to_str().unwrap()
+    )
+    .stderr_to_stdout()
+    .stdout_capture()
+    .run()
+    .unwrap();
+    debug_lines(output.stdout);
     assert!(
-        exit.success(),
+        output.status.success(),
         "dumping the database {} via {} user failed: {}",
         db,
         username,
-        exit
+        output.status
     );
     copy_out(container, dump, path);
 }
@@ -258,32 +322,38 @@ fn dump_db(container: &PostgresContainer, db: &str, username: &str, path: &Path)
 fn restore_db(container: &PostgresContainer, db: &str, username: &str, path: &Path) {
     let dump = Path::new("/tmp/dump.sql");
     copy_in(container, path, dump);
-    let exit = Command::new("docker")
-        .arg("exec")
-        .arg(container.id())
-        .arg("psql")
-        .args(["-U", username])
-        .args(["-d", db])
-        .arg("--no-password")
-        .arg("--no-psqlrc")
-        .arg("--no-readline")
-        .arg("--echo-all")
+    let output = cmd!(
+        "docker",
+        "exec",
+        container.id(),
+        "psql",
+        "-U",
+        username,
+        "-d",
+        db,
+        "--no-password",
+        "--no-psqlrc",
+        "--no-readline",
+        "--echo-all",
         // do not ON_ERROR_STOP=1. some statements in the restore will fail. for example, setting
         // the comment on the timescaledb extension. this is highly unfortunate, but seemingly
         // unavoidable according to googling. eat the errors and continue. we will rely on the
         // snapshot to determine whether the restore was successful
-        //.args(["-v", "ON_ERROR_STOP=1"]) don't uncomment me!
-        .args(["-v", "VERBOSITY=verbose"])
-        .args(["-f", dump.to_str().unwrap()])
-        .spawn()
-        .unwrap()
-        .wait()
-        .unwrap();
+        "-v",
+        "VERBOSITY=verbose",
+        "-f",
+        dump.to_str().unwrap()
+    )
+    .stderr_to_stdout()
+    .stdout_capture()
+    .run()
+    .unwrap();
+    debug_lines(output.stdout);
     assert!(
-        exit.success(),
+        output.status.success(),
         "executing psql script {} failed: {}",
         path.display(),
-        exit
+        output.status
     );
 }
 
@@ -340,7 +410,7 @@ fn post_snapshot(container: &PostgresContainer) {
 
 /// Removes the working directory if it exists, then creates it
 fn make_working_dir(dir: &Path) {
-    println!("temp dir at: {}", dir.to_str().unwrap());
+    info!("temp dir at: {}", dir.to_str().unwrap());
     if dir.exists() {
         fs::remove_dir_all(dir).expect("failed to remove temp dir");
     }
@@ -415,32 +485,8 @@ fn are_snapshots_equal(snapshot0: String, snapshot1: String) -> bool {
                 ChangeTag::Insert => "+",
                 ChangeTag::Equal => " ",
             };
-            println!("{} {}", sign, change);
+            info!("{} {}", sign, change);
         }
     }
     are_snapshots_equal
-}
-
-/// Tests the process of dumping and restoring a database using pg_dump
-#[test]
-fn dump_restore_test() {
-    let postgres_test_harness = PostgresContainerBlueprint::new()
-        .with_volume(concat!(env!("CARGO_MANIFEST_DIR"), "/scripts"), "/scripts")
-        .with_db("db")
-        .with_user("postgres");
-
-    let dir = &env::temp_dir().join("promscale-dump-restore-test");
-    make_working_dir(dir);
-    let dump = dir.join("dump.sql");
-
-    // create the first container, load it with data, snapshot it, and dump it
-    let snapshot0 = first_db(&postgres_test_harness, dir, &dump);
-
-    // create the second container, restore into it, snapshot it, add more data
-    let snapshot1 = second_db(&postgres_test_harness, dir, &dump);
-
-    // don't do `assert_eq!(snapshot0, snapshot1);`
-    // it prints both entire snapshots and is impossible to read
-    let are_snapshots_equal = are_snapshots_equal(snapshot0, snapshot1);
-    assert!(are_snapshots_equal);
 }
