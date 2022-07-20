@@ -40,6 +40,7 @@ fn upgrade_promscale_extension_all_versions() {
                     AND
                     split_part(source, '.', 2)::INT < 5
                 )
+                AND source IN (SELECT version FROM pg_available_extension_versions WHERE name = 'promscale')
             "#, &[])
         .unwrap();
 
