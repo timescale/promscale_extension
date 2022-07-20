@@ -1,6 +1,5 @@
 \set ECHO all
 \set ON_ERROR_STOP 1
-create extension promscale;
 
 \echo make sure the view returns what we expect it to
 select key, value

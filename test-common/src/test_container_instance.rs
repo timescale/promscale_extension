@@ -11,9 +11,10 @@ pub struct TestContainerInstance<'h> {
 
 impl<'pg_inst> TestContainerInstance<'pg_inst> {
     pub(crate) fn fresh_instance(pg_blueprint: &'pg_inst PostgresContainerBlueprint) -> Self {
+        let container = pg_blueprint.run();
         TestContainerInstance {
             pg_blueprint: pg_blueprint,
-            container: pg_blueprint.run(),
+            container: container,
         }
     }
 }

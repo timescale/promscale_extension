@@ -1,10 +1,8 @@
 ---
-source: e2e/tests/golden-tests.rs
+source: sql-tests/tests/tests.rs
 expression: query_result
 ---
 \set ON_ERROR_STOP 1
-create extension promscale;
-CREATE EXTENSION
 \echo make sure the view returns what we expect it to
 make sure the view returns what we expect it to
 select key, value

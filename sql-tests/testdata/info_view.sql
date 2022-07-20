@@ -1,8 +1,6 @@
 \set ECHO all
 \set ON_ERROR_STOP 1
 
-CREATE EXTENSION promscale;
-
 SELECT _prom_catalog.get_or_create_metric_table_name('cpu_usage');
 SELECT _prom_catalog.get_or_create_metric_table_name('cpu_total');
 CALL _prom_catalog.finalize_metric_creation();

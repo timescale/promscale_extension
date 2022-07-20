@@ -1,8 +1,6 @@
 \unset ECHO
 \set QUIET 1
-\i '/testdata/scripts/pgtap-1.2.0.sql'
-
-CREATE EXTENSION promscale;
+\i 'testdata/scripts/pgtap-1.2.0.sql'
 
 CREATE TEMP TABLE test_data(metric_name TEXT, prefix TEXT);
 

@@ -1,10 +1,8 @@
 \unset ECHO
 \set QUIET 1
-\i '/testdata/scripts/pgtap-1.2.0.sql'
+\i 'testdata/scripts/pgtap-1.2.0.sql'
 
 SELECT * FROM plan(16);
-
-CREATE EXTENSION promscale;
 
 INSERT INTO _ps_trace.schema_url (url)
 VALUES ('fake.url.com');

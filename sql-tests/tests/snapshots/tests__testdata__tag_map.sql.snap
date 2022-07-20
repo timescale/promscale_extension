@@ -1,9 +1,7 @@
 ---
-source: e2e/tests/golden-tests.rs
+source: sql-tests/tests/tests.rs
 expression: query_result
 ---
-CREATE EXTENSION promscale;
-CREATE EXTENSION
 -- We don't want retention to mess with the test data
 SELECT ps_trace.set_trace_retention_period('100 years'::INTERVAL);
  set_trace_retention_period 

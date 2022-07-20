@@ -1,10 +1,8 @@
 ---
-source: e2e/tests/golden-tests.rs
+source: sql-tests/tests/tests.rs
 expression: query_result
 ---
 \set ON_ERROR_STOP 1
-CREATE EXTENSION promscale;
-CREATE EXTENSION
 SELECT _prom_catalog.get_or_create_metric_table_name('cpu_usage');
  get_or_create_metric_table_name 
 ---------------------------------
