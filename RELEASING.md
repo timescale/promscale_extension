@@ -21,14 +21,17 @@ The following are step-by-step instructions for releasing the Promscale extensio
 - [ ] Prepare for the next development cycle:
   - Generate SQL schema and commit it (and upgrade symlinks to it) to the `sql` directory.
 <details>
-  <summary>Examples</summary>
+<summary>Examples</summary>
+
 Generate SQL file:
+
 ```bash
 cargo pgx schema --release
 mv sql/promscale-0.5.5.sql sql/promscale--0.5.5.sql
 ```
 
 Create symlinks:
+
 ```bash
 for i in {0..4}; do ln -s sql/promscale--0.5.5.sql sql/promscale--0.5.${i}--0.5.5.sql; done
 ```
@@ -46,8 +49,8 @@ git add sql/*--0.5.5*.sql --force
 - [ ] Bump the version in Promscale's `EXTENSION_VERSION` (Renovate should automatically create a PR for this).
 - [ ] Add the new version to `timescaledb/timescaledb-docker-ha` docker image.
 <details>
-Once CI has generated the packages files, create a PR to update the HA image.
 <summary>Example</summary>
+Once CI has generated the packages files, create a PR to update the HA image.
 1. [This PR](https://github.com/timescale/timescaledb-docker-ha/pull/285/files) adds the necessary changes and CHANGELOG entry and wait for the CI to complete and request review from the Cloud team
 2. [This PR](https://github.com/timescale/timescaledb-docker-ha/pull/286/files) actually stamps the version. Merge it with master and push the correct tag to trigger CI (see instructions in the repo)
 </details>
