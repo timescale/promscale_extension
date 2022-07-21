@@ -100,7 +100,7 @@ jobs:
         if: ${{ matrix.pgversion == 14 && matrix.base == 'ha' }}
         env:
           TS_DOCKER_IMAGE: ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.image_branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
-          GENDOC_USE_DOCKER: true
+          USE_DOCKER: true
         run: |
           make gendoc
           git diff --exit-code

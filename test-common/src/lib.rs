@@ -1,187 +1,61 @@
-use postgres::Client;
-use std::collections::HashMap;
-use std::env;
-use std::process::{Command, Stdio};
-use std::rc::Rc;
-use std::str::from_utf8;
-use testcontainers::clients;
-use testcontainers::clients::Cli;
-use testcontainers::images::generic::{GenericImage, WaitFor};
-use testcontainers::{images, Container, Docker};
+use std::{env, rc::Rc};
 
-/// A docker container running Postgres
-pub type PostgresContainer<'d> = Container<'d, Cli, GenericImage>;
+pub mod postgres_container;
+pub use postgres_container::{PostgresContainer, PostgresContainerBlueprint};
 
-#[allow(dead_code)]
-#[derive(Debug)]
-enum ImageOrigin {
-    Local,
-    Latest,
-    Master,
+mod test_container_instance;
+pub use test_container_instance::TestContainerInstance;
+
+mod local_postgres_instance;
+pub use local_postgres_instance::LocalPostgresInstance;
+
+mod postgres_test_connection;
+pub use postgres_test_connection::PostgresTestConnection;
+
+/// This trait provides an interface sufficient for the
+/// majority of our tests and should be the first choice.
+///
+/// That being said, if your test requires a lower
+/// level access to a test container [`postgres_container`]
+/// is another option.
+pub trait PostgresTestInstance {
+    fn connect<'pg_inst>(&'pg_inst self) -> PostgresTestConnection<'pg_inst>;
+    fn exec_sql_script(&self, script_path: &str) -> String;
 }
 
-#[allow(dead_code)]
-#[derive(Debug)]
-enum PgVersion {
-    V14,
-    V13,
-    V12,
-}
+/// Creates an instance of [`PostgresTestInstance`] that
+/// can be backed either by a test container configured
+/// according to the provided [`PostgresContainerBlueprint`]
+/// or by a local PostgreSQL database connection.
+///
+/// The behaviour is controlled by the number of environment
+/// variables:
+/// - `USE_DOCKER` determines which backend to use
+/// - `TS_DOCKER_IMAGE` determines the image to be used by the test container backend
+/// - `POSTGRES_URL` or a combination of
+///     `POSTGRES_USER`, `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`
+///     are used by the local database connection backend.
+pub fn new_test_instance_from_env<'h>(
+    pg_blueprint: &'h PostgresContainerBlueprint,
+) -> Rc<dyn PostgresTestInstance + 'h> {
+    let use_docker = env::var("USE_DOCKER")
+        .map(|val| val.to_ascii_lowercase() == "true")
+        .unwrap_or(false);
 
-fn postgres_image_uri(origin: ImageOrigin, version: PgVersion) -> String {
-    let prefix = match origin {
-        ImageOrigin::Local => "local/dev_promscale_extension:head-ts2-",
-        ImageOrigin::Latest => "timescaledev/promscale-extension:latest-ts2.7.0-",
-        ImageOrigin::Master => "ghcr.io/timescale/dev_promscale_extension:master-ts2-",
-    };
-    let version = match version {
-        PgVersion::V12 => "pg12",
-        PgVersion::V13 => "pg13",
-        PgVersion::V14 => "pg14",
-    };
-    format!("{}{}", prefix, version)
-}
-
-#[derive(Debug, Clone)]
-pub struct PostgresTestHarness {
-    pub docker: Rc<Cli>,
-    image_uri: String,
-    volumes: HashMap<String, String>,
-    env_vars: HashMap<String, String>,
-}
-
-impl PostgresTestHarness {
-    const DB: &'static str = "postgres-db-test";
-    const USER: &'static str = "postgres-user-test";
-    const PASSWORD: &'static str = "postgres-password-test";
-
-    /// Returns the name of the docker image to use for Postgres containers.
-    /// If the `TS_DOCKER_IMAGE` environment variable is set, it will return that value.
-    /// Otherwise, it returns a default image.
-    pub fn default_image_uri() -> String {
-        env::var("TS_DOCKER_IMAGE").unwrap_or_else(|_| {
-            String::from(postgres_image_uri(ImageOrigin::Local, PgVersion::V14))
-        })
-    }
-
-    fn init_docker() -> Cli {
-        clients::Cli::default()
-    }
-
-    fn prepare_image(&self) -> GenericImage {
-        images::generic::GenericImage::new(self.image_uri()).with_wait_for(
-            WaitFor::message_on_stderr("database system is ready to accept connections"),
-        )
-    }
-
-    pub fn new() -> Self {
-        Self {
-            docker: Rc::new(Self::init_docker()),
-            image_uri: PostgresTestHarness::default_image_uri(),
-            volumes: HashMap::default(),
-            env_vars: HashMap::default(),
-        }
-        .with_db(Self::DB)
-        .with_user(Self::USER)
-        .with_password(Self::PASSWORD)
-        .with_env_var("POSTGRES_HOST_AUTH_METHOD", "trust")
-    }
-
-    pub fn with_image_uri(mut self, image_uri: String) -> Self {
-        self.image_uri = image_uri;
-        self
-    }
-
-    pub fn image_uri(&self) -> &str {
-        self.image_uri.as_str()
-    }
-
-    pub fn with_volume<F: Into<String>, D: Into<String>>(mut self, from: F, dest: D) -> Self {
-        self.volumes.insert(from.into(), dest.into());
-        self
-    }
-
-    pub fn with_env_var<K: Into<String>, V: Into<String>>(mut self, k: K, v: V) -> Self {
-        self.env_vars.insert(k.into(), v.into());
-        self
-    }
-
-    pub fn with_db<T: Into<String>>(self, v: T) -> Self {
-        self.with_env_var("POSTGRES_DB", v)
-    }
-
-    pub fn db(&self) -> &str {
-        self.env_vars.get("POSTGRES_DB").unwrap().as_str()
-    }
-
-    pub fn with_user<T: Into<String>>(self, v: T) -> Self {
-        self.with_env_var("POSTGRES_USER", v)
-    }
-
-    pub fn user(&self) -> &str {
-        self.env_vars.get("POSTGRES_USER").unwrap().as_str()
-    }
-
-    pub fn with_password<T: Into<String>>(self, v: T) -> Self {
-        self.with_env_var("POSTGRES_PASSWORD", v)
-    }
-
-    pub fn password(&self) -> &str {
-        self.env_vars.get("POSTGRES_PASSWORD").unwrap().as_str()
-    }
-
-    pub fn with_testdata(self, src: &str) -> Self {
-        self.with_volume(src, "/testdata")
-    }
-
-    pub fn run(&self) -> PostgresContainer {
-        let mut img = self.prepare_image();
-
-        for (from, to) in self.volumes.iter() {
-            img = img.with_volume(from, to);
-        }
-        for (k, v) in self.env_vars.iter() {
-            img = img.with_env_var(k, v);
-        }
-
-        self.docker.run(img)
+    if use_docker {
+        Rc::new(TestContainerInstance::fresh_instance(pg_blueprint))
+    } else {
+        Rc::new(LocalPostgresInstance::temporary_local_db())
     }
 }
 
-pub fn connect(pg_harness: &PostgresTestHarness, node: &PostgresContainer) -> Client {
-    let connection_string = &format!(
-        "postgres://{}:{}@localhost:{}/{}",
-        pg_harness.user(),
-        pg_harness.password(),
-        node.get_host_port(5432).unwrap(),
-        pg_harness.db()
-    );
-
-    Client::connect(connection_string, postgres::NoTls).unwrap()
-}
-
-pub fn exec_sql_script(
-    pg_harness: &PostgresTestHarness,
-    node: &PostgresContainer,
-    script_path: &str,
-) -> String {
-    let id = node.id();
-    let abs_script_path = "/".to_owned() + script_path;
-    let output = Command::new("docker")
-        .arg("exec")
-        .arg(id)
-        .arg("bash")
-        .arg("-c")
-        .arg(format!(
-            "psql -U {} -d {} -f {} 2>&1",
-            pg_harness.user(),
-            pg_harness.db(),
-            abs_script_path
-        ))
-        .stdout(Stdio::piped())
-        .spawn()
-        .unwrap()
-        .wait_with_output()
-        .unwrap();
-    from_utf8(&output.stdout).unwrap().to_string()
+/// Creates an instance of [`PostgresTestInstance`] that
+/// is guaranteed to be backed by a test container configured
+/// according to the provided [`PostgresContainerBlueprint`].
+///
+/// - `TS_DOCKER_IMAGE` determines the image to be used.
+pub fn new_test_container_instance<'h>(
+    pg_blueprint: &'h PostgresContainerBlueprint,
+) -> TestContainerInstance<'h> {
+    TestContainerInstance::fresh_instance(pg_blueprint)
 }

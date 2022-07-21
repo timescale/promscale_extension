@@ -5,7 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use test_common::PostgresContainer;
-use test_common::PostgresTestHarness;
+use test_common::PostgresContainerBlueprint;
 
 /// Runs a SQL script file in the docker container
 ///
@@ -356,8 +356,8 @@ fn make_working_dir(dir: &Path) {
 /// 5. stops the container
 /// 6. returns the snapshot
 ///
-fn first_db(pg_harness: &PostgresTestHarness, dir: &Path, dump: &Path) -> String {
-    let container = pg_harness.run();
+fn first_db(pg_blueprint: &PostgresContainerBlueprint, dir: &Path, dump: &Path) -> String {
+    let container = pg_blueprint.run();
     after_create(&container);
     pre_dump(&container);
     let snapshot0 = snapshot_db(
@@ -367,8 +367,7 @@ fn first_db(pg_harness: &PostgresTestHarness, dir: &Path, dump: &Path) -> String
         dir.join("snapshot-0.txt").as_path(),
     );
     dump_db(&container, "db", "tsdbadmin", dump);
-    container.stop();
-    container.rm();
+    container.stop(); // container is removed by its Drop
     snapshot0
 }
 
@@ -383,8 +382,8 @@ fn first_db(pg_harness: &PostgresTestHarness, dir: &Path, dump: &Path) -> String
 /// 7. stops the container
 /// 8. returns the snapshot
 ///
-fn second_db(pg_harness: &PostgresTestHarness, dir: &Path, dump: &Path) -> String {
-    let container = pg_harness.run();
+fn second_db(pg_blueprint: &PostgresContainerBlueprint, dir: &Path, dump: &Path) -> String {
+    let container = pg_blueprint.run();
     after_create(&container);
     pre_restore(&container);
     restore_db(&container, "db", "tsdbadmin", dump);
@@ -396,8 +395,7 @@ fn second_db(pg_harness: &PostgresTestHarness, dir: &Path, dump: &Path) -> Strin
         dir.join("snapshot-1.txt").as_path(),
     );
     post_snapshot(&container);
-    container.stop();
-    container.rm();
+    container.stop(); // container is removed by its Drop
     snapshot1
 }
 
@@ -426,7 +424,7 @@ fn are_snapshots_equal(snapshot0: String, snapshot1: String) -> bool {
 /// Tests the process of dumping and restoring a database using pg_dump
 #[test]
 fn dump_restore_test() {
-    let postgres_test_harness = PostgresTestHarness::new()
+    let postgres_test_harness = PostgresContainerBlueprint::new()
         .with_volume(concat!(env!("CARGO_MANIFEST_DIR"), "/scripts"), "/scripts")
         .with_db("db")
         .with_user("postgres");

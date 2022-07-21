@@ -1,17 +1,19 @@
 use log::info;
+use test_common::*;
 
 #[test]
 fn create_drop_promscale_extension() {
     let _ = pretty_env_logger::try_init();
+    let pg_blueprint = PostgresContainerBlueprint::new();
+    let test_pg_instance = new_test_container_instance(&pg_blueprint);
+    let mut test_conn = test_pg_instance.connect();
 
-    let pg_harness = test_common::PostgresTestHarness::new();
-    let node = pg_harness.run();
-
-    let mut client = test_common::connect(&pg_harness, &node);
-    let result = client.simple_query("CREATE EXTENSION promscale;").unwrap();
+    let result = test_conn
+        .simple_query("CREATE EXTENSION promscale;")
+        .unwrap();
     assert_eq!(result.len(), 1);
 
-    let result = client
+    let result = test_conn
         .simple_query("DROP EXTENSION promscale CASCADE;")
         .unwrap();
 
@@ -21,14 +23,12 @@ fn create_drop_promscale_extension() {
 #[test]
 fn upgrade_promscale_extension_all_versions() {
     let _ = pretty_env_logger::try_init();
-    let pg_harness = test_common::PostgresTestHarness::new();
-    let node = pg_harness.run();
-
-    let mut client = test_common::connect(&pg_harness, &node);
-
+    let pg_blueprint = PostgresContainerBlueprint::new();
+    let test_pg_instance = new_test_container_instance(&pg_blueprint);
+    let mut test_conn = test_pg_instance.connect();
     // This query gets all possible upgrade paths for the extension. An upgrade
     // path looks like: "0.1.0--0.2.0--0.2.1--0.3.0".
-    let path_rows = client
+    let path_rows = test_conn
         .query(r#"
             SELECT path
             FROM pg_extension_update_paths('promscale')
@@ -61,7 +61,7 @@ fn upgrade_promscale_extension_all_versions() {
             match prev_version {
                 None => {
                     info!("Creating extension at version {}", version);
-                    let res = client.query(
+                    let res = test_conn.query(
                         &format!("CREATE EXTENSION promscale VERSION '{}'", version),
                         &[],
                     );
@@ -76,7 +76,7 @@ fn upgrade_promscale_extension_all_versions() {
                         "Upgrading extension from version {} to {}",
                         prev_version, version
                     );
-                    let res = client.query(
+                    let res = test_conn.query(
                         &format!("ALTER EXTENSION promscale UPDATE TO '{}'", version),
                         &[],
                     );
@@ -90,7 +90,7 @@ fn upgrade_promscale_extension_all_versions() {
             }
             prev_version = Some(version);
         }
-        let res = client.simple_query("DROP EXTENSION promscale CASCADE;");
+        let res = test_conn.simple_query("DROP EXTENSION promscale CASCADE;");
         assert!(res.is_ok(), "cannot drop extension");
     }
 }
