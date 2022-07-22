@@ -1,1 +1,1 @@
-sql/promscale--0.5.4.sql
+promscale--0.5.4.sql
