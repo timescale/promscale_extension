@@ -14,6 +14,10 @@ We use the following categories for changes:
 
 ## [Unreleased]
 
+### Changed
+
+- `ps_trace.delete_all_traces()` can only be executed when no Promscale connectors are running [#437].
+
 ## [0.5.4] - 2022-07-18
 
 Due to a critical bug in upgrading to 0.5.3, we're skipping version 0.5.3 and
