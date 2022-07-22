@@ -664,17 +664,24 @@ CREATE OR REPLACE FUNCTION ps_trace.delete_all_traces()
     VOLATILE
     SET search_path = pg_catalog, pg_temp
 AS $func$
-    TRUNCATE _ps_trace.link;
-    TRUNCATE _ps_trace.event;
-    TRUNCATE _ps_trace.span;
-    TRUNCATE _ps_trace.instrumentation_lib RESTART IDENTITY;
-    TRUNCATE _ps_trace.operation RESTART IDENTITY;
-    TRUNCATE _ps_trace.schema_url RESTART IDENTITY CASCADE;
-    TRUNCATE _ps_trace.tag RESTART IDENTITY;
-    DELETE FROM _ps_trace.tag_key WHERE id >= 1000; -- keep the "standard" tag keys
-    SELECT setval('_ps_trace.tag_key_id_seq', 1000);
+    BEGIN
+        IF (SELECT NOT pg_try_advisory_xact_lock(5585198506344173278)) THEN
+            RAISE NOTICE 'delete_all_traces can run only when no Promscale connectors are running. Please shutdown the Promscale connectors';
+            PERFORM pg_advisory_xact_lock(5585198506344173278);
+        END IF;
+
+        TRUNCATE _ps_trace.link;
+        TRUNCATE _ps_trace.event;
+        TRUNCATE _ps_trace.span;
+        TRUNCATE _ps_trace.instrumentation_lib RESTART IDENTITY;
+        TRUNCATE _ps_trace.operation RESTART IDENTITY;
+        TRUNCATE _ps_trace.schema_url RESTART IDENTITY CASCADE;
+        TRUNCATE _ps_trace.tag RESTART IDENTITY;
+        DELETE FROM _ps_trace.tag_key WHERE id >= 1000; -- keep the "standard" tag keys
+        PERFORM setval('_ps_trace.tag_key_id_seq', 1000);
+    END;
 $func$
-LANGUAGE sql;
+LANGUAGE plpgsql;
 GRANT EXECUTE ON FUNCTION ps_trace.delete_all_traces() TO prom_admin;
 COMMENT ON FUNCTION ps_trace.delete_all_traces
 IS 'WARNING: this function deletes all spans and related tracing data in the system and restores
