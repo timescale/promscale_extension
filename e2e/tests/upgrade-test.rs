@@ -11,7 +11,6 @@ use std::process::Command;
 use std::{env, fs};
 use test_common::postgres_container::{connect, postgres_image_uri, ImageOrigin, PgVersion};
 use test_common::{PostgresContainer, PostgresContainerBlueprint};
-use testcontainers::core::{ExecCommand, WaitFor};
 
 // We expect the upgrade process to produce the same results as freshly installing the extension.
 // These tests enforce that expectation.
@@ -96,22 +95,23 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     }
     create_dir_all(&working_dir).expect("failed to create working dir");
 
-    let host_data_dir = working_dir.clone().join("data");
-    if !host_data_dir.exists() {
-        create_dir_all(&host_data_dir).expect("failed to create working dir and data dir");
+    let data_dir = working_dir.clone().join("data");
+    if !data_dir.exists() {
+        create_dir_all(&data_dir).expect("failed to create working dir and data dir");
     }
     let permissions = Permissions::from_mode(0o777);
-    set_permissions(&working_dir, permissions.clone())
-        .expect("failed to chmod 0o777 on the host data directory");
-    let host_data_dir = host_data_dir.to_str().unwrap();
+    set_permissions(&data_dir, permissions.clone())
+        .expect("failed to chmod 0o777 on the data directory");
+    let data_dir = data_dir.to_str().unwrap();
     println!("working dir at {}", working_dir.to_str().unwrap());
+    println!("data dir at {}", &data_dir);
 
     // create a container using the target image
     // determine the available extension versions and the postgres major version
     // install the timescaledb extension and the promscale extension at the to_version
     // optionally load test data
     // snapshot the database
-    let (from_version, to_version, pg_version, data_dir, baseline_snapshot) = {
+    let (from_version, to_version, pg_version, to_timescaledb_version, baseline_snapshot) = {
         let baseline_blueprint = PostgresContainerBlueprint::new()
             .with_image_uri(to_image_uri.clone())
             .with_volume(script_dir, "/scripts")
@@ -124,9 +124,8 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
         let (first_version, last_version, prior_version) =
             available_extension_versions(&mut client);
         let pg_version = pg_major_version(&mut client);
-        let data_dir = pg_data_dir(&mut client);
 
-        install_timescaledb_ext(&mut client);
+        let to_timescaledb_version = install_timescaledb_ext(&mut client);
         install_promscale_ext(&mut client, &last_version);
         if with_data {
             load_data(&baseline_container);
@@ -151,7 +150,13 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
             FromVersion::First => first_version,
             FromVersion::Prior => prior_version,
         };
-        (from_version, last_version, pg_version, data_dir, snapshot)
+        (
+            from_version,
+            last_version,
+            pg_version,
+            to_timescaledb_version,
+            snapshot,
+        )
     };
 
     let from_image_uri = if env::var("GITHUB_WORKSPACE").is_ok() {
@@ -179,7 +184,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     // map postgres' data dir to a temp dir
     // install timescaledb and promscale at the from_version
     // optionally load test data
-    {
+    let from_timescaledb_version = {
         println!(
             "creating the database and extension with {}",
             from_image_uri
@@ -187,13 +192,13 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
         let from_blueprint = PostgresContainerBlueprint::new()
             .with_image_uri(from_image_uri.to_string())
             .with_volume(script_dir, "/scripts")
-            .with_volume(host_data_dir, "/var/lib/postgresql/data")
+            .with_volume(data_dir, "/var/lib/postgresql/data")
             .with_env_var("PGDATA", "/var/lib/postgresql/data")
             .with_db("db")
             .with_user("postgres");
         let from_container = from_blueprint.run();
         let mut from_client = connect(&from_blueprint, &from_container);
-        install_timescaledb_ext(&mut from_client);
+        let from_timescaledb_version = install_timescaledb_ext(&mut from_client);
         install_promscale_ext(&mut from_client, &from_version);
         if with_data {
             load_data(&from_container);
@@ -227,9 +232,10 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
         //);
 
         from_container.stop();
-    }
+        from_timescaledb_version
+    };
 
-    set_permissions(&host_data_dir, permissions)
+    set_permissions(&data_dir, permissions)
         .expect("failed to chmod 0o777 on the host data directory");
 
     // create a container using the target image
@@ -241,13 +247,15 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
         let to_blueprint = PostgresContainerBlueprint::new()
             .with_image_uri(to_image_uri)
             .with_volume(script_dir, "/scripts")
-            .with_volume(host_data_dir, "/var/lib/postgresql/data")
+            .with_volume(data_dir, "/var/lib/postgresql/data")
             .with_env_var("PGDATA", "/var/lib/postgresql/data")
             .with_db("db")
             .with_user("postgres");
         let to_container = to_blueprint.run();
         let mut to_client = connect(&to_blueprint, &to_container);
-        update_timescaledb_ext(&mut to_client, &Version::new(2, 7, 2));
+        if from_timescaledb_version != to_timescaledb_version {
+            update_timescaledb_ext(&mut to_client, &to_timescaledb_version);
+        }
         update_promscale_ext(&mut to_client, &to_version);
         let upgraded_snapshot = snapshot_db(
             &to_container,
@@ -480,22 +488,22 @@ fn pg_major_version(client: &mut Client) -> PgVersion {
 }
 
 /// Determines the data directory of the postgres cluster
-fn pg_data_dir(client: &mut Client) -> String {
-    let result = client
-        .query("show data_directory", &[])
-        .expect("failed to select data_directory");
-    let data_dir: String = result
-        .first()
-        .expect("failed to get result from selecting data_directory")
-        .get(0);
-    PathBuf::from(data_dir)
-        .parent()
-        .expect("failed to find the parent of the data_directory")
-        .to_str()
-        .unwrap()
-        .to_string()
-    //data_dir
-}
+//fn pg_data_dir(client: &mut Client) -> String {
+//    let result = client
+//        .query("show data_directory", &[])
+//        .expect("failed to select data_directory");
+//    let data_dir: String = result
+//        .first()
+//        .expect("failed to get result from selecting data_directory")
+//        .get(0);
+//    PathBuf::from(data_dir)
+//        .parent()
+//        .expect("failed to find the parent of the data_directory")
+//        .to_str()
+//        .unwrap()
+//        .to_string()
+//    //data_dir
+//}
 
 /// Diffs the two snapshots.
 /// Differences are printed to the console.
@@ -523,10 +531,21 @@ fn are_snapshots_equal(snapshot0: String, snapshot1: String) -> bool {
 }
 
 /// Installs the timescaledb extension
-fn install_timescaledb_ext(client: &mut Client) {
+fn install_timescaledb_ext(client: &mut Client) -> Version {
     client
         .execute("create extension if not exists timescaledb;", &[])
         .expect("failed to install the timescaledb extension");
+
+    let result = client.query_one(
+        "select extversion from pg_extension where extname = 'timescaledb'",
+        &[],
+    );
+    Version::parse(
+        result
+            .expect("failed to determine extension version")
+            .get(0),
+    )
+    .expect("failed to parse extension version")
 }
 
 /// Installs the promscale extension at the specified version
