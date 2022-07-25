@@ -6,7 +6,7 @@ use semver::Version;
 use similar::{ChangeTag, TextDiff};
 use std::fs::{create_dir_all, remove_dir_all, set_permissions, Permissions};
 use std::os::unix::fs::PermissionsExt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 use std::{env, fs};
 use test_common::postgres_container::{connect, postgres_image_uri, ImageOrigin, PgVersion};
@@ -86,9 +86,11 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     //}
     //.join(temp_dir_name(&from_version, with_data));
 
-    let mut working_dir = PathBuf::new();
-    working_dir.push("/tmp");
-    working_dir.push(temp_dir_name(&from_version, with_data));
+    let working_dir = env::temp_dir().join(temp_dir_name(&from_version, with_data));
+
+    //let mut working_dir = PathBuf::new();
+    //working_dir.push("/tmp");
+    //working_dir.push(temp_dir_name(&from_version, with_data));
 
     if working_dir.exists() {
         remove_dir_all(&working_dir).expect("failed to remove working dir");
@@ -159,22 +161,8 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
         )
     };
 
-    let from_image_uri = if env::var("GITHUB_WORKSPACE").is_ok() {
-        format!(
-            "{}{}",
-            postgres_image_uri(ImageOrigin::Master, pg_version),
-            if to_image_uri.ends_with("-alpine") {
-                "-alpine"
-            } else {
-                ""
-            }
-        )
-        .to_string()
-    } else {
-        postgres_image_uri(ImageOrigin::Latest, pg_version)
-    };
+    let from_image_uri = calc_from_image_uri(&to_image_uri, pg_version);
 
-    println!("postgres data_directory: {}", data_dir.clone());
     println!("from image {}", from_image_uri);
     println!("to image {}", to_image_uri);
     println!("from version {}", from_version);
@@ -276,6 +264,24 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
 
     let are_equal = are_snapshots_equal(baseline_snapshot, upgraded_snapshot);
     assert!(are_equal);
+}
+
+fn calc_from_image_uri(to_image_uri: &String, pg_version: PgVersion) -> String {
+    let from_image_uri = if env::var("GITHUB_WORKSPACE").is_ok() {
+        format!(
+            "{}{}",
+            postgres_image_uri(ImageOrigin::Master, pg_version),
+            if to_image_uri.ends_with("-alpine") {
+                "-alpine"
+            } else {
+                ""
+            }
+        )
+        .to_string()
+    } else {
+        postgres_image_uri(ImageOrigin::Latest, pg_version)
+    };
+    from_image_uri
 }
 
 fn temp_dir_name(from_version: &FromVersion, with_data: bool) -> String {
