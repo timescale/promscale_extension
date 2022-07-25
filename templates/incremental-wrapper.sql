@@ -14,8 +14,9 @@ BEGIN
     WHERE name = _migration.name;
     IF _migration_name IS NOT NULL THEN
         RAISE LOG 'Migration "{{filename}}" already applied, skipping';
-        IF _body_differs THEN
-            RAISE WARNING 'Checksum of migration "{{filename}}" has changed';
+        -- 001-extension.sql changes are expected until this issue is resolved: https://github.com/timescale/promscale_extension/issues/350
+        IF _body_differs AND _migration_name != '001-extension.sql' THEN
+            RAISE WARNING 'The contents of migration "{{filename}}" have changed';
         END IF;
         RETURN;
     END IF;
