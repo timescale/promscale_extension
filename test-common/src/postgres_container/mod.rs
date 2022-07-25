@@ -28,7 +28,7 @@ pub enum PgVersion {
 pub fn postgres_image_uri(origin: ImageOrigin, version: PgVersion) -> String {
     let prefix = match origin {
         ImageOrigin::Local => "local/dev_promscale_extension:head-ts2-",
-        ImageOrigin::Latest => "timescaledev/promscale-extension:latest-ts2.7.0-",
+        ImageOrigin::Latest => "timescaledev/promscale-extension:latest-ts2-",
         ImageOrigin::Master => "ghcr.io/timescale/dev_promscale_extension:master-ts2-",
     };
     let version = match version {

@@ -77,15 +77,19 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     // set up some working directories
     let script_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/scripts");
 
-    let working_dir = match env::var("GITHUB_WORKSPACE") {
-        Ok(v) => {
-            let mut pb = PathBuf::new();
-            pb.push(v);
-            pb
-        }
-        Err(_) => env::temp_dir(),
-    }
-    .join(temp_dir_name(&from_version, with_data));
+    //let working_dir = match env::var("GITHUB_WORKSPACE") {
+    //    Ok(v) => {
+    //        let mut pb = PathBuf::new();
+    //        pb.push(v);
+    //        pb
+    //    }
+    //    Err(_) => env::temp_dir(),
+    //}
+    //.join(temp_dir_name(&from_version, with_data));
+
+    let mut working_dir = PathBuf::new();
+    working_dir.push("/tmp");
+    working_dir.push(temp_dir_name(&from_version, with_data));
 
     if working_dir.exists() {
         remove_dir_all(&working_dir).expect("failed to remove working dir");
@@ -96,9 +100,9 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     if !host_data_dir.exists() {
         create_dir_all(&host_data_dir).expect("failed to create working dir and data dir");
     }
-    //let permissions = Permissions::from_mode(0o777);
-    //set_permissions(&working_dir, permissions.clone())
-    //    .expect("failed to chmod 0o777 on the host data directory");
+    let permissions = Permissions::from_mode(0o777);
+    set_permissions(&working_dir, permissions.clone())
+        .expect("failed to chmod 0o777 on the host data directory");
     let host_data_dir = host_data_dir.to_str().unwrap();
     println!("working dir at {}", working_dir.to_str().unwrap());
 
@@ -225,8 +229,8 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
         from_container.stop();
     }
 
-    //set_permissions(&host_data_dir, permissions)
-    //    .expect("failed to chmod 0o777 on the host data directory");
+    set_permissions(&host_data_dir, permissions)
+        .expect("failed to chmod 0o777 on the host data directory");
 
     // create a container using the target image
     // map postgres' data dir to the same temp dir from before
@@ -243,6 +247,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
             .with_user("postgres");
         let to_container = to_blueprint.run();
         let mut to_client = connect(&to_blueprint, &to_container);
+        update_timescaledb_ext(&mut to_client, &Version::new(2, 7, 2));
         update_promscale_ext(&mut to_client, &to_version);
         let upgraded_snapshot = snapshot_db(
             &to_container,
@@ -520,10 +525,7 @@ fn are_snapshots_equal(snapshot0: String, snapshot1: String) -> bool {
 /// Installs the timescaledb extension
 fn install_timescaledb_ext(client: &mut Client) {
     client
-        .execute(
-            "create extension if not exists timescaledb version '2.7.0';",
-            &[],
-        )
+        .execute("create extension if not exists timescaledb;", &[])
         .expect("failed to install the timescaledb extension");
 }
 
@@ -553,4 +555,18 @@ fn update_promscale_ext(client: &mut Client, version: &Version) {
             &[],
         )
         .expect("failed to update the promscale extension");
+}
+
+/// updates the timescaledb extension to the specified version
+fn update_timescaledb_ext(client: &mut Client, version: &Version) {
+    client
+        .execute(
+            format!(
+                "alter extension timescaledb update to '{}';",
+                version.to_string()
+            )
+            .as_str(),
+            &[],
+        )
+        .expect("failed to update the timescaledb extension");
 }
