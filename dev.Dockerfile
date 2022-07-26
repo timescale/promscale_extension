@@ -31,7 +31,8 @@ ENV RUST_VERSION=1.62.0
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --profile minimal --component rustfmt --default-toolchain ${RUST_VERSION}
 ENV PATH=/home/ubuntu/.cargo/bin:$PATH
 
-RUN cargo install cargo-pgx --git https://github.com/timescale/pgx --branch promscale-staging --rev ee52db6b
+COPY install-cargo-pgx.sh /usr/local/bin
+RUN install-cargo-pgx.sh
 
 RUN cargo pgx init --pg14 /usr/lib/postgresql/14/bin/pg_config --pg13 /usr/lib/postgresql/13/bin/pg_config --pg12 /usr/lib/postgresql/12/bin/pg_config
 

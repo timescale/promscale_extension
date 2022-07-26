@@ -49,10 +49,10 @@ mod _prom_ext {
         unsafe {
             in_aggregate_context(fc, || {
                 if sample_time < lowest_time || sample_time > greatest_time {
-                    error!(format!(
+                    error!(
                         "input time {} not in bounds [{}, {}]",
                         sample_time, lowest_time, greatest_time
-                    ))
+                    )
                 }
 
                 let mut state = state.unwrap_or_else(|| {

@@ -47,6 +47,8 @@ RUN \
     rustc --version && \
     cargo --version
 
+COPY install-cargo-pgx.sh /usr/local/bin
+
 # Remove crt-static feature on musl target to allow building cdylibs
 ENV RUSTFLAGS="-C target-feature=-crt-static"
 RUN --mount=type=cache,uid=70,gid=70,target=/build/promscale/.cargo/registry \
@@ -54,7 +56,7 @@ RUN --mount=type=cache,uid=70,gid=70,target=/build/promscale/.cargo/registry \
     [ -f "/run/secrets/AWS_ACCESS_KEY_ID" ] && export AWS_ACCESS_KEY_ID="$(cat /run/secrets/AWS_ACCESS_KEY_ID)" ; \
     [ -f "/run/secrets/AWS_SECRET_ACCESS_KEY" ] && export AWS_SECRET_ACCESS_KEY="$(cat /run/secrets/AWS_SECRET_ACCESS_KEY)" ; \
     sccache --show-stats && \
-    cargo install cargo-pgx --git https://github.com/timescale/pgx --branch promscale-staging --rev ee52db6b && \
+    install-cargo-pgx.sh && \
     cargo pgx init --pg${PG_VERSION} $(which pg_config) && \
     sccache --show-stats
 
