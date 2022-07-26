@@ -76,22 +76,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     // set up some working directories
     let script_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/scripts");
 
-    //let working_dir = match env::var("GITHUB_WORKSPACE") {
-    //    Ok(v) => {
-    //        let mut pb = PathBuf::new();
-    //        pb.push(v);
-    //        pb
-    //    }
-    //    Err(_) => env::temp_dir(),
-    //}
-    //.join(temp_dir_name(&from_version, with_data));
-
     let working_dir = env::temp_dir().join(temp_dir_name(&from_version, with_data));
-
-    //let mut working_dir = PathBuf::new();
-    //working_dir.push("/tmp");
-    //working_dir.push(temp_dir_name(&from_version, with_data));
-
     if working_dir.exists() {
         remove_dir_all(&working_dir).expect("failed to remove working dir");
     }
@@ -199,45 +184,11 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
         from_client
             .execute("checkpoint", &[])
             .expect("failed to checkpoint");
-
-        //println!("{}", format!("chmod 0777 {}", data_dir));
-        //let cmd = ExecCommand {
-        //    cmd: format!("chmod 0777 {}", data_dir),
-        //    ready_conditions: vec![WaitFor::seconds(1)],
-        //};
-        //from_container.exec(cmd);
-
-        //let exit = Command::new("docker")
-        //    .arg("exec")
-        //    .arg(from_container.id())
-        //    .arg("chmod")
-        //    .arg("0777")
-        //    .arg(format!("{}", data_dir))
-        //    .spawn()
-        //    .unwrap()
-        //    .wait()
-        //    .unwrap();
-        //assert!(
-        //    exit.success(),
-        //    "executing chmod 0777 {} failed: {}",
-        //    data_dir,
-        //    exit
-        //);
-        println!(
-            "{} files in {} just BEFORE stopping container",
-            dir_contents(&Path::new(data_dir)),
-            data_dir
-        );
         from_container.stop();
         from_timescaledb_version
     };
-    println!(
-        "{} files in {} just AFTER stopping container",
-        dir_contents(&Path::new(data_dir)),
-        data_dir
-    );
 
-    set_permissions(&data_dir, permissions).expect("failed to chmod 0o777 on the data directory");
+    //set_permissions(&data_dir, permissions).expect("failed to chmod 0o777 on the data directory");
 
     // create a container using the target image
     // map postgres' data dir to the same temp dir from before
@@ -326,6 +277,7 @@ fn temp_dir_name(from_version: &FromVersion, with_data: bool) -> String {
     )
 }
 
+#[allow(dead_code)]
 fn dir_contents(dir: &Path) -> i64 {
     fn recurse(d: &Path, mut c: i64) -> i64 {
         if d.is_dir() {
