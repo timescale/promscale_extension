@@ -97,7 +97,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     }
     create_dir_all(&working_dir).expect("failed to create working dir");
 
-    let data_dir = working_dir.clone().join("data");
+    let data_dir = working_dir.clone().join("db");
     if !data_dir.exists() {
         create_dir_all(&data_dir).expect("failed to create working dir and data dir");
     }
