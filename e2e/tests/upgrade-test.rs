@@ -264,9 +264,15 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
                 "upgrading from timescaledb {} to {}",
                 from_timescaledb_version, to_timescaledb_version
             );
-            update_timescaledb_ext(&to_container, "postgres", "db", &to_timescaledb_version);
+            update_extension(
+                &to_container,
+                "postgres",
+                "db",
+                "timescaledb",
+                &to_timescaledb_version,
+            );
         }
-        update_promscale_ext(&to_container, "postgres", "db", &to_version);
+        update_extension(&to_container, "postgres", "db", "promscale", &to_version);
         let upgraded_snapshot = snapshot_db(
             &to_container,
             "db",
