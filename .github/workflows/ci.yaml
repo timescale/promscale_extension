@@ -34,10 +34,8 @@ jobs:
       - uses: Swatinem/rust-cache@v1
 
       - name: Install cargo-pgx
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: cargo-pgx --git https://github.com/timescale/pgx --branch promscale-staging
+        run: |
+          ./install-cargo-pgx.sh
 
       - name: Cache pgx
         id: cache-pgx

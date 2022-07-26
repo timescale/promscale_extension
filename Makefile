@@ -65,7 +65,7 @@ help:
 .PHONY: build
 build: ## Build the extension
 	cargo build --release --features pg${PG_BUILD_VERSION} $(EXTRA_RUST_ARGS)
-	cargo pgx schema -f pg${PG_BUILD_VERSION} --release
+	cargo pgx schema -f pg${PG_BUILD_VERSION} --force-create-or-replace --release
 
 .PHONY: clean
 clean: ## Clean up latest build
@@ -85,20 +85,21 @@ run-14: run
 
 .PHONY: run
 run: promscale.control ## Custom wrapper around cargo pgx run
-	cargo pgx run pg${PG_BUILD_VERSION}
+	PGX_FORCE_CREATE_OR_REPLACE=true cargo pgx run pg${PG_BUILD_VERSION}
 
 .PHONY: dependencies
 dependencies: promscale.control ## Used in docker build to improve build caching
 	# both of these steps are also run in the `package` target, so we run them here to provide better caching
-	cargo pgx schema pg${PG_BUILD_VERSION} --out sql/promscale--${EXT_VERSION}.sql --release
-	cargo pgx package --pg-config ${PG_CONFIG}
+	cargo pgx schema pg${PG_BUILD_VERSION} --force-create-or-replace --out sql/promscale--${EXT_VERSION}.sql --release
+	cargo pgx package --force-create-or-replace --pg-config ${PG_CONFIG}
 	rm sql/promscale--${EXT_VERSION}.sql
 
 .PHONY: package
 package: promscale.control ## Generate extension artifacts for packaging
-	cargo pgx schema pg${PG_BUILD_VERSION} --out sql/promscale--${EXT_VERSION}.sql --release
+	cargo pgx schema pg${PG_BUILD_VERSION} --force-create-or-replace --release >/dev/null
+	cargo pgx schema pg${PG_BUILD_VERSION} --force-create-or-replace --out sql/promscale--${EXT_VERSION}.sql --release
 	bash create-upgrade-symlinks.sh
-	cargo pgx package --pg-config ${PG_CONFIG}
+	cargo pgx package --force-create-or-replace --pg-config ${PG_CONFIG}
 
 .PHONY: install
 install: ## Install the extension in the Postgres found via pg_config
@@ -187,7 +188,7 @@ docker-image: docker-image-14 docker-image-13 docker-image-12 ## Build Timescale
 
 .PHONY: docker-quick-build-12 docker-quick-build-13 docker-quick-build-14
 docker-quick-build-12 docker-quick-build-13 docker-quick-build-14: promscale.control ## A quick way to rebuild the extension image with only SQL changes
-	cargo pgx schema pg$(PG_BUILD_VERSION)
+	cargo pgx schema pg$(PG_BUILD_VERSION) --force-create-or-replace
 	docker build -f quick.Dockerfile \
 		--build-arg TIMESCALEDB_VERSION_MAJOR=$(TIMESCALEDB_VERSION_MAJOR) \
 		--build-arg PG_VERSION=$(PG_BUILD_VERSION) \
