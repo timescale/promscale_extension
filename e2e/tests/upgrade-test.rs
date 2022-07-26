@@ -223,8 +223,8 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
         from_timescaledb_version
     };
 
-    set_permissions(&data_dir, permissions)
-        .expect("failed to chmod 0o777 on the host data directory");
+    //set_permissions(&data_dir, permissions)
+    //    .expect("failed to chmod 0o777 on the host data directory");
 
     // create a container using the target image
     // map postgres' data dir to the same temp dir from before
