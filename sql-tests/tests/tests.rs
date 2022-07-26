@@ -1,5 +1,9 @@
 use insta::assert_snapshot;
-use std::{env, sync::{Mutex, Once}, mem::MaybeUninit};
+use std::{
+    env,
+    mem::MaybeUninit,
+    sync::{Mutex, Once},
+};
 use test_common::*;
 use test_generator::test_resources;
 
@@ -24,7 +28,7 @@ fn sql_tests(resource: &str) {
     let pg_blueprint = PostgresContainerBlueprint::new().with_testdata(TESTDATA);
     let test_pg_instance = new_test_instance_from_env(&pg_blueprint);
     let mut init_conn = test_pg_instance.connect();
-    // This lock prevents multiple callers from running 
+    // This lock prevents multiple callers from running
     // CREATE EXTENSION simultaneously. In case of
     // promscale_extension concurrent CREATE EXTENSION causes
     // issues when migration incremental/003-users.sql executes.

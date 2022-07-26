@@ -29,9 +29,10 @@ impl<'h> PostgresTestInstance for TestContainerInstance<'h> {
 
     fn exec_sql_script(&self, script_path: &str) -> String {
         let id = self.container.id();
-        let abs_script_path = "/".to_owned() + script_path;
         let output = Command::new("docker")
             .arg("exec")
+            .arg("-w")
+            .arg("/")
             .arg(id)
             .arg("bash")
             .arg("-c")
@@ -39,7 +40,7 @@ impl<'h> PostgresTestInstance for TestContainerInstance<'h> {
                 "psql -U {} -d {} -f {} 2>&1",
                 self.pg_blueprint.user(),
                 self.pg_blueprint.db(),
-                abs_script_path
+                script_path
             ))
             .stdout(Stdio::piped())
             .spawn()

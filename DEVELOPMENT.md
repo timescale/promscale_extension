@@ -10,13 +10,14 @@ with timescaledb, and Rust dependencies. For more information, see the
 
 To spare you the effort of getting this set up yourself, we provide a docker
 image with all required dependencies, which allows you to just get started.
+Although, `make` and `cargo` have to be installed on the host system nonetheless.
 
 Run `make devenv` to build the docker image, start it, and expose it on port
 54321 on your local machine. This docker image mounts the current directory
 into the `/code` directory in the container. By default, it runs postgres 14
 and continually recompiles and reinstalls the promscale extension on source
-modifications. This means that you can edit the sources locally, and run tests
-against the container.
+modifications. This means that you can edit the sources locally, and run SQL 
+tests against the container: `make sql-tests`.
 
 You can adjust the postgres version through the `DEVENV_PG_VERSION` env var,
 for example: `DEVENV_PG_VERSION=12 make devenv`
@@ -29,10 +30,15 @@ The `devenv-url` and `devenv-export-url` make targets output the URL above in
 convenient formats, for example:
 
 - To connect to the devenv db with psql: `psql $(make devenv-url)`
-- To set the `POSTGRES_URL` for all subshells: `eval $(make devenv-export-url`
+- To set the `POSTGRES_URL` for all subshells: `eval $(make devenv-export-url)`
 
 To permanently configure `POSTGRES_URL` when you change into this directory,
 you may consider using a tool like [direnv](https://direnv.net/).
+
+## Updating public API documentation
+
+Our CI validates `./docs/sql-api.md` is up to date. If you added a new function
+you can update it by running `make gendoc`. By default it will use the devenv container.
 
 ## Testing
 
@@ -65,3 +71,17 @@ over test setup, can create multiple connections. For more information, see the
 If you're adding a Rust function, use pgx tests. If you're adding/testing a
 SQL migration, try to test it with an end-to-end SQL test. If that is not
 possible, write it as an end-to-end Rust test.
+
+
+### Running PGX tests
+
+If you need to modify Rust code you should also run corresponding tests.
+Unfortunately, our dev environment doesn't handle this yet.
+
+Firstly, you'll need to install and configure PGX:
+- `cargo install cargo-pgx --git https://github.com/timescale/pgx --branch promscale-staging --rev ee52db6b` (the branch and rev are subject to change)
+- `cargo pgx init`
+
+Then you can run PGX tests by executing: `cargo pgx test`. If you need to run
+them against a specific PostgreSQL version you can use a corresponding feature 
+flag: `cargo pgx test pg12`.

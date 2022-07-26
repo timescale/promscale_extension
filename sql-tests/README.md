@@ -5,11 +5,25 @@ the usage of `pgtap.sql` is highly encouraged.
 
 ## Running tests
 
-Run the tests with `cargo test -p sql-tests`. The tests are run against a docker image. Set the value of
-the `TS_DOCKER_IMAGE` env var to override the default docker image, e.g.:
+Run the tests with `cargo test -p sql-tests`.  By default, the tests are run
+against `localhost:5432`. You can override it either by specifying
+`POSTGRES_URL` or a combination of `POSTGRES_USER`, `POSTGRES_HOST`, `POSTGRES_PORT`
+and `POSTGRES_DB` environment variables.
 
 ```
-TS_DOCKER_IMAGE=ghcr.io/timescale/dev_promscale_extension:master-ts2-pg13 cargo test -p e2e
+POSTGRES_URL=postgres://ubuntu@localhost:54321/ cargo test -p sql-tests
+```
+
+or
+
+```
+POSTGRES_USER=postgres POSTGRES_HOST=localhost POSTGRES_PORT=5432 cargo test -p sql-tests
+```
+
+The tests are run against a docker image. Set the value of the `TS_DOCKER_IMAGE` env var to override the default docker image, e.g.:
+
+```
+TS_DOCKER_IMAGE=ghcr.io/timescale/dev_promscale_extension:master-ts2-pg13 cargo test -p sql-tests
 ```
 
 ## SQL Snapshot tests

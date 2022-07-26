@@ -113,10 +113,6 @@ dist/$(RELEASE_FILE_NAME): release-builder
 .PHONY: release
 release: dist/$(RELEASE_FILE_NAME) ## Produces release artifacts based on OS_NAME, OS_VERSION, and PG_RELEASE_VERSION
 
-.PHONY: gendoc
-gendoc: ## Generate SQL API documentation, requires built docker image. Use TS_DOCKER_IMAGE to set Docker image
-	cargo run -p gendoc > docs/sql-api.md
-
 .PHONY: release-builder
 release-builder: dist/$(DOCKERFILE) ## Build image with the release artifact for OS_NAME, OS_VERSION, and PG_RELEASE_VERSION
 ifndef DOCKERFILE
@@ -226,25 +222,36 @@ setup-buildx: ## Setup a Buildx builder
 promscale.control: ## A hack to boostrap the build, some pgx commands require this file. It gets re-generated later.
 	cp templates/promscale.control ./promscale.control
 
-CONTAINER_NAME=promscale-extension-devcontainer
+DEVENV_CONTAINER_NAME=promscale-extension-devcontainer
 
 .PHONY: devcontainer
 devcontainer:
-	docker build -f dev.Dockerfile -t ${CONTAINER_NAME} .
+	docker build -f dev.Dockerfile -t ${DEVENV_CONTAINER_NAME} .
 
-DEVENV_PG_VERSION?=14
+DEVENV_PG_VERSION?=${PG_BUILD_VERSION}
+DEVENV_PG_INTERNAL_PORT?=288${DEVENV_PG_VERSION}
 
 .PHONY: devenv
 devenv: VOLUME_NAME=promscale-extension-build-cache
 devenv: devcontainer
 	docker volume inspect ${VOLUME_NAME} 1>/dev/null 2>&1 || docker volume create ${VOLUME_NAME}
 	docker run --rm -v ${VOLUME_NAME}:/tmp/target ubuntu bash -c "chmod a+w /tmp/target"
-	docker run -ti -e DEVENV_PG_VERSION=${DEVENV_PG_VERSION} --rm -v ${VOLUME_NAME}:/tmp/target -p54321:288${DEVENV_PG_VERSION} -v$(shell pwd):/code ${CONTAINER_NAME}
+	docker run -ti -e DEVENV_PG_VERSION=${DEVENV_PG_VERSION} --rm -v ${VOLUME_NAME}:/tmp/target -p54321:${DEVENV_PG_INTERNAL_PORT} -v$(shell pwd):/code --name ${DEVENV_CONTAINER_NAME} ${DEVENV_CONTAINER_NAME}
+
+POSTGRES_URL?=$(shell $(MAKE) devenv-url)
 
 .PHONY: devenv-export-url
 devenv-export-url:
-	@echo "export POSTGRES_URL=$(make devenv-url)"
+	@echo "export POSTGRES_URL=${POSTGRES_URL}"
 
 .PHONY: devenv-url
 devenv-url:
 	@echo "postgres://ubuntu@localhost:54321/"
+
+.PHONY: sql-tests
+sql-tests:
+	POSTGRES_URL=${POSTGRES_URL} cargo test -p sql-tests
+
+.PHONY: gendoc
+gendoc: ## Generate SQL API documentation, requires built docker image. Use TS_DOCKER_IMAGE to set Docker image
+	POSTGRES_URL=${POSTGRES_URL} cargo run -p gendoc > docs/sql-api.md
