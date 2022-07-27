@@ -32,7 +32,6 @@ jobs:
             - ubuntu/bionic
             - ubuntu/focal
             - ubuntu/jammy
-            - ubuntu/impish
           pkg_type: deb
         - name: linux
           distro: centos
