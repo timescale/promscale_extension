@@ -73,20 +73,23 @@ fn upgrade_prior_with_data_test() {
 fn test_upgrade(from_version: FromVersion, with_data: bool) {
     let to_image_uri = PostgresContainerBlueprint::default_image_uri();
 
-    let flavor = match to_image_uri.ends_with("-alpine") {
+    let flavor = match to_image_uri.starts_with("local/dev_promscale_extension") {
         true => "alpine",
-        false => "ha",
+        false => match to_image_uri.ends_with("-alpine") {
+            true => "alpine",
+            false => "ha",
+        },
     };
+    println!("image flavor: {}", &flavor);
 
-    // skip alpine tests
-    if flavor == "alpine" {
-        return;
-    }
+    let pg_version = pg_version_from_image_uri(&to_image_uri);
+    println!("postgresql version: {}", &pg_version);
 
-    let re = Regex::new("pg[0-9]{2}").unwrap();
-    let pg_version = re.find(&to_image_uri).unwrap().as_str();
+    // https://docs.github.com/en/actions/learn-github-actions/environment-variables#default-environment-variables
+    let is_ci = env::var("CI").is_ok();
+    println!("running in ci: {}", is_ci);
 
-    let from_image_uri = format!("timescale/timescaledb-ha:{}-latest", pg_version);
+    let from_image_uri = image_uri_from_flavor_pg_version(&flavor, &pg_version);
     println!("from image {}", from_image_uri);
     println!("to image {}", to_image_uri);
 
@@ -102,19 +105,22 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
         remove_dir_all(&working_dir).expect("failed to remove working dir");
     }
     create_dir_all(&working_dir).expect("failed to create working dir");
+    println!("working dir at {}", working_dir.to_str().unwrap());
+
+    let vol_name = create_docker_volume(&from_version, with_data, flavor, pg_version);
+    println!("docker volume name: {}", vol_name);
 
     // for the database we're upgrading, we need to use two containers and the data_directory
     // needs to be persistent in this dir
-    let data_dir = working_dir.clone().join("db");
-    if !data_dir.exists() {
-        create_dir_all(&data_dir).expect("failed to create working dir and data dir");
-    }
-    let permissions = Permissions::from_mode(0o777);
-    set_permissions(&data_dir, permissions.clone())
-        .expect("failed to chmod 0o777 on the data directory");
-    let data_dir = data_dir.to_str().unwrap();
-    println!("working dir at {}", working_dir.to_str().unwrap());
-    println!("data dir at {}", &data_dir);
+    //let data_dir = working_dir.clone().join("db");
+    //if !data_dir.exists() {
+    //    create_dir_all(&data_dir).expect("failed to create working dir and data dir");
+    //}
+    //let permissions = Permissions::from_mode(0o777);
+    //set_permissions(&data_dir, permissions.clone())
+    //    .expect("failed to chmod 0o777 on the data directory");
+    //let data_dir = data_dir.to_str().unwrap();
+    //println!("data dir at {}", &data_dir);
 
     // BASELINE
     // create a container using the target image
@@ -122,7 +128,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     // install the timescaledb extension and the promscale extension at the to_version
     // optionally load test data
     // snapshot the database
-    let (from_version, to_version, pg_version, to_timescaledb_version, baseline_snapshot) = {
+    let (from_version, to_version, to_timescaledb_version, baseline_snapshot) = {
         let baseline_blueprint = PostgresContainerBlueprint::new()
             .with_image_uri(to_image_uri.clone())
             .with_volume(script_dir, "/scripts")
@@ -161,13 +167,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
             FromVersion::First => first_version,
             FromVersion::Prior => prior_version,
         };
-        (
-            from_version,
-            last_version,
-            pg_version,
-            to_timescaledb_version,
-            snapshot,
-        )
+        (from_version, last_version, to_timescaledb_version, snapshot)
     };
 
     println!("from promscale version {}", from_version);
@@ -179,15 +179,11 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     // install timescaledb and promscale at the from_version
     // optionally load test data
     let from_timescaledb_version = {
-        println!(
-            "creating the database and extension with {}",
-            from_image_uri
-        );
-
+        println!("UPGRADE FROM");
         let from_blueprint = PostgresContainerBlueprint::new()
             .with_image_uri(from_image_uri.to_string())
             .with_volume(script_dir, "/scripts")
-            .with_volume(data_dir, "/var/lib/postgresql/data")
+            .with_volume(&vol_name, "/var/lib/postgresql/data")
             .with_env_var("PGDATA", "/var/lib/postgresql/data")
             .with_db("db")
             .with_user("postgres");
@@ -221,7 +217,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
         let to_blueprint = PostgresContainerBlueprint::new()
             .with_image_uri(to_image_uri)
             .with_volume(script_dir, "/scripts")
-            .with_volume(data_dir, "/var/lib/postgresql/data")
+            .with_volume(&vol_name, "/var/lib/postgresql/data")
             .with_env_var("PGDATA", "/var/lib/postgresql/data")
             .with_db("db")
             .with_user("postgres");
@@ -267,22 +263,24 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     assert!(are_equal);
 }
 
-//fn calc_from_image_uri(to_image_uri: &String, pg_version: PgVersion) -> String {
-//    let from_image_uri = if env::var("GITHUB_WORKSPACE").is_ok() {
-//        if to_image_uri.ends_with("-alpine") {
-//            format!(
-//                "{}{}",
-//                postgres_image_uri(ImageOrigin::Master, pg_version),
-//                "-alpine"
-//            )
-//        } else {
-//            postgres_image_uri(ImageOrigin::Latest, pg_version)
-//        }
-//    } else {
-//        postgres_image_uri(ImageOrigin::Latest, pg_version)
-//    };
-//    from_image_uri.to_string()
-//}
+fn image_uri_from_flavor_pg_version(flavor: &str, pg_version: &str) -> String {
+    if flavor == "ha" {
+        // ha
+        format!("timescale/timescaledb-ha:{}-latest", pg_version)
+    } else {
+        // alpine
+        format!(
+            "ghcr.io/timescale/dev_promscale_extension:master-ts2-{}",
+            pg_version
+        )
+    }
+}
+
+fn pg_version_from_image_uri(to_image_uri: &String) -> &str {
+    let re = Regex::new("pg[0-9]{2}").unwrap();
+    let pg_version = re.find(&to_image_uri).unwrap().as_str();
+    pg_version
+}
 
 fn temp_dir_name(
     from_version: &FromVersion,
@@ -303,6 +301,68 @@ fn temp_dir_name(
         flavor,
         pg_version
     )
+}
+
+fn create_docker_volume(
+    from_version: &FromVersion,
+    with_data: bool,
+    flavor: &str,
+    pg_version: &str,
+) -> String {
+    let vol_name = format!(
+        "vol-{}-{}-{}-{}",
+        match from_version {
+            FromVersion::First => "first",
+            FromVersion::Prior => "prior",
+        },
+        match with_data {
+            true => "with-data",
+            false => "no-data",
+        },
+        flavor,
+        pg_version
+    );
+    // see if a volume by this name already exists
+    let output = Command::new("docker")
+        .arg("volume")
+        .arg("ls")
+        .args(["--filter", format!("name={}", &vol_name).as_str()])
+        .args(["--format", "{{.Name}}"])
+        .output()
+        .expect("docker volume ls failed");
+    // if so, delete that volume
+    if output.stdout == vol_name.as_bytes() {
+        let exit = Command::new("docker")
+            .arg("volume")
+            .arg("rm")
+            .arg(&vol_name)
+            .spawn()
+            .unwrap()
+            .wait()
+            .unwrap();
+        assert!(
+            exit.success(),
+            "removin the docker volume {} failed: {}",
+            vol_name,
+            exit
+        );
+    }
+    // create the volume
+    let exit = Command::new("docker")
+        .arg("volume")
+        .arg("create")
+        .arg(&vol_name)
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap();
+    assert!(
+        exit.success(),
+        "creating the docker volume {} failed: {}",
+        vol_name,
+        exit
+    );
+    vol_name
 }
 
 /// Runs a SQL script file in the docker container
