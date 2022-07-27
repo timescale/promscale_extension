@@ -262,6 +262,6 @@ DEVENV_EXEC ?= docker exec -it -e POSTGRES_URL=postgres://ubuntu@localhost:${DEV
 dev-sql-tests:
 	${DEVENV_EXEC} make sql-tests
 
-.PHONY: dev-dendoc
+.PHONY: dev-gendoc
 dev-gendoc:
 	${DEVENV_EXEC} make gendoc
