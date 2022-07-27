@@ -17,7 +17,7 @@ Run `make devenv` to build the docker image, start it, and expose it on port
 into the `/code` directory in the container. By default, it runs postgres 14
 and continually recompiles and reinstalls the promscale extension on source
 modifications. This means that you can edit the sources locally, and run SQL 
-tests against the container: `make sql-tests`.
+tests against the container: `make dev-sql-tests`.
 
 You can adjust the postgres version through the `DEVENV_PG_VERSION` env var,
 for example: `DEVENV_PG_VERSION=12 make devenv`
@@ -38,7 +38,7 @@ you may consider using a tool like [direnv](https://direnv.net/).
 ## Updating public API documentation
 
 Our CI validates `./docs/sql-api.md` is up to date. If you added a new function
-you can update it by running `make gendoc`. By default it will use the devenv container.
+you can update it by running `make dev-gendoc`. Note: it relies on the devcontainer.
 
 ## Testing
 
