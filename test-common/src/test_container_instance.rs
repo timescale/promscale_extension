@@ -11,9 +11,10 @@ pub struct TestContainerInstance<'h> {
 
 impl<'pg_inst> TestContainerInstance<'pg_inst> {
     pub(crate) fn fresh_instance(pg_blueprint: &'pg_inst PostgresContainerBlueprint) -> Self {
+        let container = pg_blueprint.run();
         TestContainerInstance {
             pg_blueprint: pg_blueprint,
-            container: pg_blueprint.run(),
+            container: container,
         }
     }
 }
@@ -28,9 +29,10 @@ impl<'h> PostgresTestInstance for TestContainerInstance<'h> {
 
     fn exec_sql_script(&self, script_path: &str) -> String {
         let id = self.container.id();
-        let abs_script_path = "/".to_owned() + script_path;
         let output = Command::new("docker")
             .arg("exec")
+            .arg("-w")
+            .arg("/")
             .arg(id)
             .arg("bash")
             .arg("-c")
@@ -38,7 +40,7 @@ impl<'h> PostgresTestInstance for TestContainerInstance<'h> {
                 "psql -U {} -d {} -f {} 2>&1",
                 self.pg_blueprint.user(),
                 self.pg_blueprint.db(),
-                abs_script_path
+                script_path
             ))
             .stdout(Stdio::piped())
             .spawn()

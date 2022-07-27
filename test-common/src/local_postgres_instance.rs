@@ -2,7 +2,6 @@ use postgres::config::Host;
 use postgres::{Client, Config};
 use rand::Rng;
 use std::env;
-use std::os::unix::prelude::FromRawFd;
 use std::process::{Command, Stdio};
 use std::str::from_utf8;
 
@@ -51,6 +50,7 @@ impl LocalPostgresInstance {
 
     pub(crate) fn temporary_local_db() -> Self {
         let db_name = Self::generate_random_db_name();
+
         let mut admin_conn = Self::connect_local(None);
         admin_conn
             .simple_query(format!("CREATE DATABASE {};", db_name).as_str())
@@ -98,12 +98,14 @@ impl PostgresTestInstance for LocalPostgresInstance {
         conf.get_password()
             .map(|pwd| cmd.env("PGPASSWORD", from_utf8(pwd).unwrap()));
 
-        let output = cmd
-            .arg("-f")
-            .arg(script_path)
+        // a workaround to forward stderr to stdout
+        // in the same way Docker backend does.
+        let str_cmd = format!("{:?} 2>&1", cmd.arg("-f").arg(script_path));
+
+        let output = Command::new("bash")
+            .arg("-c")
+            .arg(str_cmd)
             .stdout(Stdio::piped())
-            // safe because we are using STDOUT
-            .stderr(unsafe { Stdio::from_raw_fd(1) })
             .spawn()
             .unwrap()
             .wait_with_output()

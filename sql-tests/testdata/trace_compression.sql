@@ -1,8 +1,6 @@
 \set ECHO all
 \set ON_ERROR_STOP 1
 
-CREATE EXTENSION promscale;
-
 -- We don't want retention to mess with the test data
 SELECT ps_trace.set_trace_retention_period('100 years'::INTERVAL);
 

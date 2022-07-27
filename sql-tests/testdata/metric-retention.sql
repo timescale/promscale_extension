@@ -1,10 +1,8 @@
 \unset ECHO
 \set QUIET 1
-\i '/testdata/scripts/pgtap-1.2.0.sql'
+\i 'testdata/scripts/pgtap-1.2.0.sql'
 
 SELECT * FROM plan(4);
-
-CREATE EXTENSION promscale;
 
 SELECT is(prom_api.get_default_metric_retention_period(), '90 days'::INTERVAL, 'default metric retention period is 90 days');
 

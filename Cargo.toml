@@ -19,7 +19,10 @@ codegen-units = 1
 [profile.dev]
 panic = "unwind"
 # It's currently broken on Apple Silicon. 1.64 seems to include a fix.
-# lto = "thin"
+# If your tests fail with SIGSEGV try and use 1.64 or newer.
+# Sadly, we can't just drop it because it's a workaround for
+# another issue https://github.com/tcdi/pgx/pull/208
+lto = "thin"
 
 [features]
 default = ["pg14", "serde_json", "proptest"] # used by rust-analyzer in VSCode

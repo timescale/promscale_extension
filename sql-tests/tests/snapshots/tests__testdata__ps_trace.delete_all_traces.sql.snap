@@ -62,7 +62,7 @@ expression: query_result
  ok 8 - _ps_trace.event has 1 row
 (1 row)
 
-psql:/testdata/ps_trace.delete_all_traces.sql:75: NOTICE:  truncate cascades to table "instrumentation_lib"
+psql:testdata/ps_trace.delete_all_traces.sql:73: NOTICE:  truncate cascades to table "instrumentation_lib"
  delete_all_traces 
 -------------------
  
