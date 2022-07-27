@@ -73,9 +73,22 @@ fn upgrade_prior_with_data_test() {
 fn test_upgrade(from_version: FromVersion, with_data: bool) {
     let to_image_uri = PostgresContainerBlueprint::default_image_uri();
 
-    if to_image_uri.ends_with("-alpine") {
+    let flavor = match to_image_uri.ends_with("-alpine") {
+        true => "alpine",
+        false => "ha",
+    };
+
+    // skip alpine tests
+    if flavor == "alpine" {
         return;
     }
+
+    let re = Regex::new("pg[0-9]{2}").unwrap();
+    let pg_version = re.find(&to_image_uri).unwrap().as_str();
+
+    let from_image_uri = format!("timescale/timescaledb-ha:{}-latest", pg_version);
+    println!("from image {}", from_image_uri);
+    println!("to image {}", to_image_uri);
 
     // set up some working directories
 
@@ -83,7 +96,8 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     let script_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/scripts");
 
     // in this directory we'll put our db snapshots we'll compare
-    let working_dir = env::temp_dir().join(temp_dir_name(&from_version, with_data));
+    let working_dir =
+        env::temp_dir().join(temp_dir_name(&from_version, with_data, flavor, pg_version));
     if working_dir.exists() {
         remove_dir_all(&working_dir).expect("failed to remove working dir");
     }
@@ -120,7 +134,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
         let mut client = connect(&baseline_blueprint, &baseline_container);
         let (first_version, last_version, prior_version) =
             available_extension_versions(&mut client);
-        let pg_version = pg_major_version(&mut client);
+        //let pg_version = pg_major_version(&mut client);
 
         let to_timescaledb_version = install_timescaledb_ext(&mut client);
         install_promscale_ext(&mut client, &last_version);
@@ -156,12 +170,8 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
         )
     };
 
-    let from_image_uri = postgres_image_uri(ImageOrigin::Latest, pg_version);
-
-    println!("from image {}", from_image_uri);
-    println!("to image {}", to_image_uri);
-    println!("from version {}", from_version);
-    println!("to version {}", to_version);
+    println!("from promscale version {}", from_version);
+    println!("to promscale version {}", to_version);
 
     // UPGRADE FROM
     // create a container using the latest image
@@ -274,9 +284,14 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
 //    from_image_uri.to_string()
 //}
 
-fn temp_dir_name(from_version: &FromVersion, with_data: bool) -> String {
+fn temp_dir_name(
+    from_version: &FromVersion,
+    with_data: bool,
+    flavor: &str,
+    pg_version: &str,
+) -> String {
     format!(
-        "test-upgrade-from-{}-{}",
+        "test-upgrade-from-{}-{}-{}-{}",
         match from_version {
             FromVersion::First => "first",
             FromVersion::Prior => "prior",
@@ -284,7 +299,9 @@ fn temp_dir_name(from_version: &FromVersion, with_data: bool) -> String {
         match with_data {
             true => "with-data",
             false => "no-data",
-        }
+        },
+        flavor,
+        pg_version
     )
 }
 
@@ -464,24 +481,24 @@ fn available_extension_versions(client: &mut Client) -> (Version, Version, Versi
 }
 
 /// Determines the major version of postgres running
-fn pg_major_version(client: &mut Client) -> PgVersion {
-    let result = client
-        .query(
-            "select setting::int / 10000 from pg_settings where name = 'server_version_num';",
-            &[],
-        )
-        .expect("failed to select server_version_num");
-    let pg_major_version: i32 = result
-        .first()
-        .expect("failed to get result from selecting server_version_num")
-        .get(0);
-    match pg_major_version {
-        14 => PgVersion::V14,
-        13 => PgVersion::V13,
-        12 => PgVersion::V12,
-        _ => panic!("unsupported postgres major version {}", pg_major_version),
-    }
-}
+//fn pg_major_version(client: &mut Client) -> PgVersion {
+//    let result = client
+//        .query(
+//            "select setting::int / 10000 from pg_settings where name = 'server_version_num';",
+//            &[],
+//        )
+//        .expect("failed to select server_version_num");
+//    let pg_major_version: i32 = result
+//        .first()
+//        .expect("failed to get result from selecting server_version_num")
+//        .get(0);
+//    match pg_major_version {
+//        14 => PgVersion::V14,
+//        13 => PgVersion::V13,
+//        12 => PgVersion::V12,
+//        _ => panic!("unsupported postgres major version {}", pg_major_version),
+//    }
+//}
 
 /// Determines the data directory of the postgres cluster
 fn pg_data_dir(client: &mut Client) -> String {
