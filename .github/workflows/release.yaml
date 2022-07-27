@@ -5,6 +5,7 @@ on:
     - '.github/workflows/release.yaml'
     - 'dist/*'
     - 'tools/*'
+    - 'foo'
   push:
     branches:
     - main
