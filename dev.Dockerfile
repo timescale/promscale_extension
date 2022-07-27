@@ -46,12 +46,15 @@ RUN sed -i "s#127.0.0.1/32#0.0.0.0/0#" ~/.pgx/data-{12,13,14}/pg_hba.conf
 # Disable telemetry
 RUN echo "timescaledb.telemetry_level=off" | tee -a ~/.pgx/data-{12,13,14}/postgresql.conf
 
-RUN sudo apt-get install -y vim
+RUN sudo apt-get install -y vim lld
 
 RUN mkdir -p ~/.cargo
 # Make cargo put compile artifacts in non-bind-mounted directory
 # To re-use compiled artifacts, mount a docker volume to /tmp/target
 RUN echo -e '[build]\ntarget-dir="/tmp/target"' > ~/.cargo/config.toml
+# Tell rustc to use a fast linker
+RUN echo 'rustflags=["-C", "link-arg=-fuse-ld=lld"]' >> ~/.cargo/config.toml
+
 # Sources should be bind-mounted to /code/
 WORKDIR /code/
 
