@@ -92,7 +92,7 @@ If you need to modify Rust code you should also run corresponding tests.
 Unfortunately, our dev environment doesn't handle this yet.
 
 Firstly, you'll need to install and configure PGX:
-- `cargo install cargo-pgx --git https://github.com/timescale/pgx --branch promscale-staging --rev ee52db6b` (the branch and rev are subject to change)
+- `./install-cargo-pgx.sh`
 - `cargo pgx init`
 
 Then you can run PGX tests by executing: `cargo pgx test`. If you need to run
