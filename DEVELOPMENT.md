@@ -1,4 +1,8 @@
-# Development environment
+# Development
+
+This document covers important topics for developing in this repository.
+
+## Development environment
 
 In order to get started developing the extension, you need a postgres install
 with timescaledb, and Rust dependencies. For more information, see the
@@ -29,3 +33,35 @@ convenient formats, for example:
 
 To permanently configure `POSTGRES_URL` when you change into this directory,
 you may consider using a tool like [direnv](https://direnv.net/).
+
+## Testing
+
+Testing in this repository is split into three different kinds of tests, each
+of which are found in their own directory or workspace:
+
+- pgx tests
+- End-to-end SQL tests
+- End-to-end Rust tests
+
+pgx tests are found in the `src` directory, typically in the same source file
+as a function defined in Rust. These tests are solely intended to test the
+behaviour of Postgres functions implemented in Rust.
+
+End-to-end SQL tests are found in the `sql-tests` workspace, in the `testdata`
+directory. The tests are written in SQL and intended to be used to test
+functions which we write in SQL (in the `migration` directory), or complex
+interactions involving both SQL and native functions. Each SQL file  is run
+against a test database, but the test has no control over database or
+connection creation, so it is not possible to test certain behaviours. For more
+information, see the [README](sql-tests/README.md).
+
+End-to-end Rust tests are found in the `e2e` directory. They are intended to
+be used as an upgrade to end-to-end SQL tests, as the test has full control
+over test setup, can create multiple connections. For more information, see the
+[README](e2e/README.md).
+
+### Which test method to use?
+
+If you're adding a Rust function, use pgx tests. If you're adding/testing a
+SQL migration, try to test it with an end-to-end SQL test. If that is not
+possible, write it as an end-to-end Rust test.
