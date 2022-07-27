@@ -20,7 +20,7 @@ or
 POSTGRES_USER=postgres POSTGRES_HOST=localhost POSTGRES_PORT=5432 cargo test -p sql-tests
 ```
 
-The tests are run against a docker image. Set the value of the `TS_DOCKER_IMAGE` env var to override the default docker image, e.g.:
+To run the tests against a docker image set the value of the `TS_DOCKER_IMAGE` to the desired docker image, e.g.:
 
 ```
 TS_DOCKER_IMAGE=ghcr.io/timescale/dev_promscale_extension:master-ts2-pg13 cargo test -p sql-tests
