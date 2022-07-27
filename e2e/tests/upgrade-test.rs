@@ -73,15 +73,24 @@ fn upgrade_prior_with_data_test() {
 fn test_upgrade(from_version: FromVersion, with_data: bool) {
     let to_image_uri = PostgresContainerBlueprint::default_image_uri();
 
+    if to_image_uri.ends_with("-alpine") {
+        return;
+    }
+
     // set up some working directories
+
+    // this dir has our sql scripts. we'll mount it into the docker containers and use them via psql
     let script_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/scripts");
 
+    // in this directory we'll put our db snapshots we'll compare
     let working_dir = env::temp_dir().join(temp_dir_name(&from_version, with_data));
     if working_dir.exists() {
         remove_dir_all(&working_dir).expect("failed to remove working dir");
     }
     create_dir_all(&working_dir).expect("failed to create working dir");
 
+    // for the database we're upgrading, we need to use two containers and the data_directory
+    // needs to be persistent in this dir
     let data_dir = working_dir.clone().join("db");
     if !data_dir.exists() {
         create_dir_all(&data_dir).expect("failed to create working dir and data dir");
@@ -93,6 +102,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     println!("working dir at {}", working_dir.to_str().unwrap());
     println!("data dir at {}", &data_dir);
 
+    // BASELINE
     // create a container using the target image
     // determine the available extension versions and the postgres major version
     // install the timescaledb extension and the promscale extension at the to_version
@@ -146,13 +156,14 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
         )
     };
 
-    let from_image_uri = calc_from_image_uri(&to_image_uri, pg_version);
+    let from_image_uri = postgres_image_uri(ImageOrigin::Latest, pg_version);
 
     println!("from image {}", from_image_uri);
     println!("to image {}", to_image_uri);
     println!("from version {}", from_version);
     println!("to version {}", to_version);
 
+    // UPGRADE FROM
     // create a container using the latest image
     // map postgres' data dir to a temp dir
     // install timescaledb and promscale at the from_version
@@ -190,6 +201,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
 
     //set_permissions(&data_dir, permissions).expect("failed to chmod 0o777 on the data directory");
 
+    // UPGRADE TO
     // create a container using the target image
     // map postgres' data dir to the same temp dir from before
     // update the promscale extension to the to_version
@@ -245,23 +257,22 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     assert!(are_equal);
 }
 
-fn calc_from_image_uri(to_image_uri: &String, pg_version: PgVersion) -> String {
-    let from_image_uri = if env::var("GITHUB_WORKSPACE").is_ok() {
-        format!(
-            "{}{}",
-            postgres_image_uri(ImageOrigin::Master, pg_version),
-            if to_image_uri.ends_with("-alpine") {
-                "-alpine"
-            } else {
-                ""
-            }
-        )
-        .to_string()
-    } else {
-        postgres_image_uri(ImageOrigin::Latest, pg_version)
-    };
-    from_image_uri
-}
+//fn calc_from_image_uri(to_image_uri: &String, pg_version: PgVersion) -> String {
+//    let from_image_uri = if env::var("GITHUB_WORKSPACE").is_ok() {
+//        if to_image_uri.ends_with("-alpine") {
+//            format!(
+//                "{}{}",
+//                postgres_image_uri(ImageOrigin::Master, pg_version),
+//                "-alpine"
+//            )
+//        } else {
+//            postgres_image_uri(ImageOrigin::Latest, pg_version)
+//        }
+//    } else {
+//        postgres_image_uri(ImageOrigin::Latest, pg_version)
+//    };
+//    from_image_uri.to_string()
+//}
 
 fn temp_dir_name(from_version: &FromVersion, with_data: bool) -> String {
     format!(
@@ -275,26 +286,6 @@ fn temp_dir_name(from_version: &FromVersion, with_data: bool) -> String {
             false => "no-data",
         }
     )
-}
-
-#[allow(dead_code)]
-fn dir_contents(dir: &Path) -> i64 {
-    fn recurse(d: &Path, mut c: i64) -> i64 {
-        if d.is_dir() {
-            for entry in fs::read_dir(d).unwrap() {
-                let entry = entry.unwrap();
-                let path = entry.path();
-                if path.is_dir() {
-                    c = recurse(&path, c);
-                } else {
-                    c = c + 1;
-                }
-            }
-        }
-        c
-    }
-    let count: i64 = 0;
-    recurse(dir, count)
 }
 
 /// Runs a SQL script file in the docker container
@@ -501,12 +492,6 @@ fn pg_data_dir(client: &mut Client) -> String {
         .first()
         .expect("failed to get result from selecting data_directory")
         .get(0);
-    //PathBuf::from(data_dir)
-    //    .parent()
-    //    .expect("failed to find the parent of the data_directory")
-    //    .to_str()
-    //    .unwrap()
-    //    .to_string()
     data_dir
 }
 
@@ -607,103 +592,3 @@ fn update_extension(
         exit
     );
 }
-/*
-/// updates the promscale extension to the specified version
-fn update_promscale_ext(
-    container: &PostgresContainer,
-    username: &str,
-    db: &str,
-    version: &Version,
-) {
-    let exit = Command::new("docker")
-        .arg("exec")
-        .arg(container.id())
-        .arg("psql")
-        .args(["-U", username])
-        .args(["-d", db])
-        .arg("-X")
-        .arg("--no-password")
-        .arg("--no-psqlrc")
-        .arg("--no-readline")
-        .arg("--echo-all")
-        .args(["-v", "ON_ERROR_STOP=1"])
-        .args([
-            "-c",
-            format!(
-                "alter extension promscale update to '{}';",
-                version.to_string()
-            )
-            .as_str(),
-        ])
-        .spawn()
-        .unwrap()
-        .wait()
-        .unwrap();
-    assert!(
-        exit.success(),
-        "updating promscale to version {} failed: {}",
-        version.to_string(),
-        exit
-    );
-
-    //client
-    //    .execute(
-    //        format!(
-    //            "alter extension promscale update to '{}';",
-    //            version.to_string()
-    //        )
-    //        .as_str(),
-    //        &[],
-    //    )
-    //    .expect("failed to update the promscale extension");
-}
-
-/// updates the timescaledb extension to the specified version
-fn update_timescaledb_ext(
-    container: &PostgresContainer,
-    username: &str,
-    db: &str,
-    version: &Version,
-) {
-    let exit = Command::new("docker")
-        .arg("exec")
-        .arg(container.id())
-        .arg("psql")
-        .args(["-U", username])
-        .args(["-d", db])
-        .arg("-X")
-        .arg("--no-password")
-        .arg("--no-psqlrc")
-        .arg("--no-readline")
-        .arg("--echo-all")
-        .args(["-v", "ON_ERROR_STOP=1"])
-        .args([
-            "-c",
-            format!(
-                "alter extension timescaledb update to '{}';",
-                version.to_string()
-            )
-            .as_str(),
-        ])
-        .spawn()
-        .unwrap()
-        .wait()
-        .unwrap();
-    assert!(
-        exit.success(),
-        "updating timescaledb to version {} failed: {}",
-        version.to_string(),
-        exit
-    );
-    //client
-    //    .execute(
-    //        format!(
-    //            "alter extension timescaledb update to '{}';",
-    //            version.to_string()
-    //        )
-    //        .as_str(),
-    //        &[],
-    //    )
-    //    .expect("failed to update the timescaledb extension");
-}
-*/
