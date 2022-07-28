@@ -1,0 +1,12 @@
+name: arm64
+on:
+  pull_request:
+
+jobs:
+  hello-world:
+    runs-on: [self-hosted, Linux, ARM64]
+
+    steps:
+    - name: Hello World
+      run: |
+        echo "hello world"
