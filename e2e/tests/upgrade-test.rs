@@ -1,13 +1,353 @@
 use postgres::Client;
 use regex::Regex;
 use semver::Version;
-use similar::{ChangeTag, TextDiff};
+//use similar::{ChangeTag, TextDiff};
+use std::env;
+use std::fs::{create_dir_all, remove_dir_all, set_permissions, Permissions};
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::Command;
-use std::{env, fs};
-use test_common::postgres_container;
+//use test_common::postgres_container;
+use test_common::postgres_container::connect;
 use test_common::{PostgresContainer, PostgresContainerBlueprint};
 
+enum FromVersion {
+    First,
+    Prior,
+}
+
+#[test]
+fn upgrade_first_no_data_test() {
+    test_upgrade(FromVersion::First, false);
+}
+
+#[test]
+fn upgrade_first_with_data_test() {
+    test_upgrade(FromVersion::First, true);
+}
+
+#[test]
+fn upgrade_prior_no_data_test() {
+    test_upgrade(FromVersion::Prior, false);
+}
+
+#[test]
+fn upgrade_prior_with_data_test() {
+    test_upgrade(FromVersion::Prior, true);
+}
+
+fn test_upgrade(from_version: FromVersion, with_data: bool) {
+    // in local development, we want local/dev_promscale_extension:head-ts2-pg14
+    // in ci, we want ghcr.io/timescale/dev_promscale_extension:<branch-name>-ts2.7.2-pg<version>
+    // this image will be used for the baseline and for upgrading the version of promscale
+    let to_image_uri = env::var("TS_DOCKER_IMAGE")
+        .unwrap_or_else(|_| "local/dev_promscale_extension:head-ts2-pg14".to_string());
+
+    // we need to know whether we are using an ha or alpine image in order to pick an appropriate
+    // corresponding "from" image used the create the older version of promscale
+    let flavor = match to_image_uri.starts_with("local/dev_promscale_extension") {
+        true => "alpine",
+        false => match to_image_uri.ends_with("-alpine") {
+            true => "alpine",
+            false => "ha",
+        },
+    };
+    println!("image flavor: {}", &flavor);
+
+    // we also need to know which version of postgres we have been instructed to use
+    let pg_version = Regex::new("pg[0-9]{2}")
+        .unwrap()
+        .find(&to_image_uri)
+        .unwrap()
+        .as_str()
+        .strip_prefix("pg")
+        .unwrap();
+    println!("postgresql version: {}", &pg_version);
+
+    // a unique name for the test combination we are running
+    let name = format!(
+        "upgrade-from-{}-{}-{}-pg{}",
+        match from_version {
+            FromVersion::First => "first",
+            FromVersion::Prior => "prior",
+        },
+        match with_data {
+            true => "with-data",
+            false => "no-data",
+        },
+        flavor,
+        pg_version
+    );
+    println!("name: {}", name);
+
+    // figure out which image we should start with in the upgrade process
+    // based on alpine vs ha and postgres version
+    let from_image_uri = if flavor == "ha" {
+        // ha
+        format!("timescale/timescaledb-ha:pg{}-ts2.7.1--latest", pg_version)
+    } else {
+        // alpine
+        format!(
+            "ghcr.io/timescale/dev_promscale_extension:master-ts2-pg{}",
+            pg_version
+        )
+    };
+    println!("from image {}", from_image_uri);
+    println!("to image {}", to_image_uri);
+
+    // in this directory we'll put our db snapshots we'll compare
+    let working_dir = env::temp_dir().join(&name);
+    if working_dir.exists() {
+        remove_dir_all(&working_dir).expect("failed to remove working dir");
+    }
+    create_dir_all(&working_dir).expect("failed to create working dir");
+    println!("working dir at {}", working_dir.to_str().unwrap());
+
+    // for the database we're upgrading, we need to use two containers and the data_directory
+    // needs to be persistent in this dir. we'll nest it inside the working directory
+    let data_dir = working_dir.clone().join("db");
+    if !data_dir.exists() {
+        create_dir_all(&data_dir).expect("failed to create working dir and data dir");
+    }
+    let permissions = Permissions::from_mode(0o777);
+    set_permissions(&data_dir, permissions.clone())
+        .expect("failed to chmod 0o777 on the data directory");
+    let data_dir = data_dir.to_str().unwrap();
+    println!("data dir at {}", &data_dir);
+
+    // this dir has our sql scripts. we'll mount it into the docker containers and use them via psql
+    let script_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/scripts");
+    println!("script dir at {}", script_dir);
+
+    /**********************************************************************************************/
+    // BASELINE
+    let baseline_blueprint = PostgresContainerBlueprint::new()
+        .with_image_uri(to_image_uri.clone())
+        .with_volume(script_dir, "/scripts")
+        .with_env_var("PGDATA", "/var/lib/postgresql/data")
+        .with_db("db")
+        .with_user("postgres");
+    let baseline_container = baseline_blueprint.run();
+    let mut baseline_client = connect(&baseline_blueprint, &baseline_container);
+
+    // determine the versions of the promscale extension we are supposed to upgrade from and to
+    let (from_version, to_version) = {
+        let (first_version, last_version, prior_version) =
+            available_extension_versions(&mut baseline_client);
+        (
+            match from_version {
+                FromVersion::First => first_version,
+                FromVersion::Prior => prior_version,
+            },
+            last_version,
+        )
+    };
+    println!("from promscale version: {}", from_version);
+    println!("to promscale version: {}", to_version);
+
+    // install the timescaledb extension at the default version for this image
+    let to_timescaledb_version = install_timescaledb_ext(&mut baseline_client);
+
+    // install the promscale extension at the "to" version
+    install_promscale_ext(&mut baseline_client, &to_version);
+
+    // load test data if configured to
+    if with_data {
+        load_data(&baseline_container);
+    }
+
+    // shut it down
+    baseline_client
+        .close()
+        .expect("failed to close database connection");
+    baseline_container.stop();
+
+    /**********************************************************************************************/
+    // UPGRADE FROM
+    let from_blueprint = PostgresContainerBlueprint::new()
+        .with_image_uri(from_image_uri)
+        .with_volume(script_dir, "/scripts")
+        .with_volume(data_dir, "/var/lib/postgresql")
+        .with_env_var("PGDATA", "/var/lib/postgresql/data")
+        .with_db("db")
+        .with_user("postgres");
+    let from_container = from_blueprint.run();
+    let mut from_client = connect(&from_blueprint, &from_container);
+
+    // install the timescaledb extension at the default version
+    let from_timescaledb_version = install_timescaledb_ext(&mut from_client);
+    println!("from timescaledb version: {}", &from_timescaledb_version);
+    println!("to timescaledb version: {}", &to_timescaledb_version);
+
+    // if the "from" version is greater than the "to" version, then we have problems!
+    assert!(from_timescaledb_version <= to_timescaledb_version);
+
+    // install the promscale extension at the "from_version"
+    install_promscale_ext(&mut from_client, &from_version);
+
+    // load test data if configured to
+    if with_data {
+        load_data(&from_container);
+    }
+
+    // checkpoint
+    from_client
+        .execute("checkpoint", &[])
+        .expect("failed to checkpoint");
+
+    // shut it down
+    from_client
+        .close()
+        .expect("failed to close databases connection");
+    from_container.stop();
+
+    /**********************************************************************************************/
+    // UPGRADE TO
+}
+
+/// Determines the first, last, and prior versions of the promscale extension available
+fn available_extension_versions(client: &mut Client) -> (Version, Version, Version) {
+    // version 0.1 won't parse correctly
+    // version 0.5.3 and pre-releases of 0.5.3 were pulled due to a bug the broke upgrades
+    let qry = r"select version 
+    from pg_available_extension_versions 
+    where name = 'promscale' 
+    and version not in ('0.1', '0.5.3') and version not like '0.5.3-%';";
+    let result = client
+        .query(qry, &[])
+        .expect("failed to select available extension versions");
+    let mut versions: Vec<Version> = vec![];
+    for row in result {
+        let x: &str = row.get(0);
+        let version = match Version::parse(x) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        if version < Version::parse("0.5.0").unwrap() {
+            continue;
+        }
+        versions.push(version);
+    }
+    assert!(versions.len() >= 2);
+    versions.sort();
+    let first = versions[0].to_owned();
+    let last = versions.pop().unwrap();
+    let prior = versions.pop().unwrap();
+    (first, last, prior)
+}
+
+/// Runs a SQL script file in the docker container
+fn psql_file(container: &PostgresContainer, db: &str, username: &str, path: &Path) {
+    println!("executing psql script {}...", path.display());
+    let exit = Command::new("docker")
+        .arg("exec")
+        .arg(container.id())
+        .arg("psql")
+        .args(["-U", username])
+        .args(["-d", db])
+        .arg("--no-password")
+        .arg("--no-psqlrc")
+        .arg("--no-readline")
+        .arg("--echo-all")
+        .args(["-v", "ON_ERROR_STOP=1"])
+        .args(["-f", path.to_str().unwrap()])
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap();
+    assert!(
+        exit.success(),
+        "executing psql script {} failed: {}",
+        path.display(),
+        exit
+    );
+}
+
+/// Runs the load-data sql script in the container
+fn load_data(container: &PostgresContainer) {
+    psql_file(
+        container,
+        "db",
+        "postgres",
+        Path::new("/scripts/load-data.sql"),
+    );
+}
+
+/// Installs the timescaledb extension
+fn install_timescaledb_ext(client: &mut Client) -> Version {
+    client
+        .execute("create extension if not exists timescaledb;", &[])
+        .expect("failed to install the timescaledb extension");
+
+    let result = client.query_one(
+        "select extversion from pg_extension where extname = 'timescaledb'",
+        &[],
+    );
+    Version::parse(
+        result
+            .expect("failed to determine extension version")
+            .get(0),
+    )
+    .expect("failed to parse extension version")
+}
+
+/// Installs the promscale extension at the specified version
+fn install_promscale_ext(client: &mut Client, version: &Version) {
+    client
+        .execute(
+            format!(
+                "create extension promscale version '{}';",
+                version.to_string()
+            )
+            .as_str(),
+            &[],
+        )
+        .expect("failed to install the promscale extension");
+}
+
+/// Updates an extension to a specific version
+fn update_extension(
+    container_id: &str,
+    username: &str,
+    db: &str,
+    extension: &str,
+    version: &Version,
+) {
+    let exit = Command::new("docker")
+        .arg("exec")
+        .arg(&container_id)
+        .arg("psql")
+        .args(["-U", username])
+        .args(["-d", db])
+        .arg("-X") // the -X flag is important!! This prevents accidentally triggering the load of a previous TimescaleDB version on session startup.
+        .arg("--no-password")
+        .arg("--no-psqlrc")
+        .arg("--no-readline")
+        .arg("--echo-all")
+        .args(["-v", "ON_ERROR_STOP=1"])
+        .args([
+            "-c",
+            format!(
+                "alter extension {} update to '{}';",
+                extension,
+                version.to_string()
+            )
+            .as_str(),
+        ])
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap();
+    assert!(
+        exit.success(),
+        "updating {} to version {} failed: {}",
+        extension,
+        version.to_string(),
+        exit
+    );
+}
+
+/*
 /// Removes the working directory if it exists, then creates it
 fn make_working_dir(dir: &Path) {
     println!("temp dir at: {}", dir.to_str().unwrap());
@@ -401,3 +741,4 @@ fn upgrade_prior_with_data_test() {
         snapshot,
     );
 }
+*/
