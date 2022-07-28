@@ -6,8 +6,7 @@ use std::env;
 use std::fs::{create_dir_all, remove_dir_all, set_permissions, Permissions};
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
-use std::process::Command;
-//use test_common::postgres_container;
+use std::process::{Command, Stdio};
 use test_common::postgres_container::connect;
 use test_common::{PostgresContainer, PostgresContainerBlueprint};
 
@@ -82,7 +81,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
 
     // figure out which image we should start with in the upgrade process
     // based on alpine vs ha and postgres version
-    let from_image_uri = if flavor == "ha" {
+    /*let from_image_uri = if flavor == "ha" {
         // ha
         format!("timescale/timescaledb-ha:pg{}-ts2.7.1--latest", pg_version)
     } else {
@@ -91,7 +90,8 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
             "ghcr.io/timescale/dev_promscale_extension:master-ts2-pg{}",
             pg_version
         )
-    };
+    };*/
+    let from_image_uri = "timescale/timescaledb-ha:pg14.4-ts2.7.1-latest".to_string();
     println!("from image {}", from_image_uri);
     println!("to image {}", to_image_uri);
 
@@ -105,7 +105,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
 
     // for the database we're upgrading, we need to use two containers and the data_directory
     // needs to be persistent in this dir. we'll nest it inside the working directory
-    let data_dir = working_dir.clone().join("db");
+    let data_dir = working_dir.join("db");
     if !data_dir.exists() {
         create_dir_all(&data_dir).expect("failed to create working dir and data dir");
     }
@@ -121,6 +121,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
 
     /**********************************************************************************************/
     // BASELINE
+    println!("BASELINE");
     let baseline_blueprint = PostgresContainerBlueprint::new()
         .with_image_uri(to_image_uri.clone())
         .with_volume(script_dir, "/scripts")
@@ -164,6 +165,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
 
     /**********************************************************************************************/
     // UPGRADE FROM
+    println!("UPGRADE FROM");
     let from_blueprint = PostgresContainerBlueprint::new()
         .with_image_uri(from_image_uri)
         .with_volume(script_dir, "/scripts")
@@ -198,11 +200,53 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     // shut it down
     from_client
         .close()
-        .expect("failed to close databases connection");
+        .expect("failed to close database connection");
     from_container.stop();
 
     /**********************************************************************************************/
     // UPGRADE TO
+    println!("UPGRADE TO");
+    let to_blueprint = PostgresContainerBlueprint::new()
+        .with_image_uri(to_image_uri)
+        .with_volume(script_dir, "/scripts")
+        .with_volume(data_dir, "/var/lib/postgresql")
+        .with_env_var("PGDATA", "/var/lib/postgresql/data")
+        .with_db("db")
+        .with_user("postgres");
+    let to_container = to_blueprint.run();
+    println!("to_container id: {}", to_container.id());
+    let mut to_client = connect(&to_blueprint, &to_container);
+
+    // upgrade the timescaledb extension if we need to
+    if from_timescaledb_version != to_timescaledb_version {
+        println!(
+            "upgrading from timescaledb {} to {}",
+            from_timescaledb_version, to_timescaledb_version
+        );
+        update_extension(
+            to_container.id(),
+            "postgres",
+            "db",
+            "timescaledb",
+            &to_timescaledb_version,
+        );
+    }
+    /*
+    // update the promscale extension
+    update_extension(
+        to_container.id(),
+        "postgres",
+        "db",
+        "promscale",
+        &to_version,
+    );
+    */
+
+    // shut it down
+    to_client
+        .close()
+        .expect("failed to close database connection");
+    to_container.stop();
 }
 
 /// Determines the first, last, and prior versions of the promscale extension available
@@ -313,7 +357,7 @@ fn update_extension(
     extension: &str,
     version: &Version,
 ) {
-    let exit = Command::new("docker")
+    let child = Command::new("docker")
         .arg("exec")
         .arg(&container_id)
         .arg("psql")
@@ -327,23 +371,22 @@ fn update_extension(
         .args(["-v", "ON_ERROR_STOP=1"])
         .args([
             "-c",
-            format!(
-                "alter extension {} update to '{}';",
-                extension,
-                version.to_string()
-            )
-            .as_str(),
+            format!("alter extension {} update to '{}';", extension, &version).as_str(),
         ])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .spawn()
-        .unwrap()
-        .wait()
-        .unwrap();
+        .expect("failed to start psql to upgrade the extension");
+    let output = child
+        .wait_with_output()
+        .expect("failed to wait for psql to exit");
     assert!(
-        exit.success(),
+        output.status.success(),
         "updating {} to version {} failed: {}",
         extension,
-        version.to_string(),
-        exit
+        &version,
+        std::str::from_utf8(output.stderr.as_slice()).unwrap()
     );
 }
 
