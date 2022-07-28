@@ -3,11 +3,11 @@ extern crate core;
 use postgres::Client;
 use regex::Regex;
 use semver::Version;
-use similar::{ChangeTag, TextDiff};
+use similar::{ChangeTag, DiffableStr, TextDiff};
 use std::fs::{create_dir_all, remove_dir_all, set_permissions, Permissions};
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::{env, fs};
 use test_common::postgres_container::{connect, postgres_image_uri, ImageOrigin, PgVersion};
 use test_common::{PostgresContainer, PostgresContainerBlueprint};
@@ -71,8 +71,13 @@ fn upgrade_prior_with_data_test() {
 }
 
 fn test_upgrade(from_version: FromVersion, with_data: bool) {
+    // in local development, we want local/dev_promscale_extension:head-ts2-pg14
+    // in ci, we want ghcr.io/timescale/dev_promscale_extension:<branch-name>-ts2.7.2-pg<version>
+    // this image will be used for the baseline and for upgrading the version of promscale
     let to_image_uri = PostgresContainerBlueprint::default_image_uri();
 
+    // we need to know whether we are using an ha or alpine image in order to pick an appropriate
+    // corresponding "from" image used the create the older version of promscale
     let flavor = match to_image_uri.starts_with("local/dev_promscale_extension") {
         true => "alpine",
         false => match to_image_uri.ends_with("-alpine") {
@@ -82,13 +87,16 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     };
     println!("image flavor: {}", &flavor);
 
+    // we also need to know which version of postgres we have been instructed to use
     let pg_version = pg_version_from_image_uri(&to_image_uri);
     println!("postgresql version: {}", &pg_version);
 
+    // are we running in ci?
     // https://docs.github.com/en/actions/learn-github-actions/environment-variables#default-environment-variables
     let is_ci = env::var("CI").is_ok();
     println!("running in ci: {}", is_ci);
 
+    // pick the appropriate corresponding "from" image used the create the older version of promscale
     let from_image_uri = image_uri_from_flavor_pg_version(&flavor, &pg_version);
     println!("from image {}", from_image_uri);
     println!("to image {}", to_image_uri);
@@ -99,28 +107,27 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     let script_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/scripts");
 
     // in this directory we'll put our db snapshots we'll compare
-    let working_dir =
-        env::temp_dir().join(temp_dir_name(&from_version, with_data, flavor, pg_version));
+    let working_dir = env::temp_dir().join(name(&from_version, with_data, flavor, pg_version));
     if working_dir.exists() {
         remove_dir_all(&working_dir).expect("failed to remove working dir");
     }
     create_dir_all(&working_dir).expect("failed to create working dir");
     println!("working dir at {}", working_dir.to_str().unwrap());
 
-    let vol_name = create_docker_volume(&from_version, with_data, flavor, pg_version);
-    println!("docker volume name: {}", vol_name);
+    //let vol_name = create_docker_volume(&from_version, with_data, flavor, pg_version);
+    //println!("docker volume name: {}", vol_name);
 
     // for the database we're upgrading, we need to use two containers and the data_directory
     // needs to be persistent in this dir
-    //let data_dir = working_dir.clone().join("db");
-    //if !data_dir.exists() {
-    //    create_dir_all(&data_dir).expect("failed to create working dir and data dir");
-    //}
-    //let permissions = Permissions::from_mode(0o777);
-    //set_permissions(&data_dir, permissions.clone())
-    //    .expect("failed to chmod 0o777 on the data directory");
-    //let data_dir = data_dir.to_str().unwrap();
-    //println!("data dir at {}", &data_dir);
+    let data_dir = working_dir.clone().join("db");
+    if !data_dir.exists() {
+        create_dir_all(&data_dir).expect("failed to create working dir and data dir");
+    }
+    let permissions = Permissions::from_mode(0o777);
+    set_permissions(&data_dir, permissions.clone())
+        .expect("failed to chmod 0o777 on the data directory");
+    let data_dir = data_dir.to_str().unwrap();
+    println!("data dir at {}", &data_dir);
 
     // BASELINE
     // create a container using the target image
@@ -128,6 +135,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     // install the timescaledb extension and the promscale extension at the to_version
     // optionally load test data
     // snapshot the database
+    /*
     let (from_version, to_version, to_timescaledb_version, baseline_snapshot) = {
         let baseline_blueprint = PostgresContainerBlueprint::new()
             .with_image_uri(to_image_uri.clone())
@@ -169,7 +177,9 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
         };
         (from_version, last_version, to_timescaledb_version, snapshot)
     };
-
+    */
+    let from_version = Version::new(0, 5, 2);
+    let to_version = Version::new(0, 5, 5);
     println!("from promscale version {}", from_version);
     println!("to promscale version {}", to_version);
 
@@ -180,87 +190,159 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     // optionally load test data
     let from_timescaledb_version = {
         println!("UPGRADE FROM");
-        let from_blueprint = PostgresContainerBlueprint::new()
-            .with_image_uri(from_image_uri.to_string())
-            .with_volume(script_dir, "/scripts")
-            .with_volume(&vol_name, "/var/lib/postgresql/data")
-            .with_env_var("PGDATA", "/var/lib/postgresql/data")
-            .with_db("db")
-            .with_user("postgres");
-        let from_container = from_blueprint.run();
-        let mut from_client = connect(&from_blueprint, &from_container);
-        println!(
-            "postgres thinks the data_directory is {}",
-            pg_data_dir(&mut from_client)
-        );
-        let from_timescaledb_version = install_timescaledb_ext(&mut from_client);
-        install_promscale_ext(&mut from_client, &from_version);
-        if with_data {
-            load_data(&from_container);
-        }
-        from_client
-            .execute("checkpoint", &[])
-            .expect("failed to checkpoint");
-        from_container.stop();
-        from_timescaledb_version
-    };
 
-    //set_permissions(&data_dir, permissions).expect("failed to chmod 0o777 on the data directory");
-
-    // UPGRADE TO
-    // create a container using the target image
-    // map postgres' data dir to the same temp dir from before
-    // update the promscale extension to the to_version
-    // snapshot the database
-    println!("starting {}", from_image_uri.clone());
-    let upgraded_snapshot = {
-        let to_blueprint = PostgresContainerBlueprint::new()
-            .with_image_uri(to_image_uri)
-            .with_volume(script_dir, "/scripts")
-            .with_volume(&vol_name, "/var/lib/postgresql/data")
-            .with_env_var("PGDATA", "/var/lib/postgresql/data")
-            .with_db("db")
-            .with_user("postgres");
-        let to_container = to_blueprint.run();
-        let mut to_client = connect(&to_blueprint, &to_container);
-        println!(
-            "postgres thinks the data_directory is {}",
-            pg_data_dir(&mut to_client)
+        let child = Command::new("docker")
+            .arg("run")
+            .arg("-d")
+            .args([
+                "--mount",
+                format!("type=bind,src={},dst=/scripts", script_dir).as_str(),
+            ])
+            .args([
+                "--mount",
+                format!("type=bind,src={},dst=/var/lib/postgresql/data", data_dir).as_str(),
+            ])
+            .args(["--env", "PGDATA=/var/lib/postgresql/data/data"])
+            .args(["--env", "POSTGRES_HOST_AUTH_METHOD=trust"])
+            .args(["--env", "POSTGRES_DB=db"])
+            .args(["--env", "POSTGRES_DB=db"])
+            .args(["--env", "POSTGRES_USER=postgres"])
+            .args(["--env", "POSTGRES_PASSWORD=password"])
+            .arg(from_image_uri)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("failed to create and run the docker container");
+        let output = child
+            .wait_with_output()
+            .expect("failed to wait on docker run");
+        assert!(
+            output.status.success(),
+            "docker run failed {}",
+            std::str::from_utf8(output.stderr.as_slice()).expect("stderr is not valid utf8")
         );
-        if from_timescaledb_version != to_timescaledb_version {
-            assert!(from_timescaledb_version < to_timescaledb_version);
-            println!(
-                "upgrading from timescaledb {} to {}",
-                from_timescaledb_version, to_timescaledb_version
+        let from_container_id = std::str::from_utf8(output.stdout.as_slice())
+            .expect("stdout is not valid utf8")
+            .trim()
+            .to_string();
+        assert_ne!(from_container_id, "");
+        println!("from_container_id: {}", &from_container_id);
+
+        loop {
+            let exit = Command::new("docker")
+                .arg("exec")
+                .arg(&from_container_id)
+                .arg("pg_isready")
+                .args(["-t", "10"])
+                .arg("-q")
+                .spawn()
+                .unwrap()
+                .wait()
+                .unwrap();
+            let exit_code = exit.code().unwrap();
+            assert!(
+                exit_code < 3,
+                "failed to wait for postgresql to be ready: {}",
+                exit
             );
-            update_extension(
-                &to_container,
-                "postgres",
-                "db",
-                "timescaledb",
-                &to_timescaledb_version,
-            );
+            if exit_code == 2 {
+                println!("postgres is not answering yet");
+                std::thread::sleep(std::time::Duration::from_secs(1));
+            }
+            if exit_code == 0 {
+                println!("postgres is ready!");
+                break;
+            }
         }
-        update_extension(&to_container, "postgres", "db", "promscale", &to_version);
-        let upgraded_snapshot = snapshot_db(
-            &to_container,
-            "db",
-            "postgres",
-            working_dir
-                .join(format!(
-                    "snapshot-{}-{}-{}.txt",
-                    from_version,
-                    to_version,
-                    if with_data { "with-data" } else { "no-data" }
-                ))
-                .as_path(),
-        );
-        to_container.stop();
-        upgraded_snapshot
-    };
+        println!("done");
+        /*
+               let from_blueprint = PostgresContainerBlueprint::new()
+                   .with_image_uri(from_image_uri.to_string())
+                   .with_volume(script_dir, "/scripts")
+                   .with_volume(&vol_name, "/var/lib/postgresql/data")
+                   .with_env_var("PGDATA", "/var/lib/postgresql/data/data")
+                   .with_db("db")
+                   .with_user("postgres");
+               let from_container = from_blueprint.run();
+               let mut from_client = connect(&from_blueprint, &from_container);
+               println!(
+                   "postgres thinks the data_directory is {}",
+                   pg_data_dir(&mut from_client)
+               );
+               let from_timescaledb_version = install_timescaledb_ext(&mut from_client);
+               install_promscale_ext(&mut from_client, &from_version);
+               if with_data {
+                   load_data(&from_container);
+               }
+               from_client
+                   .execute("checkpoint", &[])
+                   .expect("failed to checkpoint");
+               from_container.stop();
+               from_timescaledb_version
 
-    let are_equal = are_snapshots_equal(baseline_snapshot, upgraded_snapshot);
-    assert!(are_equal);
+        */
+        Version::new(2, 7, 0)
+    };
+    /*
+       //set_permissions(&data_dir, permissions).expect("failed to chmod 0o777 on the data directory");
+
+       // UPGRADE TO
+       // create a container using the target image
+       // map postgres' data dir to the same temp dir from before
+       // update the promscale extension to the to_version
+       // snapshot the database
+       println!("starting {}", from_image_uri.clone());
+       let upgraded_snapshot = {
+           let to_blueprint = PostgresContainerBlueprint::new()
+               .with_image_uri(to_image_uri)
+               .with_volume(script_dir, "/scripts")
+               .with_volume(&vol_name, "/var/lib/postgresql/data")
+               .with_env_var("PGDATA", "/var/lib/postgresql/data")
+               .with_db("db")
+               .with_user("postgres");
+           let to_container = to_blueprint.run();
+           let mut to_client = connect(&to_blueprint, &to_container);
+           println!(
+               "postgres thinks the data_directory is {}",
+               pg_data_dir(&mut to_client)
+           );
+           if from_timescaledb_version != to_timescaledb_version {
+               assert!(from_timescaledb_version < to_timescaledb_version);
+               println!(
+                   "upgrading from timescaledb {} to {}",
+                   from_timescaledb_version, to_timescaledb_version
+               );
+               update_extension(
+                   &to_container,
+                   "postgres",
+                   "db",
+                   "timescaledb",
+                   &to_timescaledb_version,
+               );
+           }
+           update_extension(&to_container, "postgres", "db", "promscale", &to_version);
+           let upgraded_snapshot = snapshot_db(
+               &to_container,
+               "db",
+               "postgres",
+               working_dir
+                   .join(format!(
+                       "snapshot-{}-{}-{}.txt",
+                       from_version,
+                       to_version,
+                       if with_data { "with-data" } else { "no-data" }
+                   ))
+                   .as_path(),
+           );
+           to_container.stop();
+           upgraded_snapshot
+       };
+
+       let are_equal = are_snapshots_equal(baseline_snapshot, upgraded_snapshot);
+       assert!(are_equal);
+
+    */
 }
 
 fn image_uri_from_flavor_pg_version(flavor: &str, pg_version: &str) -> String {
@@ -282,12 +364,7 @@ fn pg_version_from_image_uri(to_image_uri: &String) -> &str {
     pg_version
 }
 
-fn temp_dir_name(
-    from_version: &FromVersion,
-    with_data: bool,
-    flavor: &str,
-    pg_version: &str,
-) -> String {
+fn name(from_version: &FromVersion, with_data: bool, flavor: &str, pg_version: &str) -> String {
     format!(
         "test-upgrade-from-{}-{}-{}-{}",
         match from_version {
