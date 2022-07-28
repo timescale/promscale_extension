@@ -25,3 +25,4 @@ The following are step-by-step instructions for releasing the Promscale extensio
   - Update `upgradeable_from` in templates/promscale.control to add the previously released version
 - [ ] Bump the version in Promscale's `EXTENSION_VERSION` (Renovate should automatically create a PR for this).
 - [ ] Add the new version to `timescaledb/timescaledb-docker-ha` docker image.
+  - [ ] Once the new ha docker image has been released, replace all entries in `e2e/tests/config/mod.rs` with the newly released image
