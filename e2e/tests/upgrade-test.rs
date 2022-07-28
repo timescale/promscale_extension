@@ -142,7 +142,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
                 "--mount",
                 format!("type=bind,src={},dst=/scripts", script_dir).as_str(),
             ])
-            .args(["--env", "PGDATA=/var/lib/postgresql/data/data"])
+            .args(["--env", "PGDATA=/var/lib/postgresql/data"])
             .args(["--env", "POSTGRES_HOST_AUTH_METHOD=trust"])
             .args(["--env", "POSTGRES_DB=db"])
             .args(["--env", "POSTGRES_USER=postgres"])
@@ -168,10 +168,8 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
             .to_string();
         assert_ne!(baseline_container_id, "");
         println!("baseline_container_id: {}", &baseline_container_id);
-        thread::sleep(std::time::Duration::from_secs(5));
+        wait_for_log_msg(&baseline_container_id);
         wait_for_pg_ready(&baseline_container_id);
-        thread::sleep(std::time::Duration::from_secs(5));
-        //wait_for_log_msg(&baseline_container_id);
         let mut baseline_client = Client::connect(
             "postgres://postgres:password@localhost:5554/db",
             postgres::NoTls,
@@ -229,9 +227,9 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
             ])
             .args([
                 "--mount",
-                format!("type=bind,src={},dst=/var/lib/postgresql/data", data_dir).as_str(),
+                format!("type=bind,src={},dst=/var/lib/postgresql", data_dir).as_str(),
             ])
-            .args(["--env", "PGDATA=/var/lib/postgresql/data/data"])
+            .args(["--env", "PGDATA=/var/lib/postgresql/data"])
             .args(["--env", "POSTGRES_HOST_AUTH_METHOD=trust"])
             .args(["--env", "POSTGRES_DB=db"])
             .args(["--env", "POSTGRES_USER=postgres"])
@@ -258,8 +256,8 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
         assert_ne!(from_container_id, "");
         println!("from_container_id: {}", &from_container_id);
         thread::sleep(std::time::Duration::from_secs(5));
+        wait_for_log_msg(&from_container_id);
         wait_for_pg_ready(&from_container_id);
-        //wait_for_log_msg(&from_container_id);
         let mut from_client = Client::connect(
             "postgres://postgres:password@localhost:5555/db",
             postgres::NoTls,
@@ -299,9 +297,9 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
             ])
             .args([
                 "--mount",
-                format!("type=bind,src={},dst=/var/lib/postgresql/data", data_dir).as_str(),
+                format!("type=bind,src={},dst=/var/lib/postgresql", data_dir).as_str(),
             ])
-            .args(["--env", "PGDATA=/var/lib/postgresql/data/data"])
+            .args(["--env", "PGDATA=/var/lib/postgresql/data"])
             .args(["--env", "POSTGRES_HOST_AUTH_METHOD=trust"])
             .args(["--env", "POSTGRES_DB=db"])
             .args(["--env", "POSTGRES_USER=postgres"])
@@ -328,8 +326,8 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
         assert_ne!(to_container_id, "");
         println!("to_container_id: {}", &to_container_id);
         thread::sleep(std::time::Duration::from_secs(5));
+        wait_for_log_msg(&to_container_id);
         wait_for_pg_ready(&to_container_id);
-        //wait_for_log_msg(&to_container_id);
         let mut to_client = Client::connect(
             "postgres://postgres:password@localhost:5556/db",
             postgres::NoTls,
@@ -399,7 +397,7 @@ fn wait_for_log_msg(container_id: &str) {
             .output()
             .expect("failed to get container logs");
         assert!(output.status.success());
-        let logs = std::str::from_utf8(output.stdout.as_slice()).expect("stdout is not valid utf8");
+        let logs = std::str::from_utf8(output.stderr.as_slice()).expect("stdout is not valid utf8");
         if logs.contains("database system is ready to accept connections") {
             break;
         }
