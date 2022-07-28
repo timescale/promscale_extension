@@ -8,7 +8,7 @@ use std::fs::{create_dir_all, remove_dir_all, set_permissions, Permissions};
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::{env, fs};
+use std::{env, fs, thread};
 
 // We expect the upgrade process to produce the same results as freshly installing the extension.
 // These tests enforce that expectation.
@@ -84,21 +84,21 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
             false => "ha",
         },
     };
-    eprintln!("image flavor: {}", &flavor);
+    println!("image flavor: {}", &flavor);
 
     // we also need to know which version of postgres we have been instructed to use
     let pg_version = pg_version_from_image_uri(&to_image_uri);
-    eprintln!("postgresql version: {}", &pg_version);
+    println!("postgresql version: {}", &pg_version);
 
     // are we running in ci?
     // https://docs.github.com/en/actions/learn-github-actions/environment-variables#default-environment-variables
     let is_ci = env::var("CI").is_ok();
-    eprintln!("running in ci: {}", is_ci);
+    println!("running in ci: {}", is_ci);
 
     // pick the appropriate corresponding "from" image used the create the older version of promscale
     let from_image_uri = image_uri_from_flavor_pg_version(&flavor, &pg_version);
-    eprintln!("from image {}", from_image_uri);
-    eprintln!("to image {}", to_image_uri);
+    println!("from image {}", from_image_uri);
+    println!("to image {}", to_image_uri);
 
     // set up some working directories
 
@@ -113,7 +113,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
         remove_dir_all(&working_dir).expect("failed to remove working dir");
     }
     create_dir_all(&working_dir).expect("failed to create working dir");
-    eprintln!("working dir at {}", working_dir.to_str().unwrap());
+    println!("working dir at {}", working_dir.to_str().unwrap());
 
     // for the database we're upgrading, we need to use two containers and the data_directory
     // needs to be persistent in this dir
@@ -125,7 +125,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     set_permissions(&data_dir, permissions.clone())
         .expect("failed to chmod 0o777 on the data directory");
     let data_dir = data_dir.to_str().unwrap();
-    eprintln!("data dir at {}", &data_dir);
+    println!("data dir at {}", &data_dir);
 
     // BASELINE
     // create a container using the target image
@@ -134,7 +134,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     // optionally load test data
     // snapshot the database
     let (from_version, to_version, to_timescaledb_version, baseline_snapshot) = {
-        eprintln!("BASELINE");
+        println!("BASELINE");
         let child = Command::new("docker")
             .arg("run")
             .arg("-d")
@@ -144,7 +144,6 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
             ])
             .args(["--env", "PGDATA=/var/lib/postgresql/data/data"])
             .args(["--env", "POSTGRES_HOST_AUTH_METHOD=trust"])
-            .args(["--env", "POSTGRES_DB=db"])
             .args(["--env", "POSTGRES_DB=db"])
             .args(["--env", "POSTGRES_USER=postgres"])
             .args(["--env", "POSTGRES_PASSWORD=password"])
@@ -168,12 +167,16 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
             .trim()
             .to_string();
         assert_ne!(baseline_container_id, "");
-        eprintln!("baseline_container_id: {}", &baseline_container_id);
+        println!("baseline_container_id: {}", &baseline_container_id);
+        thread::sleep(std::time::Duration::from_secs(5));
         wait_for_pg_ready(&baseline_container_id);
-        wait_for_log_msg(&baseline_container_id);
-        let mut baseline_client =
-            Client::connect("postgres://postgres@localhost:5555/db", postgres::NoTls)
-                .expect("failed to connect to postgres");
+        thread::sleep(std::time::Duration::from_secs(5));
+        //wait_for_log_msg(&baseline_container_id);
+        let mut baseline_client = Client::connect(
+            "postgres://postgres:password@localhost:5554/db",
+            postgres::NoTls,
+        )
+        .expect("failed to connect to postgres");
 
         let (first_version, last_version, prior_version) =
             available_extension_versions(&mut baseline_client);
@@ -205,8 +208,8 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
         };
         (from_version, last_version, to_timescaledb_version, snapshot)
     };
-    eprintln!("from promscale version {}", from_version);
-    eprintln!("to promscale version {}", to_version);
+    println!("from promscale version {}", from_version);
+    println!("to promscale version {}", to_version);
 
     // UPGRADE FROM
     // create a container using the latest image
@@ -214,7 +217,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     // install timescaledb and promscale at the from_version
     // optionally load test data
     let from_timescaledb_version = {
-        eprintln!("UPGRADE FROM");
+        println!("UPGRADE FROM");
 
         let child = Command::new("docker")
             .arg("run")
@@ -230,7 +233,6 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
             ])
             .args(["--env", "PGDATA=/var/lib/postgresql/data/data"])
             .args(["--env", "POSTGRES_HOST_AUTH_METHOD=trust"])
-            .args(["--env", "POSTGRES_DB=db"])
             .args(["--env", "POSTGRES_DB=db"])
             .args(["--env", "POSTGRES_USER=postgres"])
             .args(["--env", "POSTGRES_PASSWORD=password"])
@@ -254,13 +256,16 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
             .trim()
             .to_string();
         assert_ne!(from_container_id, "");
-        eprintln!("from_container_id: {}", &from_container_id);
+        println!("from_container_id: {}", &from_container_id);
+        thread::sleep(std::time::Duration::from_secs(5));
         wait_for_pg_ready(&from_container_id);
-        wait_for_log_msg(&from_container_id);
-        let mut from_client =
-            Client::connect("postgres://postgres@localhost:5555/db", postgres::NoTls)
-                .expect("failed to connect to postgres");
-        eprintln!(
+        //wait_for_log_msg(&from_container_id);
+        let mut from_client = Client::connect(
+            "postgres://postgres:password@localhost:5555/db",
+            postgres::NoTls,
+        )
+        .expect("failed to connect to postgres");
+        println!(
             "postgres thinks the data_directory is {}",
             pg_data_dir(&mut from_client)
         );
@@ -284,7 +289,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     // update the promscale extension to the to_version
     // snapshot the database
     let upgraded_snapshot = {
-        eprintln!("UPGRADE TO");
+        println!("UPGRADE TO");
         let child = Command::new("docker")
             .arg("run")
             .arg("-d")
@@ -298,7 +303,6 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
             ])
             .args(["--env", "PGDATA=/var/lib/postgresql/data/data"])
             .args(["--env", "POSTGRES_HOST_AUTH_METHOD=trust"])
-            .args(["--env", "POSTGRES_DB=db"])
             .args(["--env", "POSTGRES_DB=db"])
             .args(["--env", "POSTGRES_USER=postgres"])
             .args(["--env", "POSTGRES_PASSWORD=password"])
@@ -322,19 +326,22 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
             .trim()
             .to_string();
         assert_ne!(to_container_id, "");
-        eprintln!("to_container_id: {}", &to_container_id);
+        println!("to_container_id: {}", &to_container_id);
+        thread::sleep(std::time::Duration::from_secs(5));
         wait_for_pg_ready(&to_container_id);
-        wait_for_log_msg(&to_container_id);
-        let mut to_client =
-            Client::connect("postgres://postgres@localhost:5556/db", postgres::NoTls)
-                .expect("failed to connect to postgres");
-        eprintln!(
+        //wait_for_log_msg(&to_container_id);
+        let mut to_client = Client::connect(
+            "postgres://postgres:password@localhost:5556/db",
+            postgres::NoTls,
+        )
+        .expect("failed to connect to postgres");
+        println!(
             "postgres thinks the data_directory is {}",
             pg_data_dir(&mut to_client)
         );
         if from_timescaledb_version != to_timescaledb_version {
             assert!(from_timescaledb_version < to_timescaledb_version);
-            eprintln!(
+            println!(
                 "upgrading from timescaledb {} to {}",
                 from_timescaledb_version, to_timescaledb_version
             );
@@ -393,10 +400,10 @@ fn wait_for_log_msg(container_id: &str) {
             .expect("failed to get container logs");
         assert!(output.status.success());
         let logs = std::str::from_utf8(output.stdout.as_slice()).expect("stdout is not valid utf8");
-        if logs.contains("LOG: database system is ready to accept connections") {
+        if logs.contains("database system is ready to accept connections") {
             break;
         }
-        eprintln!("postgres is not ready yet");
+        println!("postgres is not ready yet");
         std::thread::sleep(std::time::Duration::from_secs(1));
     }
 }
@@ -407,8 +414,6 @@ fn wait_for_pg_ready(container_id: &str) {
             .arg("exec")
             .arg(&container_id)
             .arg("pg_isready")
-            //.args(["-t", "10"])
-            .arg("-q")
             .spawn()
             .unwrap()
             .wait()
@@ -420,11 +425,11 @@ fn wait_for_pg_ready(container_id: &str) {
             exit
         );
         if exit_code == 2 {
-            eprintln!("postgres is not answering yet");
+            println!("postgres is not answering yet");
             std::thread::sleep(std::time::Duration::from_secs(1));
         }
         if exit_code == 0 {
-            eprintln!("postgres is ready!");
+            println!("postgres is ready!");
             break;
         }
     }
@@ -740,7 +745,7 @@ fn pg_data_dir(client: &mut Client) -> String {
 /// Differences are printed to the console.
 /// Returns a boolean. True indicates the two snapshots are identical
 fn are_snapshots_equal(snapshot0: String, snapshot1: String) -> bool {
-    eprintln!("comparing the snapshots...");
+    println!("comparing the snapshots...");
     let are_snapshots_equal = snapshot0 == snapshot1;
     if !are_snapshots_equal {
         let diff = TextDiff::from_lines(snapshot0.as_str(), snapshot1.as_str());
@@ -753,10 +758,10 @@ fn are_snapshots_equal(snapshot0: String, snapshot1: String) -> bool {
                 ChangeTag::Insert => "+",
                 ChangeTag::Equal => " ",
             };
-            eprintln!("{} {}", sign, change);
+            println!("{} {}", sign, change);
         }
     } else {
-        eprintln!("snapshots are equal");
+        println!("snapshots are equal");
     }
     are_snapshots_equal
 }
