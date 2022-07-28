@@ -5,14 +5,15 @@ edition = "2021"
 
 [dev-dependencies]
 hex = "0.4.3"
+log = "0.4.17"
 md-5 = "0.10.1"
+postgres = "0.19.2"
 pretty_env_logger = "0.4"
 regex = "1.5.5"
-similar = "2.1.0"
-log = "0.4.17"
-test-common = "0.1.0"
 semver = "1.0.12"
-postgres = "0.19.2"
+similar = "2.1.0"
+tempdir = "0.3.7"
+test-common = "0.1.0"
 
 [build-dependencies]
 build-deps = "^0.1"

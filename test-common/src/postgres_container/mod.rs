@@ -1,4 +1,5 @@
 use postgres::Client;
+use std::fmt::{Display, Formatter};
 use testcontainers::images::generic::GenericImage;
 use testcontainers::Container;
 
@@ -23,6 +24,29 @@ pub enum PgVersion {
     V14,
     V13,
     V12,
+}
+
+impl TryFrom<&str> for PgVersion {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "14" => Ok(PgVersion::V14),
+            "13" => Ok(PgVersion::V13),
+            "12" => Ok(PgVersion::V12),
+            _ => Err(format!("Unknown postgres version {}", value)),
+        }
+    }
+}
+
+impl Display for PgVersion {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PgVersion::V14 => write!(f, "14"),
+            PgVersion::V13 => write!(f, "13"),
+            PgVersion::V12 => write!(f, "12"),
+        }
+    }
 }
 
 pub fn postgres_image_uri(origin: ImageOrigin, version: PgVersion) -> String {
