@@ -90,6 +90,27 @@ Variations we run:
 │ local │ alpine │ 14 │ without │ first │
 │ local │ alpine │ 14 │ without │ prior │
 └───────┴────────┴────┴─────────┴───────┘
+
+PGDATA:
+> This optional variable can be used to define another location - like a subdirectory - for the
+> database files. The default is /var/lib/postgresql/data. If the data volume you're using is a
+> filesystem mountpoint (like with GCE persistent disks) or remote folder that cannot be chowned to
+> the postgres user (like some NFS mounts), Postgres initdb recommends a subdirectory be created to
+> contain the data.
+>
+> For example:
+>
+> $ docker run -d \
+> 	--name some-postgres \
+> 	-e POSTGRES_PASSWORD=mysecretpassword \
+> 	-e PGDATA=/var/lib/postgresql/data/pgdata \
+> 	-v /custom/mount:/var/lib/postgresql/data \
+> 	postgres
+>
+> This is an environment variable that is not Docker specific. Because the variable is used by the
+> postgres server binary (see the PostgreSQL docs), the entrypoint script takes it into account.
+- https://hub.docker.com/_/postgres
+
 */
 
 enum FromVersion {
