@@ -1,14 +1,96 @@
 use postgres::Client;
 use regex::Regex;
 use semver::Version;
-//use similar::{ChangeTag, TextDiff};
-use std::env;
+use similar::{ChangeTag, TextDiff};
 use std::fs::{create_dir_all, remove_dir_all, set_permissions, Permissions};
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::{env, fs};
 use test_common::postgres_container::connect;
 use test_common::{PostgresContainer, PostgresContainerBlueprint};
+
+/*
+
+OBJECTIVE:
+Ensure that a fresh install of the extension will produce the same results as starting
+from a prior version of the extension and upgrading it.
+
+APPROACH:
+We have a candidate version that has been built into a docker image. This may be build locally on a
+developer's machine, or in CI off a branch. We want to test the install vs upgrade using this
+candidate image.
+
+We start with a baseline. We use the candidate image to install the promscale extension from scratch
+at the default version, which should be the latest version, which should also be the candidate
+version. We "snapshot" the structure and data of the database to a text file.
+
+Next, we want to compare this baseline snapshot to one produced by an upgrade process. We want to
+mimic what a real-world user would do. So, we start with a "blessed" image -- ideally, a published
+release image. We create the promscale extension at a "prior" version and shutdown the container.
+
+We then create a new container using the candidate image and the existing data directory. We then
+update the promscale extension to the latest version. We snapshot the structure and data of the
+database to a file.
+
+The snapshots produced by the baseline and the upgrade should be identical.
+
+COMPLEXITIES:
+
+* We need these tests to run locally on a developer's machine, and in CI.
+* We should ideally test both "flavors" of our images: HA and Alpine. Images built on developers'
+  machines with make are of the alpine "flavor". Both "flavors" are used in CI.
+* We should ideally test with postgres versions 12, 13, and 14.
+* We have had at least one issue with a release in which the upgrade failed because of a database
+  migration that would not work if a given table was empty. So, we now have test scenarios both
+  with and without data. See issue: https://github.com/timescale/promscale/issues/33
+* We want to test with the immediately prior version of the promscale extension and the first
+  version of the extension that can be installed without the connector.
+* The default version of timescaledb in the "from" and "to" images may differ. We update the
+  timescaledb extension in this case as well.
+
+Variations we run:
+┌───────┬────────┬────┬─────────┬───────┐
+│ where │ flavor │ pg │  data   │ from  │
+├───────┼────────┼────┼─────────┼───────┤
+│ ci    │ alpine │ 12 │ with    │ first │
+│ ci    │ alpine │ 12 │ with    │ prior │
+│ ci    │ alpine │ 12 │ without │ first │
+│ ci    │ alpine │ 12 │ without │ prior │
+│ ci    │ alpine │ 13 │ with    │ first │
+│ ci    │ alpine │ 13 │ with    │ prior │
+│ ci    │ alpine │ 13 │ without │ first │
+│ ci    │ alpine │ 13 │ without │ prior │
+│ ci    │ alpine │ 14 │ with    │ first │
+│ ci    │ alpine │ 14 │ with    │ prior │
+│ ci    │ alpine │ 14 │ without │ first │
+│ ci    │ alpine │ 14 │ without │ prior │
+│ ci    │ ha     │ 12 │ with    │ first │
+│ ci    │ ha     │ 12 │ with    │ prior │
+│ ci    │ ha     │ 12 │ without │ first │
+│ ci    │ ha     │ 12 │ without │ prior │
+│ ci    │ ha     │ 13 │ with    │ first │
+│ ci    │ ha     │ 13 │ with    │ prior │
+│ ci    │ ha     │ 13 │ without │ first │
+│ ci    │ ha     │ 13 │ without │ prior │
+│ ci    │ ha     │ 14 │ with    │ first │
+│ ci    │ ha     │ 14 │ with    │ prior │
+│ ci    │ ha     │ 14 │ without │ first │
+│ ci    │ ha     │ 14 │ without │ prior │
+│ local │ alpine │ 12 │ with    │ first │
+│ local │ alpine │ 12 │ with    │ prior │
+│ local │ alpine │ 12 │ without │ first │
+│ local │ alpine │ 12 │ without │ prior │
+│ local │ alpine │ 13 │ with    │ first │
+│ local │ alpine │ 13 │ with    │ prior │
+│ local │ alpine │ 13 │ without │ first │
+│ local │ alpine │ 13 │ without │ prior │
+│ local │ alpine │ 14 │ with    │ first │
+│ local │ alpine │ 14 │ with    │ prior │
+│ local │ alpine │ 14 │ without │ first │
+│ local │ alpine │ 14 │ without │ prior │
+└───────┴────────┴────┴─────────┴───────┘
+*/
 
 enum FromVersion {
     First,
@@ -81,7 +163,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
 
     // figure out which image we should start with in the upgrade process
     // based on alpine vs ha and postgres version
-    /*let from_image_uri = if flavor == "ha" {
+    let from_image_uri = if flavor == "ha" {
         // ha
         format!("timescale/timescaledb-ha:pg{}-ts2.7.1--latest", pg_version)
     } else {
@@ -90,8 +172,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
             "ghcr.io/timescale/dev_promscale_extension:master-ts2-pg{}",
             pg_version
         )
-    };*/
-    let from_image_uri = "timescale/timescaledb-ha:pg14.4-ts2.7.1-latest".to_string();
+    };
     println!("from image {}", from_image_uri);
     println!("to image {}", to_image_uri);
 
@@ -157,6 +238,14 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
         load_data(&baseline_container);
     }
 
+    // snapshot the database
+    let baseline_snapshot: String = snapshot_db(
+        baseline_container.id(),
+        "db",
+        "postgres",
+        working_dir.join("baseline-snapshot.txt").as_path(),
+    );
+
     // shut it down
     baseline_client
         .close()
@@ -169,7 +258,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     let from_blueprint = PostgresContainerBlueprint::new()
         .with_image_uri(from_image_uri)
         .with_volume(script_dir, "/scripts")
-        .with_volume(data_dir, "/var/lib/postgresql")
+        .with_volume(data_dir, "/var/lib/postgresql/data:z")
         .with_env_var("PGDATA", "/var/lib/postgresql/data")
         .with_db("db")
         .with_user("postgres");
@@ -209,13 +298,12 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     let to_blueprint = PostgresContainerBlueprint::new()
         .with_image_uri(to_image_uri)
         .with_volume(script_dir, "/scripts")
-        .with_volume(data_dir, "/var/lib/postgresql")
+        .with_volume(data_dir, "/var/lib/postgresql/data:z")
         .with_env_var("PGDATA", "/var/lib/postgresql/data")
         .with_db("db")
         .with_user("postgres");
     let to_container = to_blueprint.run();
     println!("to_container id: {}", to_container.id());
-    let mut to_client = connect(&to_blueprint, &to_container);
 
     // upgrade the timescaledb extension if we need to
     if from_timescaledb_version != to_timescaledb_version {
@@ -231,7 +319,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
             &to_timescaledb_version,
         );
     }
-    /*
+
     // update the promscale extension
     update_extension(
         to_container.id(),
@@ -240,16 +328,24 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
         "promscale",
         &to_version,
     );
-    */
+
+    // snapshot the database
+    let upgraded_snapshot = snapshot_db(
+        to_container.id(),
+        "db",
+        "postgres",
+        working_dir.join("upgraded-snapshot.txt").as_path(),
+    );
 
     // shut it down
-    to_client
-        .close()
-        .expect("failed to close database connection");
     to_container.stop();
+
+    // compare the snapshots
+    let are_equal = are_snapshots_equal(baseline_snapshot, upgraded_snapshot);
+    assert!(are_equal);
 }
 
-/// Determines the first, last, and prior versions of the promscale extension available
+/// determines the first, last, and prior versions of the promscale extension available
 fn available_extension_versions(client: &mut Client) -> (Version, Version, Version) {
     // version 0.1 won't parse correctly
     // version 0.5.3 and pre-releases of 0.5.3 were pulled due to a bug the broke upgrades
@@ -280,7 +376,7 @@ fn available_extension_versions(client: &mut Client) -> (Version, Version, Versi
     (first, last, prior)
 }
 
-/// Runs a SQL script file in the docker container
+/// runs a SQL script file in the docker container
 fn psql_file(container: &PostgresContainer, db: &str, username: &str, path: &Path) {
     println!("executing psql script {}...", path.display());
     let exit = Command::new("docker")
@@ -307,7 +403,7 @@ fn psql_file(container: &PostgresContainer, db: &str, username: &str, path: &Pat
     );
 }
 
-/// Runs the load-data sql script in the container
+/// runs the load-data sql script in the container
 fn load_data(container: &PostgresContainer) {
     psql_file(
         container,
@@ -317,7 +413,107 @@ fn load_data(container: &PostgresContainer) {
     );
 }
 
-/// Installs the timescaledb extension
+/// copies a file out of a container to the host filesystem
+fn copy_out(container_id: &str, src: &Path, dest: &Path) {
+    if dest.exists() {
+        fs::remove_file(dest).expect("failed to remove existing dest file");
+    }
+    let exit = Command::new("docker")
+        .arg("cp")
+        .arg(format!("{}:{}", &container_id, src.display()))
+        .arg(dest.to_str().unwrap())
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap();
+    assert!(
+        exit.success(),
+        "copying the file out of the container failed: {}",
+        exit
+    );
+}
+
+/// edits a snapshot file to account for acceptable differences
+fn normalize_snapshot(path: &Path) -> String {
+    let snapshot = fs::read_to_string(path).expect("failed to read snapshot file");
+
+    // partition constraints are printed with the OID of the table, but OIDs are allowed to change
+    let re = Regex::new(r"Partition constraint: satisfies_hash_partition\('\d+'::oid").unwrap();
+    let snapshot = re.replace_all(
+        &snapshot,
+        "Partition constraint: satisfies_hash_partition('*'::oid",
+    );
+
+    // chunks have constraints defined on the time column. the constants will be slightly off and that's okay
+    let re = Regex::new(
+        "\"time\" (>=|<) '[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{0,6}\\+00'",
+    )
+    .unwrap();
+    let snapshot = re.replace_all(&snapshot, "\"time\" >= '1982-01-06 01:02:03.123456+00'");
+
+    fs::write(path, snapshot.as_bytes()).expect("failed to write snapshot file");
+    snapshot.to_string()
+}
+
+/// takes a snapshot of a database to a text file on the host filesystem
+fn snapshot_db(container_id: &str, db: &str, username: &str, path: &Path) -> String {
+    let snapshot = Path::new("/tmp/snapshot.txt");
+    println!("snapshotting database {} via {} user...", db, username);
+    let exit = Command::new("docker")
+        .arg("exec")
+        .arg(&container_id)
+        .arg("psql")
+        .args(["-U", username])
+        .args(["-d", db])
+        .arg("--no-password")
+        .arg("--no-psqlrc")
+        .arg("--no-readline")
+        .arg("--echo-all")
+        // do not ON_ERROR_STOP=1. some meta commands will not find objects for some schemas
+        // and psql treats this as an error. this is expected, and we don't want the snapshot to
+        // fail because of it. eat the error and continue
+        //.args(["-v", "ON_ERROR_STOP=1"]) don't uncomment me!
+        .args(["-o", snapshot.to_str().unwrap()])
+        .args(["-f", "/scripts/snapshot.sql"])
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap();
+    assert!(
+        exit.success(),
+        "snapshotting the database {} via {} user failed: {}",
+        db,
+        username,
+        exit
+    );
+    copy_out(container_id, snapshot, path);
+    normalize_snapshot(path)
+}
+
+/// diffs the two snapshots
+fn are_snapshots_equal(snapshot0: String, snapshot1: String) -> bool {
+    println!("comparing the snapshots...");
+    let are_snapshots_equal = snapshot0 == snapshot1;
+    if !are_snapshots_equal {
+        let diff = TextDiff::from_lines(snapshot0.as_str(), snapshot1.as_str());
+        for change in diff.iter_all_changes() {
+            if change.tag() == ChangeTag::Equal {
+                continue;
+            }
+            let sign = match change.tag() {
+                ChangeTag::Delete => "-",
+                ChangeTag::Insert => "+",
+                ChangeTag::Equal => " ",
+            };
+            println!("{} {}", sign, change);
+        }
+    } else {
+        println!("snapshots are equal");
+    }
+    are_snapshots_equal
+}
+
+/// installs the timescaledb extension
 fn install_timescaledb_ext(client: &mut Client) -> Version {
     client
         .execute("create extension if not exists timescaledb;", &[])
@@ -335,7 +531,7 @@ fn install_timescaledb_ext(client: &mut Client) -> Version {
     .expect("failed to parse extension version")
 }
 
-/// Installs the promscale extension at the specified version
+/// installs the promscale extension at the specified version
 fn install_promscale_ext(client: &mut Client, version: &Version) {
     client
         .execute(
@@ -349,7 +545,7 @@ fn install_promscale_ext(client: &mut Client, version: &Version) {
         .expect("failed to install the promscale extension");
 }
 
-/// Updates an extension to a specific version
+/// updates an extension to a specific version
 fn update_extension(
     container_id: &str,
     username: &str,
