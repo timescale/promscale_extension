@@ -33,7 +33,7 @@ mv sql/promscale-0.5.5.sql sql/promscale--0.5.5.sql
 Create symlinks:
 
 ```bash
-for i in {0..4}; do ln -s sql/promscale--0.5.5.sql sql/promscale--0.5.${i}--0.5.5.sql; done
+./create-upgrade-symlinks.sh
 ```
 
 Force add the `.sql` files to the commit, as they're in `.gitignore`:
