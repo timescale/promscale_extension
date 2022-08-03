@@ -26,7 +26,7 @@ The following are step-by-step instructions for releasing the Promscale extensio
 Generate SQL file:
 
 ```bash
-cargo pgx schema --release
+cargo pgx schema --release --out=sql/promscale--$(./extract-extension-version.sh | tr -d '\n').sql
 mv sql/promscale-0.5.5.sql sql/promscale--0.5.5.sql
 ```
 
