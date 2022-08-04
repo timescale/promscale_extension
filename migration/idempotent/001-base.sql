@@ -980,10 +980,10 @@ $$
           RAISE '% is not a metric. unable to drop it.', metric_name_to_be_dropped;
         END IF;
         RAISE NOTICE 'deleting "%" metric with metric_id as "%" and table_name as "%"', metric_name_to_be_dropped, deletable_metric_id, hypertable_name;
-        EXECUTE FORMAT('DROP VIEW prom_series.%1$I;', hypertable_name);
-        EXECUTE FORMAT('DROP VIEW prom_metric.%1$I;', hypertable_name);
-        EXECUTE FORMAT('DROP TABLE prom_data_series.%1$I;', hypertable_name);
-        EXECUTE FORMAT('DROP TABLE prom_data.%1$I;', hypertable_name);
+        EXECUTE FORMAT('DROP VIEW IF EXISTS prom_series.%1$I;', hypertable_name);
+        EXECUTE FORMAT('DROP VIEW IF EXISTS prom_metric.%1$I;', hypertable_name);
+        EXECUTE FORMAT('DROP TABLE IF EXISTS prom_data_series.%1$I;', hypertable_name);
+        EXECUTE FORMAT('DROP TABLE IF EXISTS prom_data.%1$I;', hypertable_name);
         DELETE FROM _prom_catalog.metric WHERE id=deletable_metric_id;
         -- clean up unreferenced labels, label_keys and its position.
         DELETE FROM _prom_catalog.label_key_position WHERE metric_name=metric_name_to_be_dropped;
