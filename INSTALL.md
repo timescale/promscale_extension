@@ -54,7 +54,7 @@ See the Postgres [documentation](https://www.postgresql.org/download/linux/redha
 - `alpine` - legacy and local development -- Avoid if you can. It will eat your ~laundry~ collation.
 - `quick` and package building images are not published anywhere and are used for local development and building packages 
 
-## Compile From Source
+## Compile From Source on Ubuntu Linux
 
 For bare-metal installations, the full instructions for setting up PostgreSQL, TimescaleDB, and the Promscale Extension are:
 
@@ -121,7 +121,53 @@ For bare-metal installations, the full instructions for setting up PostgreSQL, T
     LATEST_VERSION=$(curl -s https://api.github.com/repos/timescale/promscale/releases/latest | grep "tag_name" | cut -d'"' -f4)
     curl -L -o promscale "https://github.com/timescale/promscale/releases/download/${LATEST_VERSION}/promscale_${LATEST_VERSION}_Linux_x86_64"
     chmod +x promscale
-    ./promscale --db-name promscale --db-password promscale --db-user promscale --db-ssl-mode allow --install-extensions
+    ./promscale --db.name promscale --db.password promscale --db.user promscale --db.ssl-mode allow --startup.install-extensions
+    ```
+## Compile From Source on MacOS(Darwin, ARM64)
+
+For bare-metal installations, the full instructions for setting up PostgreSQL, TimescaleDB, and the Promscale Extension are:
+
+1) Follow [this doc](https://docs.timescale.com/install/latest/self-hosted/installation-macos/#install-self-hosted-timescaledb-using-homebrew) and install TimescaleDB(which also install Postgres)
+
+1) Restart Postgres after executing `timescaledb-tune` script
+    ```bash
+    pg_ctl -D /opt/homebrew/var/postgres restart
+    ```
+1) [Install rust](https://www.rust-lang.org/tools/install).
+    ```bash
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+    source $HOME/.cargo/env
+    ```
+1) Install the PGX framework
+    ```bash
+    cargo install cargo-pgx --git https://github.com/timescale/pgx --branch promscale-staging
+    ```
+1) Initialize the PGX framework using the PostgreSQL 14 installation
+    ```bash
+    cargo pgx init --pg14=/opt/homebrew/bin/pg_config
+    ```
+1) Download this repo and change directory into it
+    ```bash
+    git clone https://github.com/timescale/promscale_extension
+    cd promscale_extension
+    git checkout 0.5.0
+    ```
+1) Compile and install
+    ```bash
+    make package
+    sudo make install
+    ```
+1) Create a PostgreSQL user and database for promscale (use an appropriate password!)
+    ```bash
+    psql postgres -c "CREATE USER promscale SUPERUSER PASSWORD 'promscale';"
+    psql postgres -c "CREATE DATABASE promscale OWNER promscale;"
+    ```
+1) [Download and run promscale (it will install the extension in the PostgreSQL database)](https://github.com/timescale/promscale/blob/master/docs/bare-metal-promscale-stack.md#2-deploying-promscale)
+    ```bash
+    LATEST_VERSION=$(curl -s https://api.github.com/repos/timescale/promscale/releases/latest | grep "tag_name" | cut -d'"' -f4)
+    curl -L -o promscale "https://github.com/timescale/promscale/releases/download/${LATEST_VERSION}/promscale_${LATEST_VERSION}_Darwin_arm64"
+    chmod +x promscale
+    ./promscale --db.name promscale --db.password promscale --db.user promscale --db.ssl-mode allow --startup.install-extensions
     ```
 
 This extension will be created via `CREATE EXTENSION` automatically by the Promscale connector and should not be created manually.

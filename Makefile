@@ -103,7 +103,7 @@ package: promscale.control ## Generate extension artifacts for packaging
 
 .PHONY: install
 install: ## Install the extension in the Postgres found via pg_config
-	cp --recursive ./target/release/promscale-pg${PG_BUILD_VERSION}/* /
+	cp -R ./target/release/promscale-pg${PG_BUILD_VERSION}/* /
 
 dist/$(RELEASE_FILE_NAME): release-builder
 	@container="$$(docker create $(RELEASE_IMAGE_NAME))"; \
