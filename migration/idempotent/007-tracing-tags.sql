@@ -33,7 +33,7 @@ CREATE OR REPLACE FUNCTION ps_trace.tag_map_object_field(ps_trace.tag_map, pg_ca
     LANGUAGE internal AS 'jsonb_object_field';
 GRANT EXECUTE ON FUNCTION ps_trace.tag_map_object_field(ps_trace.tag_map, pg_catalog.text) TO prom_reader;
 COMMENT ON FUNCTION ps_trace.tag_map_object_field
-IS 'This function is a part of custom ps_trace.tag_map type which is a wrapper for 
+IS 'This function is a part of custom ps_trace.tag_map type which is a wrapper for
 the built-in jsonb. It is the same as its jsonb_ namesake, but returns _ps_trace.tag_v.';
 
 DO $do$
@@ -49,7 +49,7 @@ EXCEPTION
 END;
 $do$;
 COMMENT ON OPERATOR ps_trace.-> (ps_trace.tag_map, pg_catalog.text)
-IS 'This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
+IS 'This operator is a part of custom ps_trace.tag_map type which is a wrapper for
 the built-in jsonb. It is the same as its jsonb_ namesake, but returns _ps_trace.tag_v.';
 
 -------------------------------------------------------------------------------
@@ -65,7 +65,7 @@ CREATE OR REPLACE FUNCTION ps_trace.tag_v_eq(_ps_trace.tag_v, pg_catalog.jsonb)
     AS 'jsonb_eq';
 GRANT EXECUTE ON FUNCTION ps_trace.tag_v_eq(_ps_trace.tag_v, pg_catalog.jsonb) TO prom_reader;
 COMMENT ON FUNCTION ps_trace.tag_v_eq(_ps_trace.tag_v, pg_catalog.jsonb)
-IS 'This function is a part of custom _ps_trace.tag_v type which is a wrapper for 
+IS 'This function is a part of custom _ps_trace.tag_v type which is a wrapper for
 the built-in jsonb. It is the same as its jsonb_ namesake, but has a support function attached.';
 
 CREATE OR REPLACE FUNCTION ps_trace.tag_v_eq(_ps_trace.tag_v, _ps_trace.tag_v)
@@ -78,7 +78,7 @@ CREATE OR REPLACE FUNCTION ps_trace.tag_v_eq(_ps_trace.tag_v, _ps_trace.tag_v)
 GRANT EXECUTE ON FUNCTION ps_trace.tag_v_eq(_ps_trace.tag_v, _ps_trace.tag_v) TO prom_reader;
 
 COMMENT ON FUNCTION ps_trace.tag_v_eq(_ps_trace.tag_v, _ps_trace.tag_v)
-IS 'This function is a part of custom _ps_trace.tag_v type which is a wrapper for 
+IS 'This function is a part of custom _ps_trace.tag_v type which is a wrapper for
 the built-in jsonb. It is the same as its jsonb_ namesake, but has a support function attached.';
 
 CREATE OR REPLACE FUNCTION _ps_trace.tag_v_eq_matching_tags(_tag_key pg_catalog.text, _value pg_catalog.jsonb)
@@ -96,9 +96,58 @@ $fnc$
 $fnc$;
 GRANT EXECUTE ON FUNCTION _ps_trace.tag_v_eq_matching_tags(_tag_key pg_catalog.text, _value pg_catalog.jsonb) TO prom_reader;
 COMMENT ON FUNCTION _ps_trace.tag_v_eq_matching_tags
-IS 'This function is a part of custom _ps_trace.tag_v type which is a wrapper for 
+IS 'This function is a part of custom _ps_trace.tag_v type which is a wrapper for
 the built-in jsonb. The tag_map_rewrite support function, attached to tag_v_eq,
 will use this function instead, if it can.';
+
+CREATE OR REPLACE FUNCTION _ps_trace.text_matches(_value pg_catalog.text)
+    RETURNS pg_catalog.jsonb[]
+    --note: to_jsonb is stable, not immutable because of timestamptz handling which does not apply here.
+    --so this is safe.
+    LANGUAGE sql IMMUTABLE
+    -- Note: no explicit `SET SCHEMA` because we want this function to be inlined
+    PARALLEL SAFE AS
+$fnc$
+SELECT CASE
+ WHEN _value OPERATOR(pg_catalog.=) ANY(array['true', 'false']) THEN ARRAY[pg_catalog.to_jsonb(_value), pg_catalog.to_jsonb(_value::pg_catalog.bool)]
+ --regex from https://www.regular-expressions.info/floatingpoint.html
+ --the jsonb internals all use numeric types for maniplation so use numeric here too (as opposed to float)
+ WHEN _value OPERATOR(pg_catalog.~) '^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$' THEN ARRAY[pg_catalog.to_jsonb(_value), pg_catalog.to_jsonb(_value::pg_catalog.numeric)]
+ ELSE ARRAY[pg_catalog.to_jsonb(_value)]
+END
+$fnc$;
+GRANT EXECUTE ON FUNCTION _ps_trace.text_matches(_value pg_catalog.text) TO prom_reader;
+COMMENT ON FUNCTION _ps_trace.text_matches
+IS 'This function is an internal function that given a peice of text, returns all the possible
+jsonb representations of that text. I.e. it is the inverse of the jsonb ->> operator.';
+
+CREATE OR REPLACE FUNCTION _ps_trace.tag_v_text_eq_matching_tags(_tag_key pg_catalog.text, _tag_value_text pg_catalog.text)
+    RETURNS pg_catalog.jsonb[]
+    LANGUAGE sql STABLE
+    SET search_path = pg_catalog, pg_temp
+    PARALLEL SAFE AS
+$fnc$
+    SELECT coalesce(pg_catalog.array_agg(pg_catalog.jsonb_build_object(a.key_id, a.id)), array[]::pg_catalog.jsonb[])
+    FROM
+    (
+            SELECT v, _prom_ext.jsonb_digest(v) as digest
+            FROM unnest(_ps_trace.text_matches(_tag_value_text)) as v
+    ) as matchers
+    INNER JOIN LATERAL (
+        SELECT t.*
+        FROM _ps_trace.tag t
+        WHERE t.key OPERATOR(pg_catalog.=) _tag_key
+        AND _prom_ext.jsonb_digest(t.value) OPERATOR(pg_catalog.=) matchers.digest
+        AND t.value OPERATOR(pg_catalog.=) matchers.v
+        LIMIT 1
+    ) as a on (true);
+$fnc$;
+GRANT EXECUTE ON FUNCTION _ps_trace.tag_v_text_eq_matching_tags(_tag_key pg_catalog.text, _tag_value_text pg_catalog.text) TO prom_reader;
+COMMENT ON FUNCTION _ps_trace.tag_v_text_eq_matching_tags
+IS 'This function is a part of custom _ps_trace.tag_v type which is a wrapper for
+the built-in jsonb. This function returns all the jsonb { tag_key_id, tag_value_id } pairs where
+the tag key matches _tag_key and the textual output of tag value matches _tag_value_text';
+
 
 DO $do$
 BEGIN
@@ -117,7 +166,7 @@ EXCEPTION
 END;
 $do$;
 COMMENT ON OPERATOR ps_trace.= (_ps_trace.tag_v, pg_catalog.jsonb)
-IS 'This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
+IS 'This operator is a part of custom ps_trace.tag_map type which is a wrapper for
 the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.';
 
 
@@ -138,7 +187,7 @@ EXCEPTION
 END;
 $do$;
 COMMENT ON OPERATOR ps_trace.%= (_ps_trace.tag_v, _ps_trace.tag_v)
-IS 'This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
+IS 'This operator is a part of custom ps_trace.tag_map type which is a wrapper for
 the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.';
 
 -------------------------------------------------------------------------------
@@ -154,7 +203,7 @@ CREATE OR REPLACE FUNCTION ps_trace.tag_v_ne(_ps_trace.tag_v, pg_catalog.jsonb)
     AS 'jsonb_ne';
 GRANT EXECUTE ON FUNCTION ps_trace.tag_v_ne(_ps_trace.tag_v, pg_catalog.jsonb) TO prom_reader;
 COMMENT ON FUNCTION ps_trace.tag_v_ne(_ps_trace.tag_v, pg_catalog.jsonb)
-IS 'This function is a part of custom _ps_trace.tag_v type which is a wrapper for 
+IS 'This function is a part of custom _ps_trace.tag_v type which is a wrapper for
 the built-in jsonb. It is the same as its jsonb_ namesake, but has a support function attached.';
 
 CREATE OR REPLACE FUNCTION ps_trace.tag_v_ne(_ps_trace.tag_v, _ps_trace.tag_v)
@@ -167,7 +216,7 @@ CREATE OR REPLACE FUNCTION ps_trace.tag_v_ne(_ps_trace.tag_v, _ps_trace.tag_v)
     AS 'jsonb_ne';
 GRANT EXECUTE ON FUNCTION ps_trace.tag_v_ne(_ps_trace.tag_v, _ps_trace.tag_v) TO prom_reader;
 COMMENT ON FUNCTION ps_trace.tag_v_ne(_ps_trace.tag_v, _ps_trace.tag_v)
-IS 'This function is a part of custom _ps_trace.tag_v type which is a wrapper for 
+IS 'This function is a part of custom _ps_trace.tag_v type which is a wrapper for
 the built-in jsonb. It is the same as its jsonb_ namesake, but has a support function attached.';
 
 CREATE OR REPLACE FUNCTION _ps_trace.tag_v_ne_matching_tags(_tag_key pg_catalog.text, _value pg_catalog.jsonb)
@@ -183,7 +232,7 @@ $fnc$
 $fnc$;
 GRANT EXECUTE ON FUNCTION _ps_trace.tag_v_ne_matching_tags(_tag_key pg_catalog.text, _value pg_catalog.jsonb) TO prom_reader;
 COMMENT ON FUNCTION _ps_trace.tag_v_ne_matching_tags
-IS 'This function is a part of custom _ps_trace.tag_v type which is a wrapper for 
+IS 'This function is a part of custom _ps_trace.tag_v type which is a wrapper for
 the built-in jsonb. The tag_map_rewrite support function, attached to tag_v_ne,
 will use this function instead, if it can.';
 
@@ -204,7 +253,7 @@ EXCEPTION
 END;
 $do$;
 COMMENT ON OPERATOR ps_trace.<> (_ps_trace.tag_v, pg_catalog.jsonb)
-IS 'This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
+IS 'This operator is a part of custom ps_trace.tag_map type which is a wrapper for
 the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.';
 
 DO $do$
@@ -223,7 +272,7 @@ EXCEPTION
 END;
 $do$;
 COMMENT ON OPERATOR ps_trace.%<> (_ps_trace.tag_v, _ps_trace.tag_v)
-IS 'This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
+IS 'This operator is a part of custom ps_trace.tag_map type which is a wrapper for
 the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.';
 
 -------------------------------------------------------------------------------
@@ -318,7 +367,7 @@ EXCEPTION
 END;
 $do$;
 COMMENT ON OPERATOR ps_trace.%>= (_ps_trace.tag_v, _ps_trace.tag_v)
-IS 'This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
+IS 'This operator is a part of custom ps_trace.tag_map type which is a wrapper for
 the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.';
 
 DO $do$
@@ -337,7 +386,7 @@ EXCEPTION
 END;
 $do$;
 COMMENT ON OPERATOR ps_trace.%< (_ps_trace.tag_v, _ps_trace.tag_v)
-IS 'This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
+IS 'This operator is a part of custom ps_trace.tag_map type which is a wrapper for
 the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.';
 
 DO $do$
@@ -356,7 +405,7 @@ EXCEPTION
 END;
 $do$;
 COMMENT ON OPERATOR ps_trace.%<= (_ps_trace.tag_v, _ps_trace.tag_v)
-IS 'This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
+IS 'This operator is a part of custom ps_trace.tag_map type which is a wrapper for
 the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.';
 
 

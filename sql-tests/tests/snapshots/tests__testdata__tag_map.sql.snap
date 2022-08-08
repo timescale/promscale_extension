@@ -55,7 +55,7 @@ CREATE FUNCTION explain_jsonb(_query pg_catalog.text, OUT _result pg_catalog.jso
     LANGUAGE plpgsql VOLATILE AS
 $fnc$
 BEGIN
-    EXECUTE 'explain (format json) ' || _query INTO _result;
+    EXECUTE 'explain (format json, verbose, analyze) ' || _query INTO _result;
     RETURN;
 END;
 $fnc$;
@@ -168,5 +168,36 @@ SELECT span_tags -> 'pwlen' AS tagv FROM span  GROUP BY tagv;
  18
  25
 (2 rows)
+
+\unset ECHO
+ plan  
+-------
+ 1..10
+(1 row)
+
+            is            
+--------------------------
+ ok 1 - test text_matches
+ ok 2 - test text_matches
+ ok 3 - test text_matches
+ ok 4 - test text_matches
+ ok 5 - test text_matches
+ ok 6 - test text_matches
+ ok 7 - test text_matches
+(7 rows)
+
+           ok           |        ok         
+------------------------+-------------------
+ ok 8 - subplan is used | ok 9 - uses index
+(1 row)
+
+                ok                 
+-----------------------------------
+ ok 10 - exclusion does not happen
+(1 row)
+
+ finish 
+--------
+(0 rows)
 
 
