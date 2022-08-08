@@ -17,6 +17,7 @@ We use the following categories for changes:
 ### Added
 
 - Added `prom_api.get_default_chunk_interval()` and `prom_api.get_metric_chunk_interval(TEXT)` [#464].
+- Added `_ps_trace.text_matches()` and `_ps_trace.tag_v_text_eq_matching_tags()` [#461]
 
 ### Fixed
 - Incorrect type coercion when using `tag_map` with `=` operator [#462]

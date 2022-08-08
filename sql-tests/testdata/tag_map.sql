@@ -30,7 +30,7 @@ CREATE FUNCTION explain_jsonb(_query pg_catalog.text, OUT _result pg_catalog.jso
     LANGUAGE plpgsql VOLATILE AS
 $fnc$
 BEGIN
-    EXECUTE 'explain (format json) ' || _query INTO _result;
+    EXECUTE 'explain (format json, verbose, analyze) ' || _query INTO _result;
     RETURN;
 END;
 $fnc$;
@@ -90,3 +90,50 @@ SELECT DISTINCT span_tags -> 'pwlen' FROM span ;
 
 SELECT span_tags -> 'pwlen' AS tagv FROM span  GROUP BY tagv;
 
+
+\unset ECHO
+\set QUIET 1
+\i 'testdata/scripts/pgtap-1.2.0.sql'
+
+SELECT * FROM plan(10);
+
+SELECT is(_ps_trace.text_matches(input), expected, 'test text_matches')
+FROM
+(
+    values
+    ('regular text'   , array['"regular text"']::jsonb[]),
+    ('true'           , array['"true"', 'true']::jsonb[]),
+    ('false'          , array['"false"', 'false']::jsonb[]),
+    ('1.0'          , array['"1.0"', '1.0']::jsonb[]),
+    ('+2.0'          , array['"+2.0"', '2.0']::jsonb[]),
+    ('10'          , array['"10"', '10']::jsonb[]),
+    ('-20'          , array['"-20"', '-20']::jsonb[])
+) x(input, expected)
+;
+
+set enable_seqscan=off;
+
+SELECT
+  ok(j @? '$.**."Subplan Name" ? (@ == "InitPlan 1 (returns $0)")','subplan is used'),
+  ok(j @? '$.**."Index Cond" ?  (@ like_regex ".*span_tags.*::jsonb @> ANY .*\\\$0.*")', 'uses index')
+FROM
+explain_jsonb(
+    $$
+        SELECT *
+        FROM _ps_trace.span
+        WHERE span_tags @> ANY((SELECT _ps_trace.tag_v_text_eq_matching_tags('pwlen', '25'))::jsonb[])
+    $$) j;
+
+--the following case should get optimized with https://github.com/timescale/timescaledb/pull/4556, because the matching tags will be an empty array
+--this will need to be changed after that's merged
+SELECT
+    ok(j @? '$.** ? (@."Custom Plan Provider" == "ChunkAppend" && @."Runtime Exclusion" == false)', 'exclusion does not happen')
+FROM
+explain_jsonb(
+    $$
+       SELECT * FROM _ps_trace.span WHERE span_tags @> ANY((SELECT _ps_trace.tag_v_text_eq_matching_tags('pwlen', 'does not exist'))::jsonb[]);
+    $$) j;
+
+RESET enable_seqscan;
+
+SELECT * FROM finish(true);
