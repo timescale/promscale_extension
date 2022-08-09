@@ -14,6 +14,9 @@ We use the following categories for changes:
 
 ## [Unreleased]
 
+### Fixed
+- Incorrect type coercion when using `tag_map` with `=` operator [#345]
+
 ### Changed
 
 - `ps_trace.delete_all_traces()` can only be executed when no Promscale connectors are running [#437].
