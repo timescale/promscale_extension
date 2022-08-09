@@ -123,7 +123,7 @@ the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map
 
 DO $do$
 BEGIN
-	DROP OPERATOR IF EXISTS ps_trace.= (_ps_trace.tag_v, _ps_trace.tag_v);
+	DROP OPERATOR IF EXISTS ps_trace.= (_ps_trace.tag_v, _ps_trace.tag_v) CASCADE;
 	CREATE OPERATOR ps_trace.%= (
 	    FUNCTION       = ps_trace.tag_v_eq,
 	    LEFTARG        = _ps_trace.tag_v,
@@ -210,7 +210,7 @@ the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map
 
 DO $do$
 BEGIN
-	DROP OPERATOR IF EXISTS ps_trace.<> (_ps_trace.tag_v, _ps_trace.tag_v);
+	DROP OPERATOR IF EXISTS ps_trace.<> (_ps_trace.tag_v, _ps_trace.tag_v)  CASCADE;
 	CREATE OPERATOR ps_trace.%<> (
 	    FUNCTION       = ps_trace.tag_v_ne,
 	    LEFTARG        = _ps_trace.tag_v,
@@ -289,7 +289,7 @@ IS 'This function is a part of custom _ps_trace.tag_v type which is a wrapper fo
 
 DO $do$
 BEGIN
-	DROP OPERATOR IF EXISTS ps_trace.> (_ps_trace.tag_v, _ps_trace.tag_v);
+	DROP OPERATOR IF EXISTS ps_trace.> (_ps_trace.tag_v, _ps_trace.tag_v) CASCADE;
 	CREATE OPERATOR ps_trace.%> (
 	    FUNCTION       = ps_trace.tag_v_gt,
 	    LEFTARG        = _ps_trace.tag_v,
@@ -307,7 +307,7 @@ $do$;
 
 DO $do$
 BEGIN
-	DROP OPERATOR IF EXISTS ps_trace.>= (_ps_trace.tag_v, _ps_trace.tag_v);
+	DROP OPERATOR IF EXISTS ps_trace.>= (_ps_trace.tag_v, _ps_trace.tag_v) CASCADE;
 	CREATE OPERATOR ps_trace.%>= (
 	    FUNCTION       = ps_trace.tag_v_ge,
 	    LEFTARG        = _ps_trace.tag_v,
@@ -327,7 +327,7 @@ the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map
 
 DO $do$
 BEGIN
-	DROP OPERATOR IF EXISTS ps_trace.< (_ps_trace.tag_v, _ps_trace.tag_v);
+	DROP OPERATOR IF EXISTS ps_trace.< (_ps_trace.tag_v, _ps_trace.tag_v) CASCADE;
 	CREATE OPERATOR ps_trace.%< (
 	    FUNCTION       = ps_trace.tag_v_lt,
 	    LEFTARG        = _ps_trace.tag_v,
@@ -347,7 +347,7 @@ the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map
 
 DO $do$
 BEGIN
-	DROP OPERATOR IF EXISTS ps_trace.<= (_ps_trace.tag_v, _ps_trace.tag_v);
+	DROP OPERATOR IF EXISTS ps_trace.<= (_ps_trace.tag_v, _ps_trace.tag_v) CASCADE;
 	CREATE OPERATOR ps_trace.%<= (
 	    FUNCTION       = ps_trace.tag_v_le,
 	    LEFTARG        = _ps_trace.tag_v,
