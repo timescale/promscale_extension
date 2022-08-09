@@ -67,8 +67,9 @@ fn upgrade_promscale_extension_all_versions() {
                     );
                     assert!(
                         res.is_ok(),
-                        "cannot create extension at version {}",
-                        version
+                        "cannot create extension at version {}: {}",
+                        version,
+                        res.unwrap_err()
                     );
                 }
                 Some(prev_version) => {
@@ -82,15 +83,16 @@ fn upgrade_promscale_extension_all_versions() {
                     );
                     assert!(
                         res.is_ok(),
-                        "cannot upgrade extension from version {} to {}",
+                        "cannot upgrade extension from version {} to {}: {}",
                         prev_version,
-                        version
+                        version,
+                        res.unwrap_err(),
                     );
                 }
             }
             prev_version = Some(version);
         }
-        let res = test_conn.simple_query("DROP EXTENSION promscale CASCADE;");
-        assert!(res.is_ok(), "cannot drop extension");
+        let res = test_conn.query("DROP EXTENSION promscale CASCADE;", &[]);
+        assert!(res.is_ok(), "cannot drop extension: {}", res.unwrap_err());
     }
 }
