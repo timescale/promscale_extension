@@ -14,6 +14,10 @@ We use the following categories for changes:
 
 ## [Unreleased]
 
+### Added
+
+- Added `prom_api.get_default_chunk_interval()` and `prom_api.get_metric_chunk_interval(TEXT)` [#464].
+
 ### Changed
 
 - `ps_trace.delete_all_traces()` can only be executed when no Promscale connectors are running [#437].

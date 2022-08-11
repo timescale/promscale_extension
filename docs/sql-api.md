@@ -36,10 +36,20 @@ Execute maintenance tasks like dropping data according to retention policy. This
 ```
 procedure void **prom_api.execute_maintenance**(IN log_verbose boolean DEFAULT false)
 ```
+### prom_api.get_default_chunk_interval
+Get the default chunk interval for all metrics
+```
+function interval **prom_api.get_default_chunk_interval**()
+```
 ### prom_api.get_default_metric_retention_period
 get the default retention period for all metrics
 ```
 function interval **prom_api.get_default_metric_retention_period**()
+```
+### prom_api.get_metric_chunk_interval
+Get the chunk interval for a specific metric, or the default chunk interval if not explicitly set
+```
+function interval **prom_api.get_metric_chunk_interval**(metric_name text)
 ```
 ### prom_api.get_metric_metadata
 
