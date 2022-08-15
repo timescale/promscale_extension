@@ -195,7 +195,7 @@ BEGIN
 	    FUNCTION       = ps_trace.tag_v_ne,
 	    LEFTARG        = _ps_trace.tag_v,
 	    RIGHTARG       = pg_catalog.jsonb,
-	    NEGATOR        = OPERATOR(ps_trace.%=),
+	    NEGATOR        = OPERATOR(ps_trace.=),
 	    RESTRICT       = neqsel,
 	    JOIN           = neqjoinsel
 	);
@@ -370,8 +370,9 @@ the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map
 
 DO $do$
 BEGIN
-    DROP OPERATOR CLASS IF EXISTS btree_tag_v_ops USING btree;
-    CREATE OPERATOR CLASS btree_tag_v_ops
+    DROP OPERATOR CLASS IF EXISTS public.btree_tag_v_ops USING btree;
+    DROP OPERATOR CLASS IF EXISTS ps_trace.btree_tag_v_ops USING btree;
+    CREATE OPERATOR CLASS ps_trace.btree_tag_v_ops
     DEFAULT FOR TYPE _ps_trace.tag_v USING btree
     AS
             OPERATOR        1       ps_trace.%<  ,
