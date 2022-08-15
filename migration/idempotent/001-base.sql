@@ -1426,6 +1426,17 @@ COMMENT ON FUNCTION prom_api.set_default_chunk_interval(INTERVAL)
 IS 'set the chunk interval for any metrics (existing and new) without an explicit override';
 GRANT EXECUTE ON FUNCTION prom_api.set_default_chunk_interval(INTERVAL) TO prom_admin;
 
+CREATE OR REPLACE FUNCTION prom_api.get_default_chunk_interval()
+    RETURNS INTERVAL
+    SET search_path = pg_catalog, pg_temp
+AS $func$
+    SELECT _prom_catalog.get_default_value('chunk_interval')::pg_catalog.interval;
+$func$
+    LANGUAGE SQL;
+COMMENT ON FUNCTION prom_api.get_default_chunk_interval()
+    IS 'Get the default chunk interval for all metrics';
+GRANT EXECUTE ON FUNCTION prom_api.get_default_chunk_interval() TO prom_admin;
+
 CREATE OR REPLACE FUNCTION prom_api.set_metric_chunk_interval(metric_name TEXT, chunk_interval INTERVAL)
     RETURNS BOOLEAN
     VOLATILE
@@ -1446,6 +1457,35 @@ LANGUAGE SQL;
 COMMENT ON FUNCTION prom_api.set_metric_chunk_interval(TEXT, INTERVAL)
 IS 'set a chunk interval for a specific metric (this overrides the default)';
 GRANT EXECUTE ON FUNCTION prom_api.set_metric_chunk_interval(TEXT, INTERVAL) TO prom_admin;
+
+CREATE OR REPLACE FUNCTION prom_api.get_metric_chunk_interval(metric_name TEXT)
+    RETURNS INTERVAL
+    SET search_path = pg_catalog, pg_temp
+AS $func$
+    DECLARE
+    _table_name TEXT;
+    _is_default BOOLEAN;
+    _chunk_interval INTERVAL;
+    BEGIN
+        SELECT table_name, default_chunk_interval
+        INTO STRICT _table_name, _is_default
+        FROM _prom_catalog.metric WHERE table_schema = 'prom_data' AND metric.metric_name = get_metric_chunk_interval.metric_name;
+        IF _is_default THEN
+            RETURN prom_api.get_default_chunk_interval();
+        END IF;
+
+        SELECT time_interval
+        INTO STRICT _chunk_interval
+        FROM timescaledb_information.dimensions
+        WHERE hypertable_schema = 'prom_data' AND hypertable_name = _table_name AND column_name = 'time';
+
+        RETURN _chunk_interval;
+    END
+$func$
+LANGUAGE plpgsql;
+COMMENT ON FUNCTION prom_api.get_metric_chunk_interval(TEXT)
+    IS 'Get the chunk interval for a specific metric, or the default chunk interval if not explicitly set';
+GRANT EXECUTE ON FUNCTION prom_api.get_metric_chunk_interval(TEXT) TO prom_admin;
 
 CREATE OR REPLACE FUNCTION prom_api.reset_metric_chunk_interval(metric_name TEXT)
     RETURNS BOOLEAN
