@@ -1411,18 +1411,52 @@ This function supports the @? operator.
 __Function:__ tag_op_jsonb_path_exists
 
 __Schema:__ ps_tag
+### _ps_trace.tag_v %< _ps_trace.tag_v → boolean
+This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
+the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.
+
+__Function:__ tag_v_lt
+
+__Schema:__ ps_trace
+### _ps_trace.tag_v %<= _ps_trace.tag_v → boolean
+This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
+the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.
+
+__Function:__ tag_v_le
+
+__Schema:__ ps_trace
+### _ps_trace.tag_v %<> _ps_trace.tag_v → boolean
+This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
+the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.
+
+__Function:__ ps_trace.tag_v_ne
+
+__Schema:__ ps_trace
+### _ps_trace.tag_v %= _ps_trace.tag_v → boolean
+This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
+the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.
+
+__Function:__ ps_trace.tag_v_eq
+
+__Schema:__ ps_trace
+### _ps_trace.tag_v %> _ps_trace.tag_v → boolean
+This function is a part of custom _ps_trace.tag_v type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.
+
+__Function:__ tag_v_gt
+
+__Schema:__ ps_trace
+### _ps_trace.tag_v %>= _ps_trace.tag_v → boolean
+This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
+the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.
+
+__Function:__ tag_v_ge
+
+__Schema:__ ps_trace
 ### tag_map -> text → _ps_trace.tag_v
 This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
 the built-in jsonb. It is the same as its jsonb_ namesake, but returns _ps_trace.tag_v.
 
 __Function:__ tag_map_object_field
-
-__Schema:__ ps_trace
-### _ps_trace.tag_v < _ps_trace.tag_v → boolean
-This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
-the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.
-
-__Function:__ tag_v_lt
 
 __Schema:__ ps_trace
 ### trace_id < trace_id → boolean
@@ -1431,24 +1465,10 @@ This function is a part of custom ps_trace.tag_traceid type which is a wrapper f
 __Function:__ _ps_trace.trace_id_lt
 
 __Schema:__ ps_trace
-### _ps_trace.tag_v <= _ps_trace.tag_v → boolean
-This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
-the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.
-
-__Function:__ tag_v_le
-
-__Schema:__ ps_trace
 ### trace_id <= trace_id → boolean
 This function is a part of custom ps_trace.tag_traceid type which is a wrapper for the built-in uuid. It is the same as its uuid_ namesake.
 
 __Function:__ _ps_trace.trace_id_le
-
-__Schema:__ ps_trace
-### _ps_trace.tag_v <> _ps_trace.tag_v → boolean
-This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
-the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.
-
-__Function:__ ps_trace.tag_v_ne
 
 __Schema:__ ps_trace
 ### _ps_trace.tag_v <> jsonb → boolean
@@ -1464,13 +1484,6 @@ This function is a part of custom ps_trace.tag_traceid type which is a wrapper f
 __Function:__ _ps_trace.trace_id_ne
 
 __Schema:__ ps_trace
-### _ps_trace.tag_v = _ps_trace.tag_v → boolean
-This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
-the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.
-
-__Function:__ ps_trace.tag_v_eq
-
-__Schema:__ ps_trace
 ### _ps_trace.tag_v = jsonb → boolean
 This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
 the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.
@@ -1484,23 +1497,10 @@ This function is a part of custom ps_trace.tag_traceid type which is a wrapper f
 __Function:__ _ps_trace.trace_id_eq
 
 __Schema:__ ps_trace
-### _ps_trace.tag_v > _ps_trace.tag_v → boolean
-This function is a part of custom _ps_trace.tag_v type which is a wrapper for the built-in jsonb. It is the same as its jsonb_ namesake.
-
-__Function:__ tag_v_gt
-
-__Schema:__ ps_trace
 ### trace_id > trace_id → boolean
 This function is a part of custom ps_trace.tag_traceid type which is a wrapper for the built-in uuid. It is the same as its uuid_ namesake.
 
 __Function:__ _ps_trace.trace_id_gt
-
-__Schema:__ ps_trace
-### _ps_trace.tag_v >= _ps_trace.tag_v → boolean
-This operator is a part of custom ps_trace.tag_map type which is a wrapper for 
-the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map_* functions.
-
-__Function:__ tag_v_ge
 
 __Schema:__ ps_trace
 ### trace_id >= trace_id → boolean
