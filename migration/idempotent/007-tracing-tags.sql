@@ -372,6 +372,9 @@ DO $do$
 BEGIN
     DROP OPERATOR CLASS IF EXISTS public.btree_tag_v_ops USING btree;
     DROP OPERATOR CLASS IF EXISTS ps_trace.btree_tag_v_ops USING btree;
+    DROP OPERATOR FAMILY IF EXISTS public.btree_tag_v_ops USING btree;
+    DROP OPERATOR FAMILY IF EXISTS ps_trace.btree_tag_v_ops USING btree;
+
     CREATE OPERATOR CLASS ps_trace.btree_tag_v_ops
     DEFAULT FOR TYPE _ps_trace.tag_v USING btree
     AS
@@ -383,6 +386,7 @@ BEGIN
             FUNCTION        1       _ps_trace.tag_v_cmp(_ps_trace.tag_v, _ps_trace.tag_v);
 EXCEPTION
     WHEN SQLSTATE '42710' THEN -- object already exists
-        EXECUTE format($q$ALTER OPERATOR CLASS public.btree_tag_v_ops USING btree OWNER TO %I$q$, current_user);
+        EXECUTE format($q$ALTER OPERATOR CLASS ps_trace.btree_tag_v_ops USING btree OWNER TO %I$q$, current_user);
+        EXECUTE format($q$ALTER OPERATOR FAMILY ps_trace.btree_tag_v_ops USING btree OWNER TO %I$q$, current_user);
 END;
 $do$;
