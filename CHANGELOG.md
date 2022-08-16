@@ -75,6 +75,7 @@ We use the following categories for changes:
 ### Changed
 
 - `ps_trace.delete_all_traces()` can only be executed when no Promscale connectors are running [#437].
+- `_prom_catalog.create_series` now throws an exception if the label ids in label_array do not exist in the _prom_catalog.label table [#465].
 
 ## [0.5.4] - 2022-07-18
 

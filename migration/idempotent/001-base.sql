@@ -1245,10 +1245,21 @@ CREATE OR REPLACE FUNCTION _prom_catalog.create_series(
     SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
-   new_series_id bigint;
+    _missing_labels int[];
+    new_series_id bigint;
 BEGIN
   new_series_id = nextval('_prom_catalog.series_id');
 LOOP
+    SELECT COALESCE(array_agg(id), ARRAY[]::int[])
+    INTO _missing_labels
+    FROM unnest(label_array) AS id
+    LEFT JOIN _prom_catalog.label l USING (id)
+    WHERE l.key IS NULL OR l.value IS NULL;
+
+    IF array_length(_missing_labels, 1) > 0 THEN
+        RAISE EXCEPTION 'Unable to find labels for label ids: %', _missing_labels;
+    END IF;
+
     EXECUTE format ($$
         INSERT INTO prom_data_series.%I(id, metric_id, labels)
         SELECT $1, $2, $3
