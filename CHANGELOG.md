@@ -18,6 +18,9 @@ We use the following categories for changes:
 
 - Added `prom_api.get_default_chunk_interval()` and `prom_api.get_metric_chunk_interval(TEXT)` [#464].
 
+### Fixed
+- Incorrect type coercion when using `tag_map` with `=` operator [#462]
+
 ### Changed
 
 - `ps_trace.delete_all_traces()` can only be executed when no Promscale connectors are running [#437].
