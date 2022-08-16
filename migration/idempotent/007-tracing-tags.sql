@@ -123,7 +123,6 @@ the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map
 
 DO $do$
 BEGIN
-	DROP OPERATOR IF EXISTS ps_trace.= (_ps_trace.tag_v, _ps_trace.tag_v) CASCADE;
 	CREATE OPERATOR ps_trace.%= (
 	    FUNCTION       = ps_trace.tag_v_eq,
 	    LEFTARG        = _ps_trace.tag_v,
@@ -210,7 +209,6 @@ the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map
 
 DO $do$
 BEGIN
-	DROP OPERATOR IF EXISTS ps_trace.<> (_ps_trace.tag_v, _ps_trace.tag_v)  CASCADE;
 	CREATE OPERATOR ps_trace.%<> (
 	    FUNCTION       = ps_trace.tag_v_ne,
 	    LEFTARG        = _ps_trace.tag_v,
@@ -289,7 +287,6 @@ IS 'This function is a part of custom _ps_trace.tag_v type which is a wrapper fo
 
 DO $do$
 BEGIN
-	DROP OPERATOR IF EXISTS ps_trace.> (_ps_trace.tag_v, _ps_trace.tag_v) CASCADE;
 	CREATE OPERATOR ps_trace.%> (
 	    FUNCTION       = ps_trace.tag_v_gt,
 	    LEFTARG        = _ps_trace.tag_v,
@@ -307,7 +304,6 @@ $do$;
 
 DO $do$
 BEGIN
-	DROP OPERATOR IF EXISTS ps_trace.>= (_ps_trace.tag_v, _ps_trace.tag_v) CASCADE;
 	CREATE OPERATOR ps_trace.%>= (
 	    FUNCTION       = ps_trace.tag_v_ge,
 	    LEFTARG        = _ps_trace.tag_v,
@@ -327,7 +323,6 @@ the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map
 
 DO $do$
 BEGIN
-	DROP OPERATOR IF EXISTS ps_trace.< (_ps_trace.tag_v, _ps_trace.tag_v) CASCADE;
 	CREATE OPERATOR ps_trace.%< (
 	    FUNCTION       = ps_trace.tag_v_lt,
 	    LEFTARG        = _ps_trace.tag_v,
@@ -347,7 +342,6 @@ the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map
 
 DO $do$
 BEGIN
-	DROP OPERATOR IF EXISTS ps_trace.<= (_ps_trace.tag_v, _ps_trace.tag_v) CASCADE;
 	CREATE OPERATOR ps_trace.%<= (
 	    FUNCTION       = ps_trace.tag_v_le,
 	    LEFTARG        = _ps_trace.tag_v,
@@ -370,20 +364,15 @@ the built-in jsonb. It is the same as its jsonb_ namesake, but relies on tag_map
 
 DO $do$
 BEGIN
-    DROP OPERATOR CLASS IF EXISTS public.btree_tag_v_ops USING btree;
-    DROP OPERATOR CLASS IF EXISTS ps_trace.btree_tag_v_ops USING btree;
-    DROP OPERATOR FAMILY IF EXISTS public.btree_tag_v_ops USING btree;
-    DROP OPERATOR FAMILY IF EXISTS ps_trace.btree_tag_v_ops USING btree;
-
     CREATE OPERATOR CLASS ps_trace.btree_tag_v_ops
-    DEFAULT FOR TYPE _ps_trace.tag_v USING btree
-    AS
-            OPERATOR        1       ps_trace.%<  ,
-            OPERATOR        2       ps_trace.%<= ,
-            OPERATOR        3       ps_trace.%=  ,
-            OPERATOR        4       ps_trace.%>= ,
-            OPERATOR        5       ps_trace.%>  ,
-            FUNCTION        1       _ps_trace.tag_v_cmp(_ps_trace.tag_v, _ps_trace.tag_v);
+        DEFAULT FOR TYPE _ps_trace.tag_v USING btree
+        AS
+                OPERATOR        1       ps_trace.%<  ,
+                OPERATOR        2       ps_trace.%<= ,
+                OPERATOR        3       ps_trace.%=  ,
+                OPERATOR        4       ps_trace.%>= ,
+                OPERATOR        5       ps_trace.%>  ,
+                FUNCTION        1       _ps_trace.tag_v_cmp(_ps_trace.tag_v, _ps_trace.tag_v);
 EXCEPTION
     WHEN SQLSTATE '42710' THEN -- object already exists
         EXECUTE format($q$ALTER OPERATOR CLASS ps_trace.btree_tag_v_ops USING btree OWNER TO %I$q$, current_user);
