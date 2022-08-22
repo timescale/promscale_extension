@@ -140,7 +140,7 @@ For bare-metal installations, the full instructions for setting up PostgreSQL, T
     ```
 1) Install the PGX framework
     ```bash
-    cargo install cargo-pgx --git https://github.com/timescale/pgx --branch promscale-staging
+    ./install-cargo-pgx.sh
     ```
 1) Initialize the PGX framework using the PostgreSQL 14 installation
     ```bash
@@ -150,7 +150,7 @@ For bare-metal installations, the full instructions for setting up PostgreSQL, T
     ```bash
     git clone https://github.com/timescale/promscale_extension
     cd promscale_extension
-    git checkout 0.5.0
+    git checkout 0.5.4
     ```
 1) Compile and install
     ```bash
