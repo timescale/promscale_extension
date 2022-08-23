@@ -14,11 +14,14 @@ We use the following categories for changes:
 
 ## [Unreleased]
 
+## [0.5.5] - 2022-08-23
+
 ### Added
 
 - Added `prom_api.get_default_chunk_interval()` and `prom_api.get_metric_chunk_interval(TEXT)` [#464].
 
 ### Fixed
+
 - Incorrect type coercion when using `tag_map` with `=` operator [#462]
 
 ### Changed
