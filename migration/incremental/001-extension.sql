@@ -12,7 +12,7 @@ CREATE OR REPLACE FUNCTION _prom_ext."gapfilldeltatransition_in"(
 ) RETURNS _prom_ext.GapfillDeltaTransition /* promscale::aggregates::gapfill_delta::GapfillDeltaTransition */
 IMMUTABLE PARALLEL SAFE STRICT
 LANGUAGE c /* Rust */
-AS '$libdir/promscale-0.5.5-dev', 'gapfilldeltatransition_in_wrapper';
+AS '$libdir/promscale-0.6.0', 'gapfilldeltatransition_in_wrapper';
 
 -- src/aggregates/gapfill_delta.rs:29
 -- promscale::aggregates::gapfill_delta::gapfilldeltatransition_out
@@ -21,7 +21,7 @@ CREATE OR REPLACE FUNCTION _prom_ext."gapfilldeltatransition_out"(
 ) RETURNS cstring /* &cstr_core::CStr */
 IMMUTABLE PARALLEL SAFE STRICT
 LANGUAGE c /* Rust */
-AS '$libdir/promscale-0.5.5-dev', 'gapfilldeltatransition_out_wrapper';
+AS '$libdir/promscale-0.6.0', 'gapfilldeltatransition_out_wrapper';
 
 -- src/aggregates/gapfill_delta.rs:29
 -- promscale::aggregates::gapfill_delta::GapfillDeltaTransition
