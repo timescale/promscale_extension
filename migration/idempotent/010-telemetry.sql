@@ -116,6 +116,12 @@ $$
         SELECT public.approximate_row_count('_ps_trace.span')::TEXT INTO result;
         PERFORM _ps_catalog.apply_telemetry('traces_spans_total_approx', result);
 
+        -- According to [1], Trace spans processed by Jaeger collector will have an internal attribute named 'internal.span.format' with one of the values 'jaeger|zipkin|proto|otlp|unknown'[2]. We can use this to infer whether promscale's gRPC remote storage implementation has been used or not.
+        -- [1] https://github.com/jaegertracing/jaeger/issues/1490
+        -- [2] https://github.com/jaegertracing/jaeger/blob/b7088238c017e5a54896efbf5ed38959e885e0c5/cmd/collector/app/processor/interface.go#L56-L67
+        SELECT ARRAY_AGG(value)::TEXT INTO result FROM _ps_trace.tag WHERE key='internal.span.format' AND _prom_ext.jsonb_digest(value) IN (_prom_ext.jsonb_digest('"jaeger"'), _prom_ext.jsonb_digest('"zipkin"'), _prom_ext.jsonb_digest('"proto"'), _prom_ext.jsonb_digest('"otlp"'), _prom_ext.jsonb_digest('"unknown"'));
+        PERFORM _ps_catalog.apply_telemetry('traces_jaeger_span_types', result);
+
         -- Others.
         -- The -1 is to ignore the row summing deleted rows i.e., the counter reset row. 
         SELECT (count(*) - 1)::TEXT INTO result FROM _ps_catalog.promscale_instance_information;
