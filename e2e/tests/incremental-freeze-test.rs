@@ -23,7 +23,7 @@ fn incremental_freeze_test() {
 
     let frozen_files = [
         // ↓↓↓ frozen in 0.5.0 ↓↓↓
-        ("001-extension.sql", "66dd9ae5e47b32fe93af380e8dc107e2"),
+        ("001-extension.sql", "b2468a9e7d133a3476e4d6bde7f3ab8e"),
         ("002-utils.sql", "2450a0291c64f48e80bd4d4638f3bba0"),
         ("003-users.sql", "ca921c533531d5715bfeb688f569325f"),
         ("004-schemas.sql", "f2785b92611bd621c8fb64f2a5403b47"),
@@ -104,6 +104,15 @@ fn incremental_freeze_test() {
         (
             "029-remove-unused-ingest-func.sql",
             "a42d08b7425c11efe492dc6c70031781",
+        ),
+        // ↓↓↓ frozen in 0.6.0 ↓↓↓
+        (
+            "030-remove-get-confirmed-unused-series.sql",
+            "b76c3604ba1a067bfda1dcebc9450ac1",
+        ),
+        (
+            "031-remove-superfluous-tag_v-ops.sql",
+            "d22c77ead3e203f579aceeb239c4751c",
         ),
         // ↓↓↓ frozen in x.x.x ↓↓↓
     ];
