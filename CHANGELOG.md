@@ -20,6 +20,7 @@ We use the following categories for changes:
 
 ### Fixed
 - Incorrect type coercion when using `tag_map` with `=` operator [#462]
+- During upgrade from 0.3.x only alter relations which actually exist [#474]
 
 ### Changed
 
