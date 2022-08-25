@@ -183,7 +183,7 @@ BEGIN
 	);
 EXCEPTION
     WHEN SQLSTATE '42723' THEN -- operator already exists
-        EXECUTE format($q$ALTER OPERATOR ps_trace.%=(_ps_trace.tag_v, _ps_trace.tag_v) OWNER TO %I$q$, current_user);
+        EXECUTE format($q$ALTER OPERATOR ps_trace.%%=(_ps_trace.tag_v, _ps_trace.tag_v) OWNER TO %I$q$, current_user);
 END;
 $do$;
 COMMENT ON OPERATOR ps_trace.%= (_ps_trace.tag_v, _ps_trace.tag_v)
@@ -268,7 +268,7 @@ BEGIN
 	);
 EXCEPTION
     WHEN SQLSTATE '42723' THEN -- operator already exists
-        EXECUTE format($q$ALTER OPERATOR ps_trace.%<>(_ps_trace.tag_v, _ps_trace.tag_v) OWNER TO %I$q$, current_user);
+        EXECUTE format($q$ALTER OPERATOR ps_trace.%%<>(_ps_trace.tag_v, _ps_trace.tag_v) OWNER TO %I$q$, current_user);
 END;
 $do$;
 COMMENT ON OPERATOR ps_trace.%<> (_ps_trace.tag_v, _ps_trace.tag_v)
@@ -346,7 +346,7 @@ BEGIN
 	);
 EXCEPTION
     WHEN SQLSTATE '42723' THEN -- operator already exists
-        EXECUTE format($q$ALTER OPERATOR ps_trace.%>(_ps_trace.tag_v, _ps_trace.tag_v) OWNER TO %I$q$, current_user);
+        EXECUTE format($q$ALTER OPERATOR ps_trace.%%>(_ps_trace.tag_v, _ps_trace.tag_v) OWNER TO %I$q$, current_user);
 END;
 $do$;
 
@@ -363,7 +363,7 @@ BEGIN
 	);
 EXCEPTION
     WHEN SQLSTATE '42723' THEN -- operator already exists
-        EXECUTE format($q$ALTER OPERATOR ps_trace.%>=(_ps_trace.tag_v, _ps_trace.tag_v) OWNER TO %I$q$, current_user);
+        EXECUTE format($q$ALTER OPERATOR ps_trace.%%>=(_ps_trace.tag_v, _ps_trace.tag_v) OWNER TO %I$q$, current_user);
 END;
 $do$;
 COMMENT ON OPERATOR ps_trace.%>= (_ps_trace.tag_v, _ps_trace.tag_v)
@@ -382,7 +382,7 @@ BEGIN
 	);
 EXCEPTION
     WHEN SQLSTATE '42723' THEN -- operator already exists
-        EXECUTE format($q$ALTER OPERATOR ps_trace.%<(_ps_trace.tag_v, _ps_trace.tag_v) OWNER TO %I$q$, current_user);
+        EXECUTE format($q$ALTER OPERATOR ps_trace.%%<(_ps_trace.tag_v, _ps_trace.tag_v) OWNER TO %I$q$, current_user);
 END;
 $do$;
 COMMENT ON OPERATOR ps_trace.%< (_ps_trace.tag_v, _ps_trace.tag_v)
@@ -401,7 +401,7 @@ BEGIN
 	);
 EXCEPTION
     WHEN SQLSTATE '42723' THEN -- operator already exists
-        EXECUTE format($q$ALTER OPERATOR ps_trace.%<=(_ps_trace.tag_v, _ps_trace.tag_v) OWNER TO %I$q$, current_user);
+        EXECUTE format($q$ALTER OPERATOR ps_trace.%%<=(_ps_trace.tag_v, _ps_trace.tag_v) OWNER TO %I$q$, current_user);
 END;
 $do$;
 COMMENT ON OPERATOR ps_trace.%<= (_ps_trace.tag_v, _ps_trace.tag_v)
