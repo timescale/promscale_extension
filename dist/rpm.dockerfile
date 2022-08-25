@@ -71,6 +71,7 @@ localedef -f UTF-8 -i en_US en_US.UTF-8
 
 # Pin dotenv gem because 2.8.0 is not compatible with earlier ruby
 gem install --version 2.7.6 dotenv
+gem install --version 4.0.7 public_suffix
 # Install FPM
 gem install fpm
 
