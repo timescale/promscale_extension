@@ -15,7 +15,7 @@ jobs:
   package:
     runs-on: ubuntu-latest
     env:
-      RUST_VERSION: "1.58.0"
+      RUST_VERSION: "1.59.0"
     strategy:
       fail-fast: false
       matrix:
