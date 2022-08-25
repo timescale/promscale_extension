@@ -22,6 +22,8 @@ We use the following categories for changes:
 - Added `_ps_trace.text_matches()` and `_ps_trace.tag_v_text_eq_matching_tags()` [#461]
 
 ### Fixed
+
+- Don't fail metric deletion if some tables or views are missing [#460]
 - Incorrect type coercion when using `tag_map` with `=` operator [#462]
 - During upgrade from 0.3.x only alter relations which actually exist [#474]
 
