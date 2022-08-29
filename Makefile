@@ -63,9 +63,9 @@ help:
 	@perl -nle'print $& if m{^[a-zA-Z_-]+:.*?## .*$$}' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: build
-build: ## Build the extension
+build: promscale.control ## Build the extension
 	cargo build --release --features pg${PG_BUILD_VERSION} $(EXTRA_RUST_ARGS)
-	cargo pgx schema -f pg${PG_BUILD_VERSION} --force-create-or-replace --release
+	cargo pgx schema pg${PG_BUILD_VERSION} --force-create-or-replace --out sql/promscale--${EXT_VERSION}.sql --release
 
 .PHONY: clean
 clean: ## Clean up latest build
@@ -152,6 +152,11 @@ endif
 .PHONY: release-test
 release-test: release-tester ## Test the currently selected release package
 	./tools/smoke-test "$(RELEASE_IMAGE_NAME)-test" "timescale/promscale:0.11.0-alpha" $(DOCKER_PLATFORM)
+
+.PHONY: post-release
+post-release: promscale.control
+	cargo pgx schema pg${PG_BUILD_VERSION} --force-create-or-replace --out sql/promscale--${EXT_VERSION}.sql --release
+	bash create-upgrade-symlinks.sh
 
 .PHONY: docker-image-build-12 docker-image-build-13 docker-image-build-14
 docker-image-build-12 docker-image-build-13 docker-image-build-14: alpine.Dockerfile $(SQL_FILES) $(SRCS) Cargo.toml Cargo.lock $(RUST_SRCS)

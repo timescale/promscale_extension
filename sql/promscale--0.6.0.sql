@@ -131,7 +131,7 @@ CREATE SCHEMA IF NOT EXISTS _prom_ext; /* promscale::util::_prom_ext */
 
 -- src/util.rs:8
 -- promscale::util::_prom_ext::num_cpus
-CREATE FUNCTION _prom_ext."num_cpus"() RETURNS integer /* i32 */
+CREATE OR REPLACE FUNCTION _prom_ext."num_cpus"() RETURNS integer /* i32 */
 IMMUTABLE PARALLEL SAFE STRICT
 LANGUAGE c /* Rust */
 AS '$libdir/promscale-0.6.0', 'num_cpus_wrapper';
@@ -139,30 +139,30 @@ AS '$libdir/promscale-0.6.0', 'num_cpus_wrapper';
 -- src/support.rs:3
 CREATE SCHEMA IF NOT EXISTS _prom_ext; /* promscale::support::_prom_ext */
 
--- src/support.rs:141
--- promscale::support::_prom_ext::tag_map_rewrite
-CREATE FUNCTION _prom_ext."tag_map_rewrite"(
-	"input" internal /* pgx::datum::internal::Internal */
-) RETURNS internal /* pgx::datum::internal::Internal */
-IMMUTABLE STRICT
-LANGUAGE c /* Rust */
-AS '$libdir/promscale-0.6.0', 'tag_map_rewrite_wrapper';
-
 -- src/support.rs:34
 -- promscale::support::_prom_ext::rewrite_fn_call_to_subquery
-CREATE FUNCTION _prom_ext."rewrite_fn_call_to_subquery"(
+CREATE OR REPLACE FUNCTION _prom_ext."rewrite_fn_call_to_subquery"(
 	"input" internal /* pgx::datum::internal::Internal */
 ) RETURNS internal /* pgx::datum::internal::Internal */
 IMMUTABLE STRICT
 LANGUAGE c /* Rust */
 AS '$libdir/promscale-0.6.0', 'rewrite_fn_call_to_subquery_wrapper';
 
+-- src/support.rs:141
+-- promscale::support::_prom_ext::tag_map_rewrite
+CREATE OR REPLACE FUNCTION _prom_ext."tag_map_rewrite"(
+	"input" internal /* pgx::datum::internal::Internal */
+) RETURNS internal /* pgx::datum::internal::Internal */
+IMMUTABLE STRICT
+LANGUAGE c /* Rust */
+AS '$libdir/promscale-0.6.0', 'tag_map_rewrite_wrapper';
+
 -- src/regex.rs:3
 CREATE SCHEMA IF NOT EXISTS _prom_ext; /* promscale::regex::_prom_ext */
 
 -- src/regex.rs:44
 -- promscale::regex::_prom_ext::re2_match
-CREATE FUNCTION _prom_ext."re2_match"(
+CREATE OR REPLACE FUNCTION _prom_ext."re2_match"(
 	"string" text, /* &str */
 	"pattern" text /* &str */
 ) RETURNS bool /* bool */
@@ -178,7 +178,7 @@ CREATE SCHEMA IF NOT EXISTS _prom_ext; /* promscale::aggregates::vector_selector
 
 -- src/aggregates/vector_selector.rs:157
 -- promscale::aggregates::vector_selector::_prom_ext::vector_selector_transition
-CREATE FUNCTION _prom_ext."vector_selector_transition"(
+CREATE OR REPLACE FUNCTION _prom_ext."vector_selector_transition"(
 	"state" internal, /* pgx::datum::internal::Internal */
 	"start_time" timestamp with time zone, /* i64 */
 	"end_time" timestamp with time zone, /* i64 */
@@ -191,9 +191,18 @@ IMMUTABLE PARALLEL SAFE
 LANGUAGE c /* Rust */
 AS '$libdir/promscale-0.6.0', 'vector_selector_transition_wrapper';
 
+-- src/aggregates/vector_selector.rs:207
+-- promscale::aggregates::vector_selector::_prom_ext::vector_selector_final
+CREATE OR REPLACE FUNCTION _prom_ext."vector_selector_final"(
+	"state" internal /* pgx::datum::internal::Internal */
+) RETURNS double precision[] /* core::option::Option<alloc::vec::Vec<core::option::Option<f64>>> */
+IMMUTABLE PARALLEL SAFE
+LANGUAGE c /* Rust */
+AS '$libdir/promscale-0.6.0', 'vector_selector_final_wrapper';
+
 -- src/aggregates/vector_selector.rs:232
 -- promscale::aggregates::vector_selector::_prom_ext::vector_selector_combine
-CREATE FUNCTION _prom_ext."vector_selector_combine"(
+CREATE OR REPLACE FUNCTION _prom_ext."vector_selector_combine"(
 	"state1" internal, /* pgx::datum::internal::Internal */
 	"state2" internal /* pgx::datum::internal::Internal */
 ) RETURNS internal /* pgx::datum::internal::Internal */
@@ -201,21 +210,12 @@ IMMUTABLE PARALLEL SAFE
 LANGUAGE c /* Rust */
 AS '$libdir/promscale-0.6.0', 'vector_selector_combine_wrapper';
 
--- src/aggregates/vector_selector.rs:207
--- promscale::aggregates::vector_selector::_prom_ext::vector_selector_final
-CREATE FUNCTION _prom_ext."vector_selector_final"(
-	"state" internal /* pgx::datum::internal::Internal */
-) RETURNS double precision[] /* core::option::Option<alloc::vec::Vec<core::option::Option<f64>>> */
-IMMUTABLE PARALLEL SAFE
-LANGUAGE c /* Rust */
-AS '$libdir/promscale-0.6.0', 'vector_selector_final_wrapper';
-
 -- src/aggregates/prom_rate.rs:3
 CREATE SCHEMA IF NOT EXISTS _prom_ext; /* promscale::aggregates::prom_rate::_prom_ext */
 
 -- src/aggregates/prom_rate.rs:14
 -- promscale::aggregates::prom_rate::_prom_ext::prom_rate_transition
-CREATE FUNCTION _prom_ext."prom_rate_transition"(
+CREATE OR REPLACE FUNCTION _prom_ext."prom_rate_transition"(
 	"state" internal, /* pgx::datum::internal::Internal */
 	"lowest_time" timestamp with time zone, /* i64 */
 	"greatest_time" timestamp with time zone, /* i64 */
@@ -233,7 +233,7 @@ CREATE SCHEMA IF NOT EXISTS _prom_ext; /* promscale::aggregates::prom_increase::
 
 -- src/aggregates/prom_increase.rs:14
 -- promscale::aggregates::prom_increase::_prom_ext::prom_increase_transition
-CREATE FUNCTION _prom_ext."prom_increase_transition"(
+CREATE OR REPLACE FUNCTION _prom_ext."prom_increase_transition"(
 	"state" internal, /* pgx::datum::internal::Internal */
 	"lowest_time" timestamp with time zone, /* i64 */
 	"greatest_time" timestamp with time zone, /* i64 */
@@ -251,7 +251,7 @@ CREATE SCHEMA IF NOT EXISTS _prom_ext; /* promscale::aggregates::prom_delta::_pr
 
 -- src/aggregates/prom_delta.rs:20
 -- promscale::aggregates::prom_delta::_prom_ext::prom_delta_transition
-CREATE FUNCTION _prom_ext."prom_delta_transition"(
+CREATE OR REPLACE FUNCTION _prom_ext."prom_delta_transition"(
 	"state" internal, /* pgx::datum::internal::Internal */
 	"lowest_time" timestamp with time zone, /* i64 */
 	"greatest_time" timestamp with time zone, /* i64 */
@@ -269,7 +269,7 @@ CREATE SCHEMA IF NOT EXISTS _prom_ext; /* promscale::aggregates::gapfill_delta::
 
 -- src/aggregates/gapfill_delta.rs:11
 -- promscale::aggregates::gapfill_delta::_prom_ext::prom_extrapolate_final
-CREATE FUNCTION _prom_ext."prom_extrapolate_final"(
+CREATE OR REPLACE FUNCTION _prom_ext."prom_extrapolate_final"(
 	"state" internal /* pgx::datum::internal::Internal */
 ) RETURNS double precision[] /* core::option::Option<alloc::vec::Vec<core::option::Option<f64>>> */
 IMMUTABLE PARALLEL SAFE
@@ -281,6 +281,61 @@ AS '$libdir/promscale-0.6.0', 'prom_extrapolate_final_wrapper';
 -- Skipped due to `#[pgx(sql = false)]`
 
 
+-- src/aggregates/prom_increase.rs:91
+-- requires:
+--   prom_increase_transition
+--   prom_extrapolate_final
+
+
+    CREATE OR REPLACE AGGREGATE _prom_ext.prom_increase(
+        lowest_time TIMESTAMPTZ,
+        greatest_time TIMESTAMPTZ,
+        step_size BIGINT,
+        range BIGINT,
+        sample_time TIMESTAMPTZ,
+        sample_value DOUBLE PRECISION)
+    (
+        sfunc=_prom_ext.prom_increase_transition,
+        stype=internal,
+        finalfunc=_prom_ext.prom_extrapolate_final
+    );
+    
+
+-- src/aggregates/prom_rate.rs:94
+-- requires:
+--   prom_rate_transition
+--   prom_extrapolate_final
+
+
+    CREATE OR REPLACE AGGREGATE _prom_ext.prom_rate(
+        lowest_time TIMESTAMPTZ,
+        greatest_time TIMESTAMPTZ,
+        step_size BIGINT,
+        range BIGINT,
+        sample_time TIMESTAMPTZ,
+        sample_value DOUBLE PRECISION)
+    (
+        sfunc=_prom_ext.prom_rate_transition,
+        stype=internal,
+        finalfunc=_prom_ext.prom_extrapolate_final
+    );
+    
+
+-- src/iterable_jsonb.rs:6
+-- creates:
+--   Type(promscale::iterable_jsonb::Jsonb)
+
+
+
+-- src/jsonb_digest.rs:33
+-- promscale::jsonb_digest::_prom_ext::jsonb_digest
+CREATE OR REPLACE FUNCTION _prom_ext."jsonb_digest"(
+	"jsonb" Jsonb /* promscale::iterable_jsonb::Jsonb */
+) RETURNS bytea /* alloc::vec::Vec<u8> */
+IMMUTABLE STRICT PARALLEL SAFE
+LANGUAGE c /* Rust */
+AS '$libdir/promscale-0.6.0', 'jsonb_digest_wrapper';
+
 -- src/raw.rs:6
 -- creates:
 --   Type(promscale::raw::bytea)
@@ -290,7 +345,7 @@ AS '$libdir/promscale-0.6.0', 'prom_extrapolate_final_wrapper';
 
 -- src/aggregates/vector_selector.rs:215
 -- promscale::aggregates::vector_selector::_prom_ext::vector_selector_serialize
-CREATE FUNCTION _prom_ext."vector_selector_serialize"(
+CREATE OR REPLACE FUNCTION _prom_ext."vector_selector_serialize"(
 	"state" internal /* pgx::datum::internal::Internal */
 ) RETURNS bytea /* promscale::raw::bytea */
 IMMUTABLE PARALLEL SAFE STRICT
@@ -299,7 +354,7 @@ AS '$libdir/promscale-0.6.0', 'vector_selector_serialize_wrapper';
 
 -- src/aggregates/vector_selector.rs:226
 -- promscale::aggregates::vector_selector::_prom_ext::vector_selector_deserialize
-CREATE FUNCTION _prom_ext."vector_selector_deserialize"(
+CREATE OR REPLACE FUNCTION _prom_ext."vector_selector_deserialize"(
 	"bytes" bytea, /* promscale::raw::bytea */
 	"_internal" internal /* pgx::datum::internal::Internal */
 ) RETURNS internal /* pgx::datum::internal::Internal */
@@ -354,61 +409,6 @@ AS '$libdir/promscale-0.6.0', 'vector_selector_deserialize_wrapper';
     );
     
 
--- src/aggregates/prom_increase.rs:91
--- requires:
---   prom_increase_transition
---   prom_extrapolate_final
-
-
-    CREATE OR REPLACE AGGREGATE _prom_ext.prom_increase(
-        lowest_time TIMESTAMPTZ,
-        greatest_time TIMESTAMPTZ,
-        step_size BIGINT,
-        range BIGINT,
-        sample_time TIMESTAMPTZ,
-        sample_value DOUBLE PRECISION)
-    (
-        sfunc=_prom_ext.prom_increase_transition,
-        stype=internal,
-        finalfunc=_prom_ext.prom_extrapolate_final
-    );
-    
-
--- src/iterable_jsonb.rs:6
--- creates:
---   Type(promscale::iterable_jsonb::Jsonb)
-
-
-
--- src/jsonb_digest.rs:33
--- promscale::jsonb_digest::_prom_ext::jsonb_digest
-CREATE FUNCTION _prom_ext."jsonb_digest"(
-	"jsonb" Jsonb /* promscale::iterable_jsonb::Jsonb */
-) RETURNS bytea /* alloc::vec::Vec<u8> */
-IMMUTABLE STRICT PARALLEL SAFE
-LANGUAGE c /* Rust */
-AS '$libdir/promscale-0.6.0', 'jsonb_digest_wrapper';
-
--- src/aggregates/prom_rate.rs:94
--- requires:
---   prom_rate_transition
---   prom_extrapolate_final
-
-
-    CREATE OR REPLACE AGGREGATE _prom_ext.prom_rate(
-        lowest_time TIMESTAMPTZ,
-        greatest_time TIMESTAMPTZ,
-        step_size BIGINT,
-        range BIGINT,
-        sample_time TIMESTAMPTZ,
-        sample_value DOUBLE PRECISION)
-    (
-        sfunc=_prom_ext.prom_rate_transition,
-        stype=internal,
-        finalfunc=_prom_ext.prom_extrapolate_final
-    );
-    
-
 -- src/schema.rs:5
 -- finalize
 
@@ -433,7 +433,7 @@ CREATE OR REPLACE FUNCTION _prom_ext."gapfilldeltatransition_in"(
 ) RETURNS _prom_ext.GapfillDeltaTransition /* promscale::aggregates::gapfill_delta::GapfillDeltaTransition */
 IMMUTABLE PARALLEL SAFE STRICT
 LANGUAGE c /* Rust */
-AS '$libdir/promscale-0.6.0', 'gapfilldeltatransition_in_wrapper';
+AS '$libdir/promscale-0.6.1-dev', 'gapfilldeltatransition_in_wrapper';
 
 -- src/aggregates/gapfill_delta.rs:29
 -- promscale::aggregates::gapfill_delta::gapfilldeltatransition_out
@@ -442,7 +442,7 @@ CREATE OR REPLACE FUNCTION _prom_ext."gapfilldeltatransition_out"(
 ) RETURNS cstring /* &cstr_core::CStr */
 IMMUTABLE PARALLEL SAFE STRICT
 LANGUAGE c /* Rust */
-AS '$libdir/promscale-0.6.0', 'gapfilldeltatransition_out_wrapper';
+AS '$libdir/promscale-0.6.1-dev', 'gapfilldeltatransition_out_wrapper';
 
 -- src/aggregates/gapfill_delta.rs:29
 -- promscale::aggregates::gapfill_delta::GapfillDeltaTransition
@@ -485,7 +485,7 @@ CREATE OR REPLACE FUNCTION _prom_ext."gapfilldeltatransition_in"(
 ) RETURNS _prom_ext.GapfillDeltaTransition /* promscale::aggregates::gapfill_delta::GapfillDeltaTransition */
 IMMUTABLE PARALLEL SAFE STRICT
 LANGUAGE c /* Rust */
-AS '$libdir/promscale-0.6.0', 'gapfilldeltatransition_in_wrapper';
+AS '$libdir/promscale-0.6.1-dev', 'gapfilldeltatransition_in_wrapper';
 
 -- src/aggregates/gapfill_delta.rs:29
 -- promscale::aggregates::gapfill_delta::gapfilldeltatransition_out
@@ -494,7 +494,7 @@ CREATE OR REPLACE FUNCTION _prom_ext."gapfilldeltatransition_out"(
 ) RETURNS cstring /* &cstr_core::CStr */
 IMMUTABLE PARALLEL SAFE STRICT
 LANGUAGE c /* Rust */
-AS '$libdir/promscale-0.6.0', 'gapfilldeltatransition_out_wrapper';
+AS '$libdir/promscale-0.6.1-dev', 'gapfilldeltatransition_out_wrapper';
 
 -- src/aggregates/gapfill_delta.rs:29
 -- promscale::aggregates::gapfill_delta::GapfillDeltaTransition
@@ -10476,7 +10476,7 @@ BEGIN
 	);
 EXCEPTION
     WHEN SQLSTATE '42723' THEN -- operator already exists
-        EXECUTE format($q$ALTER OPERATOR ps_trace.%=(_ps_trace.tag_v, _ps_trace.tag_v) OWNER TO %I$q$, current_user);
+        EXECUTE format($q$ALTER OPERATOR ps_trace.%%=(_ps_trace.tag_v, _ps_trace.tag_v) OWNER TO %I$q$, current_user);
 END;
 $do$;
 COMMENT ON OPERATOR ps_trace.%= (_ps_trace.tag_v, _ps_trace.tag_v)
@@ -10561,7 +10561,7 @@ BEGIN
 	);
 EXCEPTION
     WHEN SQLSTATE '42723' THEN -- operator already exists
-        EXECUTE format($q$ALTER OPERATOR ps_trace.%<>(_ps_trace.tag_v, _ps_trace.tag_v) OWNER TO %I$q$, current_user);
+        EXECUTE format($q$ALTER OPERATOR ps_trace.%%<>(_ps_trace.tag_v, _ps_trace.tag_v) OWNER TO %I$q$, current_user);
 END;
 $do$;
 COMMENT ON OPERATOR ps_trace.%<> (_ps_trace.tag_v, _ps_trace.tag_v)
@@ -10639,7 +10639,7 @@ BEGIN
 	);
 EXCEPTION
     WHEN SQLSTATE '42723' THEN -- operator already exists
-        EXECUTE format($q$ALTER OPERATOR ps_trace.%>(_ps_trace.tag_v, _ps_trace.tag_v) OWNER TO %I$q$, current_user);
+        EXECUTE format($q$ALTER OPERATOR ps_trace.%%>(_ps_trace.tag_v, _ps_trace.tag_v) OWNER TO %I$q$, current_user);
 END;
 $do$;
 
@@ -10656,7 +10656,7 @@ BEGIN
 	);
 EXCEPTION
     WHEN SQLSTATE '42723' THEN -- operator already exists
-        EXECUTE format($q$ALTER OPERATOR ps_trace.%>=(_ps_trace.tag_v, _ps_trace.tag_v) OWNER TO %I$q$, current_user);
+        EXECUTE format($q$ALTER OPERATOR ps_trace.%%>=(_ps_trace.tag_v, _ps_trace.tag_v) OWNER TO %I$q$, current_user);
 END;
 $do$;
 COMMENT ON OPERATOR ps_trace.%>= (_ps_trace.tag_v, _ps_trace.tag_v)
@@ -10675,7 +10675,7 @@ BEGIN
 	);
 EXCEPTION
     WHEN SQLSTATE '42723' THEN -- operator already exists
-        EXECUTE format($q$ALTER OPERATOR ps_trace.%<(_ps_trace.tag_v, _ps_trace.tag_v) OWNER TO %I$q$, current_user);
+        EXECUTE format($q$ALTER OPERATOR ps_trace.%%<(_ps_trace.tag_v, _ps_trace.tag_v) OWNER TO %I$q$, current_user);
 END;
 $do$;
 COMMENT ON OPERATOR ps_trace.%< (_ps_trace.tag_v, _ps_trace.tag_v)
@@ -10694,7 +10694,7 @@ BEGIN
 	);
 EXCEPTION
     WHEN SQLSTATE '42723' THEN -- operator already exists
-        EXECUTE format($q$ALTER OPERATOR ps_trace.%<=(_ps_trace.tag_v, _ps_trace.tag_v) OWNER TO %I$q$, current_user);
+        EXECUTE format($q$ALTER OPERATOR ps_trace.%%<=(_ps_trace.tag_v, _ps_trace.tag_v) OWNER TO %I$q$, current_user);
 END;
 $do$;
 COMMENT ON OPERATOR ps_trace.%<= (_ps_trace.tag_v, _ps_trace.tag_v)
@@ -12797,7 +12797,7 @@ CREATE OR REPLACE FUNCTION _prom_ext."gapfilldeltatransition_in"(
 ) RETURNS _prom_ext.GapfillDeltaTransition /* promscale::aggregates::gapfill_delta::GapfillDeltaTransition */
     IMMUTABLE PARALLEL SAFE STRICT
     LANGUAGE c /* Rust */
-AS '$libdir/promscale-0.6.0', 'gapfilldeltatransition_in_wrapper';
+AS '$libdir/promscale-0.6.1-dev', 'gapfilldeltatransition_in_wrapper';
 
 -- src/aggregates/gapfill_delta.rs:29
 -- promscale::aggregates::gapfill_delta::gapfilldeltatransition_out
@@ -12806,7 +12806,7 @@ CREATE OR REPLACE FUNCTION _prom_ext."gapfilldeltatransition_out"(
 ) RETURNS cstring /* &cstr_core::CStr */
     IMMUTABLE PARALLEL SAFE STRICT
     LANGUAGE c /* Rust */
-AS '$libdir/promscale-0.6.0', 'gapfilldeltatransition_out_wrapper';
+AS '$libdir/promscale-0.6.1-dev', 'gapfilldeltatransition_out_wrapper';
 
 
 END;
