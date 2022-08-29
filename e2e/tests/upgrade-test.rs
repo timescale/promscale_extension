@@ -619,7 +619,7 @@ fn install_extension_version(
             ),
             &[],
         )
-        .expect("failed to install the timescaledb extension");
+        .expect("failed to install the extension");
 
     let result = client.query_one(
         &format!(
