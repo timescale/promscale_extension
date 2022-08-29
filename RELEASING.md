@@ -2,6 +2,12 @@
 
 The following are step-by-step instructions for releasing the Promscale extension.
 
+## Create an issue to track the release
+
+Create a new issue titled "Release <version to be released here>". Copy everything below this line into that issue, and use it to to keep track of the release tasks.
+
+--- 
+
 ## Pre-release
 - [ ] Ensure `upgradeable_from` in `templates/promscale.control` contains the previously released version.
 - [ ] Update `CHANGELOG.md` with release version and date.
