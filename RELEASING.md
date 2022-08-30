@@ -4,7 +4,9 @@ The following are step-by-step instructions for releasing the Promscale extensio
 
 ## Create an issue to track the release
 
-Create a new issue titled "Release <version to be released here>". Copy everything below this line into that issue, and use it to to keep track of the release tasks.
+Create a new issue titled "Release `<version to be released here>`". Copy everything below this line into that issue, and use it to keep track of the release tasks.
+
+---
 
 ## Pre-release
 - [ ] Create a git branch named `pre-release-x.x.x`
