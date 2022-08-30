@@ -27,9 +27,16 @@ struct ControlFile {
     is_pg_12: bool,
 }
 
+#[derive(Template)]
+#[template(path = "promscale--0.0.0.sql", escape = "none")]
+struct Promscale000<'a> {
+    extension_version: &'a str,
+}
+
 const CONTROL_FILE_NAME: &str = "promscale.control";
 const MIGRATION_FILE_NAME: &str = "hand-written-migration.sql";
 const BOOTSTRAP_FILE_NAME: &str = "bootstrap.sql";
+const EXTENSION_VERSION_PLACEHOLDER: &str = "{{extension_version}}";
 
 fn main() {
     println!("cargo:rerun-if-changed=Cargo.lock");
@@ -54,6 +61,20 @@ fn main() {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     generate_migration_sql(manifest_dir.as_str());
     generate_control_file(manifest_dir.as_str());
+    generate_promscale_000_sql(manifest_dir.as_str());
+}
+
+fn generate_promscale_000_sql(manifest_dir: &str) {
+    let mut promscale_000_template_path = PathBuf::from(manifest_dir);
+    promscale_000_template_path.push("templates/promscale--0.0.0.sql");
+    let extension_version = env!("CARGO_PKG_VERSION");
+    let promscale_000_contents = Promscale000 { extension_version }.render().unwrap();
+    let mut promscale_000_path = PathBuf::from(manifest_dir);
+    promscale_000_path.push("sql/promscale--0.0.0.sql");
+    let mut promscale_000 = File::create(promscale_000_path).unwrap();
+    promscale_000
+        .write_all(promscale_000_contents.as_bytes())
+        .expect("unable to write control file contents");
 }
 
 /// This procedure generates promscale.control file based on postgresql version.
@@ -187,7 +208,7 @@ fn wrap(path: &Path, sql_type: &SqlType) -> String {
         .to_str()
         .expect("unable to convert file path to str");
     let version = env!("CARGO_PKG_VERSION");
-    let body = read_file(path);
+    let body = read_file(path).replace(EXTENSION_VERSION_PLACEHOLDER, version);
     match sql_type {
         SqlType::Incremental => wrap_incremental_file(filename, version, &body),
         SqlType::Idempotent => wrap_idempotent_file(filename, version, &body),
