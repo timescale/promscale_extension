@@ -11,14 +11,9 @@ Create a new issue titled "Release `<version to be released here>`". Copy everyt
 ## Pre-release
 - [ ] Create a git branch named `pre-release-x.x.x`
 - [ ] Ensure `upgradeable_from` in `templates/promscale.control` contains the previously released version.
-- [ ] Update `CHANGELOG.md` with release version and date.
-- [ ] Update the package version in `Cargo.toml` to the version being released
-- [ ] Update the version in the references to the .so in `migration/incremental/001-extension.sql`
-- [ ] Update the MD5 hash of the `migration/incremental/001-extension.sql` file in `e2e/tests/incremental-freeze-test.rs`
-- [ ] Update the version in the references to the .so in `migration/idempotent/014-extension-type-functions.sql`
-- [ ] Update the version in the references to the .so in `sql/promscale--0.0.0.sql`
+- [ ] Update `CHANGELOG.md` with release version and date, ensuring that all relevant changes are reflected.
+- [ ] Update the version in all places with `./update-version.sh <version-here>`
 - [ ] Freeze any new incremental sql scripts released in this version in `incremental_freeze_test`
-- [ ] Update the extension tag in the _Compile From Source_ instructions in `INSTALL.md` (there are more than one!)
 - [ ] Create a PR from the `pre-release-x.x.x` branch. Get it approved. Merge the PR to master.
 
 ## Release
@@ -38,11 +33,8 @@ Create a new issue titled "Release `<version to be released here>`". Copy everyt
 - [ ] Create a new git branch named `post-release-x.x.x`
 - [ ] Run `make post-release` which will generate the `sql/promscale--x.x.x.sql` file of the version just released and create all the upgrade path sql files.
 - [ ] Add and commit the newly created sql files to git. They are ignored by default. e.g. `git add sql/*--0.5.5.sql --force`
-- [ ] Update the package version in `Cargo.toml` to the next version
-- [ ] Update the version in the references to the .so in `migration/incremental/001-extension.sql`
-- [ ] Update the MD5 hash of the `migration/incremental/001-extension.sql` file in `e2e/tests/incremental-freeze-test.rs`
-- [ ] Update the version in the references to the .so in `migration/idempotent/014-extension-type-functions.sql`
-- [ ] Update the version in the references to the .so in `sql/promscale--0.0.0.sql`
+- [ ] Determine the develop version (determined by bumping the patch version and appending `-dev`)
+- [ ] Set the version in all places necessary with `./update-version.sh <develop-version>`
 - [ ] Update `upgradeable_from` in templates/promscale.control to add the previously released version
 - [ ] Update `e2e/tests/config/mod.rs` to refer to the new docker images
 - [ ] Create a PR and get it merged
