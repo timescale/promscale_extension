@@ -238,7 +238,7 @@ DEVENV_PG_INTERNAL_PORT ?= 288${DEVENV_PG_VERSION}
 
 .PHONY: devenv
 devenv: VOLUME_NAME=promscale-extension-build-cache
-devenv: devcontainer
+devenv: devcontainer promscale.control
 	docker volume inspect ${VOLUME_NAME} 1>/dev/null 2>&1 || docker volume create ${VOLUME_NAME}
 	docker run --rm -v ${VOLUME_NAME}:/tmp/target ubuntu bash -c "chmod a+w /tmp/target"
 	docker run -ti -e DEVENV_PG_VERSION=${DEVENV_PG_VERSION} --rm -v ${VOLUME_NAME}:/tmp/target -p54321:${DEVENV_PG_INTERNAL_PORT} -v$(shell pwd):/code --name ${DEVENV_CONTAINER_NAME} ${DEVENV_CONTAINER_NAME}
