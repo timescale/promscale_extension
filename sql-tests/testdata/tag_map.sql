@@ -127,7 +127,7 @@ explain_jsonb(
 --the following case should get optimized with https://github.com/timescale/timescaledb/pull/4556, because the matching tags will be an empty array
 --this will need to be changed after that's merged
 SELECT
-    ok(j @? '$.** ? (@."Custom Plan Provider" == "ChunkAppend" && @."Runtime Exclusion" == false)', 'exclusion does not happen')
+    ok(j @? '$.** ? (@."Custom Plan Provider" == "ChunkAppend" && @."Runtime Exclusion" == true)', 'exclusion does happen')
 FROM
 explain_jsonb(
     $$

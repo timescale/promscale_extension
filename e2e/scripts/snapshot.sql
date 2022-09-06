@@ -91,8 +91,10 @@ select
         when n.nspname = '_ps_catalog'::name and k.relname = 'migration'::name
             then 'select name, body from _ps_catalog.migration where name != ''001-extension.sql'' AND name != ''024-adjust_autovacuum.sql'' order by name, body;'
         when n.nspname = '_timescaledb_internal' and (k.relname like '_compressed_hypertable_%' or k.relname like 'compress_hyper_%_chunk')
-            -- cannot order by tbl on compressed hypertables
-            then format('select * from %I.%I', n.nspname, k.relname)
+            -- 1. Cannot order by tbl on compressed hypertables
+            -- 2. Not every column should be in a snapshot. 
+            --    E.g. _ts_meta_sequence_num changes its value when upgrading past TS 2.8.0
+            then format('select to_jsonb(comp_tab) - ''_ts_meta_sequence_num''::text from (select * from %I.%I) comp_tab', n.nspname, k.relname)
         when n.nspname = '_timescaledb_catalog'::name and k.relname = 'dimension'::name
             -- the interval_length column will mismatch in some cases and we don't care
             then $$select id, hypertable_id, column_name, column_type, aligned, num_slices, partitioning_func_schema,

@@ -191,9 +191,9 @@ SELECT span_tags -> 'pwlen' AS tagv FROM span  GROUP BY tagv;
  ok 8 - subplan is used | ok 9 - uses index
 (1 row)
 
-                ok                 
------------------------------------
- ok 10 - exclusion does not happen
+              ok               
+-------------------------------
+ ok 10 - exclusion does happen
 (1 row)
 
  finish 
