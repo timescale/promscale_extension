@@ -78,6 +78,24 @@ GRANT EXECUTE ON FUNCTION _prom_catalog.drop_metric_chunk_data(text, text, times
 COMMENT ON FUNCTION _prom_catalog.drop_metric_chunk_data(text, text, timestamptz)
     IS 'drop chunks from schema_name.metric_name containing data older than older_than.';
 
+CREATE OR REPLACE FUNCTION _prom_catalog.initialize_current_epoch()
+    RETURNS VOID
+    --security definer to have permissions on global_epoch table
+    SECURITY DEFINER
+    VOLATILE
+    SET search_path = pg_catalog, pg_temp
+AS $func$
+    UPDATE _prom_catalog.global_epoch e SET current_epoch = now()
+    WHERE e.current_epoch = '2020-01-01 00:00:00'::TIMESTAMPTZ;
+$func$
+LANGUAGE SQL;
+--redundant given schema settings but extra caution for security definers
+REVOKE ALL ON FUNCTION _prom_catalog.initialize_current_epoch() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION _prom_catalog.initialize_current_epoch() TO prom_maintenance;
+COMMENT ON FUNCTION _prom_catalog.initialize_current_epoch()
+    IS 'The current_epoch field of _prom_catalog.global_epoch is initialized to a value in the past.
+       This must be correctly initialized to prevent spurious epoch aborts during ingestion.';
+
 --drop chunks from metrics tables and delete the appropriate series.
 CREATE OR REPLACE PROCEDURE _prom_catalog.drop_metric_chunks(
     schema_name TEXT, metric_name TEXT, older_than TIMESTAMPTZ, ran_at TIMESTAMPTZ = now(), log_verbose BOOLEAN = FALSE
@@ -90,8 +108,8 @@ DECLARE
     metric_series_table NAME;
     is_metric_view BOOLEAN;
     time_dimension_id INT;
-    last_updated TIMESTAMPTZ;
-    present_epoch BIGINT;
+    present_epoch TIMESTAMPTZ;
+    delete_epoch TIMESTAMPTZ;
     lastT TIMESTAMPTZ;
     startT TIMESTAMPTZ;
 BEGIN
@@ -133,8 +151,10 @@ BEGIN
         END IF;
         -- end this txn so we're not holding any locks on the catalog
 
-        SELECT current_epoch, last_update_time INTO present_epoch, last_updated FROM
-            _prom_catalog.ids_epoch LIMIT 1;
+        -- ensure that current_epoch is not set to the default initial value
+        PERFORM _prom_catalog.initialize_current_epoch();
+        SELECT e.current_epoch, e.delete_epoch INTO present_epoch, delete_epoch FROM
+            _prom_catalog.global_epoch e LIMIT 1;
     COMMIT;
     -- reset search path after transaction end
     SET LOCAL search_path = pg_catalog, pg_temp;
@@ -144,7 +164,7 @@ BEGIN
         -- we may still have old ones to delete
         lastT := pg_catalog.clock_timestamp();
         PERFORM _prom_catalog.set_app_name(pg_catalog.format('promscale maintenance: data retention: metric %s: delete expired series', metric_name));
-        PERFORM _prom_catalog.delete_expired_series(metric_schema, metric_table, metric_series_table, ran_at, present_epoch, last_updated);
+        PERFORM _prom_catalog.delete_expired_series(metric_schema, metric_table, metric_series_table, ran_at);
         IF log_verbose THEN
             RAISE LOG 'promscale maintenance: data retention: metric %: done deleting expired series as only action in %', metric_name, pg_catalog.clock_timestamp() OPERATOR(pg_catalog.-) lastT;
             RAISE LOG 'promscale maintenance: data retention: metric %: finished in %', metric_name, pg_catalog.clock_timestamp() OPERATOR(pg_catalog.-) startT;
@@ -170,8 +190,8 @@ BEGIN
         IF log_verbose THEN
             RAISE LOG 'promscale maintenance: data retention: metric %: done dropping chunks in %', metric_name, pg_catalog.clock_timestamp() OPERATOR(pg_catalog.-) lastT;
         END IF;
-        SELECT current_epoch, last_update_time INTO present_epoch, last_updated FROM
-            _prom_catalog.ids_epoch LIMIT 1;
+        SELECT e.current_epoch, e.delete_epoch INTO present_epoch, delete_epoch FROM
+            _prom_catalog.global_epoch e LIMIT 1;
     COMMIT;
     -- reset search path after transaction end
     SET LOCAL search_path = pg_catalog, pg_temp;
@@ -180,7 +200,7 @@ BEGIN
     -- transaction 4
         lastT := pg_catalog.clock_timestamp();
         PERFORM _prom_catalog.set_app_name(pg_catalog.format('promscale maintenance: data retention: metric %s: delete expired series', metric_name));
-        PERFORM _prom_catalog.delete_expired_series(metric_schema, metric_table, metric_series_table, ran_at, present_epoch, last_updated);
+        PERFORM _prom_catalog.delete_expired_series(metric_schema, metric_table, metric_series_table, ran_at);
         IF log_verbose THEN
             RAISE LOG 'promscale maintenance: data retention: metric %: done deleting expired series in %', metric_name, pg_catalog.clock_timestamp() OPERATOR(pg_catalog.-) lastT;
             RAISE LOG 'promscale maintenance: data retention: metric %: finished in %', metric_name, pg_catalog.clock_timestamp() OPERATOR(pg_catalog.-) startT;

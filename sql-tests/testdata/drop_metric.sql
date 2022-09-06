@@ -2,7 +2,7 @@
 \set QUIET 1
 \i 'testdata/scripts/pgtap-1.2.0.sql'
 
-SELECT * FROM plan(49);
+SELECT * FROM plan(45);
 --
 -- Moved from TestSQLDropMetricChunk
 --
@@ -16,8 +16,8 @@ BEGIN
  -- Avoid randomness in chunk interval size by setting explicitly.
  PERFORM _prom_catalog.get_or_create_metric_table_name('test');
  PERFORM public.set_chunk_time_interval('prom_data.test', interval '8 hours');
- -- Set 1h epoch duration to prevent changing defaults from affecting this test's outcome.
- PERFORM _prom_catalog.set_default_value('epoch_duration', (interval '1 hour')::text);
+ -- Explicitly set epoch duration to prevent changing defaults from affecting this test's outcome.
+ PERFORM _prom_catalog.set_default_value('epoch_duration', (interval '4 hour')::text);
 
 
  -- this series (s1) will be deleted along with it's label
@@ -43,9 +43,9 @@ BEGIN
    ('2009-11-11 05:00:00+00',    0.1,s3_series_id); 
 
  PERFORM
-    CASE current_epoch > 0::BIGINT + 1 WHEN true THEN _prom_catalog.epoch_abort(0) 
+    CASE current_epoch <= delete_epoch WHEN true THEN _prom_catalog.epoch_abort(current_epoch)
     END
-  FROM _prom_catalog.ids_epoch 
+  FROM _prom_catalog.global_epoch
   LIMIT 1;
 
  CALL _prom_catalog.finalize_metric_creation();
@@ -55,7 +55,7 @@ END$$;
 -- Checking state of the ingested data prior to drop attempts
 SELECT ok(count(*) = 4, 'none of the chunks are deleted') FROM prom_data.test;
 SELECT ok(count(*) = 3, 'none of the series should be removed yet') FROM _prom_catalog.series;
-SELECT ok(count(*) = 0, 'none of the series should be marked for deletion') FROM _prom_catalog.series WHERE delete_epoch IS NOT NULL;
+SELECT ok(count(*) = 0, 'none of the series should be marked for deletion') FROM _prom_catalog.series WHERE mark_for_deletion_epoch IS NOT NULL;
 SELECT ok(count(*) = 3, 'none of the labels should deleted yet') FROM _prom_catalog.label where key='name1';
 
 -- Dropping the data
@@ -66,7 +66,7 @@ $fnc$
 BEGIN
  RETURN NEXT is(count(*), 2::BIGINT, msg || ': expired chunks are gone') FROM prom_data.test;
  RETURN NEXT is(count(*), 3::BIGINT, msg || ': none of the series should be removed yet') FROM _prom_catalog.series;
- RETURN NEXT is(count(*), 1::BIGINT, msg || ': one series should be marked for deletion') FROM _prom_catalog.series WHERE delete_epoch IS NOT NULL;
+ RETURN NEXT is(count(*), 1::BIGINT, msg || ': one series should be marked for deletion') FROM _prom_catalog.series WHERE mark_for_deletion_epoch IS NOT NULL;
  RETURN NEXT is(count(*), 3::BIGINT, msg || ': none of the labels should deleted yet') FROM _prom_catalog.label where key='name1';
  RETURN;
 END;
@@ -76,10 +76,7 @@ $fnc$;
 CALL _prom_catalog.drop_metric_chunks('prom_data', 'test', E'2009-11-11 00:00:05+00');
 SELECT asserts_before_deletion('after the first timestamp');
 -- Attempting to drop chunks while incrementally moving `run_at` by an hour
--- reruns shouldn't change anything until the epoch advances beyond current_epoch + 4
--- 
--- And current_epoch advances every time ran_at advances for the length of an epoch
--- duration. Which we set to be 1h at the beginning of this test.
+-- reruns shouldn't change anything until run time advances beyond current_epoch + epoch_duration (4 hours)
 CALL _prom_catalog.drop_metric_chunks('prom_data', 'test', E'2009-11-11 00:00:05+00');
 SELECT asserts_before_deletion('after iter 0');
 CALL _prom_catalog.drop_metric_chunks('prom_data', 'test', E'2009-11-11 00:00:05+00', now() + '1 hours');
@@ -88,9 +85,6 @@ CALL _prom_catalog.drop_metric_chunks('prom_data', 'test', E'2009-11-11 00:00:05
 SELECT asserts_before_deletion('after iter 2');
 CALL _prom_catalog.drop_metric_chunks('prom_data', 'test', E'2009-11-11 00:00:05+00', now() + '3 hours');
 SELECT asserts_before_deletion('after iter 3');
-CALL _prom_catalog.drop_metric_chunks('prom_data', 'test', E'2009-11-11 00:00:05+00', now() + '4 hours');
-SELECT asserts_before_deletion('after iter 4');
-
 
 CREATE FUNCTION asserts_after_deletion(msg TEXT)
  RETURNS SETOF TEXT
@@ -99,7 +93,7 @@ $fnc$
 BEGIN
  RETURN NEXT is(count(*), 2::BIGINT, msg || ': expired chunks are gone') FROM prom_data.test;
  RETURN NEXT is(count(*), 2::BIGINT, msg || ': one series should be removed') FROM _prom_catalog.series;
- RETURN NEXT is(count(*), 0::BIGINT, msg || ': no series should be marked for deletion') FROM _prom_catalog.series WHERE delete_epoch IS NOT NULL;
+ RETURN NEXT is(count(*), 0::BIGINT, msg || ': no series should be marked for deletion') FROM _prom_catalog.series WHERE mark_for_deletion_epoch IS NOT NULL;
  RETURN NEXT is(count(*), 2::BIGINT, msg || ': unused labels should deleted') FROM _prom_catalog.label where key='name1';
  RETURN;
 END;
@@ -119,11 +113,11 @@ SELECT asserts_after_deletion('after all iterations');
 
 SELECT throws_like(
   'SELECT
-     CASE current_epoch > 0::BIGINT + 1 WHEN true THEN _prom_catalog.epoch_abort(0) 
+     CASE current_epoch > ''1970-01-01 00:00:00''::TIMESTAMPTZ WHEN true THEN _prom_catalog.epoch_abort(''1970-01-01 00:00:00''::TIMESTAMPTZ)
      END
-   FROM _prom_catalog.ids_epoch 
+   FROM _prom_catalog.global_epoch
    LIMIT 1;',
-   'epoch 0 to old to continue INSERT, current: %',
+   'epoch 1970-01-01 00:00:00+00 to old to continue INSERT, current DB delete epoch: %',
    'Epoch has changed after a series was dropped'
  );
 

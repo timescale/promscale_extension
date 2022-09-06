@@ -4,7 +4,7 @@ expression: query_result
 ---
  plan  
 -------
- 1..49
+ 1..45
 (1 row)
 
                   ok                   
@@ -67,57 +67,49 @@ expression: query_result
  ok 24 - after iter 3: none of the labels should deleted yet
 (4 rows)
 
-                    asserts_before_deletion                     
-----------------------------------------------------------------
- ok 25 - after iter 4: expired chunks are gone
- ok 26 - after iter 4: none of the series should be removed yet
- ok 27 - after iter 4: one series should be marked for deletion
- ok 28 - after iter 4: none of the labels should deleted yet
+                    asserts_after_deletion                     
+---------------------------------------------------------------
+ ok 25 - after iter 5: expired chunks are gone
+ ok 26 - after iter 5: one series should be removed
+ ok 27 - after iter 5: no series should be marked for deletion
+ ok 28 - after iter 5: unused labels should deleted
 (4 rows)
 
                     asserts_after_deletion                     
 ---------------------------------------------------------------
- ok 29 - after iter 5: expired chunks are gone
- ok 30 - after iter 5: one series should be removed
- ok 31 - after iter 5: no series should be marked for deletion
- ok 32 - after iter 5: unused labels should deleted
+ ok 29 - after iter 6: expired chunks are gone
+ ok 30 - after iter 6: one series should be removed
+ ok 31 - after iter 6: no series should be marked for deletion
+ ok 32 - after iter 6: unused labels should deleted
 (4 rows)
 
                     asserts_after_deletion                     
 ---------------------------------------------------------------
- ok 33 - after iter 6: expired chunks are gone
- ok 34 - after iter 6: one series should be removed
- ok 35 - after iter 6: no series should be marked for deletion
- ok 36 - after iter 6: unused labels should deleted
+ ok 33 - after iter 7: expired chunks are gone
+ ok 34 - after iter 7: one series should be removed
+ ok 35 - after iter 7: no series should be marked for deletion
+ ok 36 - after iter 7: unused labels should deleted
 (4 rows)
 
                     asserts_after_deletion                     
 ---------------------------------------------------------------
- ok 37 - after iter 7: expired chunks are gone
- ok 38 - after iter 7: one series should be removed
- ok 39 - after iter 7: no series should be marked for deletion
- ok 40 - after iter 7: unused labels should deleted
-(4 rows)
-
-                    asserts_after_deletion                     
----------------------------------------------------------------
- ok 41 - after iter 8: expired chunks are gone
- ok 42 - after iter 8: one series should be removed
- ok 43 - after iter 8: no series should be marked for deletion
- ok 44 - after iter 8: unused labels should deleted
+ ok 37 - after iter 8: expired chunks are gone
+ ok 38 - after iter 8: one series should be removed
+ ok 39 - after iter 8: no series should be marked for deletion
+ ok 40 - after iter 8: unused labels should deleted
 (4 rows)
 
                         asserts_after_deletion                         
 -----------------------------------------------------------------------
- ok 45 - after all iterations: expired chunks are gone
- ok 46 - after all iterations: one series should be removed
- ok 47 - after all iterations: no series should be marked for deletion
- ok 48 - after all iterations: unused labels should deleted
+ ok 41 - after all iterations: expired chunks are gone
+ ok 42 - after all iterations: one series should be removed
+ ok 43 - after all iterations: no series should be marked for deletion
+ ok 44 - after all iterations: unused labels should deleted
 (4 rows)
 
                      throws_like                      
 ------------------------------------------------------
- ok 49 - Epoch has changed after a series was dropped
+ ok 45 - Epoch has changed after a series was dropped
 (1 row)
 
  finish 

@@ -564,7 +564,7 @@ function void **_prom_catalog.delay_compression_job**(ht_table text, new_start t
 ### _prom_catalog.delete_expired_series
 
 ```
-function void **_prom_catalog.delete_expired_series**(metric_schema text, metric_table text, metric_series_table text, ran_at timestamp with time zone, present_epoch bigint, last_updated_epoch timestamp with time zone)
+function void **_prom_catalog.delete_expired_series**(metric_schema text, metric_table text, metric_series_table text, ran_at timestamp with time zone)
 ```
 ### _prom_catalog.delete_series_catalog_row
 
@@ -594,7 +594,7 @@ procedure void **_prom_catalog.drop_metric_chunks**(IN schema_name text, IN metr
 ### _prom_catalog.epoch_abort
 ABORT an INSERT transaction due to the ID epoch being out of date
 ```
-function void **_prom_catalog.epoch_abort**(user_epoch bigint)
+function void **_prom_catalog.epoch_abort**(user_epoch timestamp with time zone)
 ```
 ### _prom_catalog.execute_compression_policy
 compress data according to the policy. This procedure should be run regularly in a cron job
@@ -820,6 +820,12 @@ function TABLE(hypertable_name text, node_name text, node_up boolean) **_prom_ca
 
 ```
 function TABLE(hypertable_name text, table_bytes bigint, index_bytes bigint, toast_bytes bigint, total_bytes bigint) **_prom_catalog.hypertable_remote_size**(schema_name_in text)
+```
+### _prom_catalog.initialize_current_epoch
+The current_epoch field of _prom_catalog.global_epoch is initialized to a value in the past.
+       This must be correctly initialized to prevent spurious epoch aborts during ingestion.
+```
+function void **_prom_catalog.initialize_current_epoch**()
 ```
 ### _prom_catalog.insert_exemplar_row
 

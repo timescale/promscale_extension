@@ -474,7 +474,7 @@ BEGIN
             id bigint NOT NULL,
             metric_id int NOT NULL,
             labels prom_api.label_array NOT NULL,
-            delete_epoch BIGINT NULL DEFAULT NULL,
+            mark_for_deletion_epoch TIMESTAMPTZ NULL DEFAULT NULL,
             CHECK(labels[1] = %2$L AND labels[1] IS NOT NULL),
             CHECK(metric_id = %3$L),
             CONSTRAINT series_labels_id_%3$s UNIQUE(labels) INCLUDE (id),
@@ -488,7 +488,7 @@ BEGIN
     --these indexes are logically on all series tables but they cannot be defined on the parent due to
     --dump/restore issues.
     EXECUTE format('CREATE INDEX series_labels_%s ON prom_data_series.%I USING GIN (labels)', NEW.id, NEW.table_name);
-    EXECUTE format('CREATE INDEX series_delete_epoch_id_%s ON prom_data_series.%I (delete_epoch, id) WHERE delete_epoch IS NOT NULL', NEW.id, NEW.table_name);
+    EXECUTE format('CREATE INDEX series_mark_for_deletion_epoch_id_%s ON prom_data_series.%I (mark_for_deletion_epoch, id) WHERE mark_for_deletion_epoch IS NOT NULL', NEW.id, NEW.table_name);
 
     EXECUTE format('ALTER TABLE prom_data_series.%1$I OWNER TO prom_admin', NEW.table_name);
     EXECUTE format('GRANT ALL PRIVILEGES ON TABLE prom_data_series.%I TO prom_admin', NEW.table_name);
@@ -866,7 +866,7 @@ AS
 $$
 BEGIN
     EXECUTE FORMAT(
-        'UPDATE prom_data_series.%1$I SET delete_epoch = current_epoch+1 FROM _prom_catalog.ids_epoch WHERE delete_epoch IS NULL AND id = ANY($1)',
+        'UPDATE prom_data_series.%1$I SET mark_for_deletion_epoch = current_epoch FROM _prom_catalog.global_epoch WHERE mark_for_deletion_epoch IS NULL AND id = ANY($1)',
         metric_table
     ) USING series_ids;
     RETURN;
@@ -1285,7 +1285,7 @@ AS $func$
 BEGIN
     EXECUTE FORMAT($query$
         UPDATE prom_data_series.%1$I
-        SET delete_epoch = NULL
+        SET mark_for_deletion_epoch = NULL
         WHERE id = $1
     $query$, metric_table) using series_id;
 END
@@ -1322,7 +1322,7 @@ BEGIN
     ), existing AS (
         SELECT
             id,
-            CASE WHEN delete_epoch IS NOT NULL THEN
+            CASE WHEN mark_for_deletion_epoch IS NOT NULL THEN
                 _prom_catalog.resurrect_series_ids(%1$L, id)
             END
         FROM prom_data_series.%1$I as series
@@ -1367,7 +1367,7 @@ BEGIN
     ), existing AS (
         SELECT
             id,
-            CASE WHEN delete_epoch IS NOT NULL THEN
+            CASE WHEN mark_for_deletion_epoch IS NOT NULL THEN
                 _prom_catalog.resurrect_series_ids(%1$L, id)
             END
         FROM prom_data_series.%1$I as series
@@ -1397,7 +1397,7 @@ BEGIN
     WITH existing AS (
         SELECT
             id,
-            CASE WHEN delete_epoch IS NOT NULL THEN
+            CASE WHEN mark_for_deletion_epoch IS NOT NULL THEN
                 _prom_catalog.resurrect_series_ids(%1$L, id)
             END
         FROM prom_data_series.%1$I as series
@@ -1975,23 +1975,23 @@ COMMENT ON FUNCTION prom_api.reset_metric_compression_setting(TEXT)
 IS 'resets the compression setting for a specific metric to using the default';
 GRANT EXECUTE ON FUNCTION prom_api.reset_metric_compression_setting(TEXT) TO prom_admin;
 
-CREATE OR REPLACE FUNCTION _prom_catalog.epoch_abort(user_epoch BIGINT)
+CREATE OR REPLACE FUNCTION _prom_catalog.epoch_abort(user_epoch TIMESTAMPTZ)
     RETURNS VOID
     VOLATILE
     SET search_path = pg_catalog, pg_temp
 AS $func$
-DECLARE db_epoch BIGINT;
+DECLARE db_delete_epoch TIMESTAMPTZ;
 BEGIN
-    SELECT current_epoch FROM _prom_catalog.ids_epoch LIMIT 1
-        INTO db_epoch;
-    RAISE EXCEPTION 'epoch % to old to continue INSERT, current: %',
-        user_epoch, db_epoch
+    SELECT delete_epoch FROM _prom_catalog.global_epoch LIMIT 1
+        INTO db_delete_epoch;
+    RAISE EXCEPTION 'epoch % to old to continue INSERT, current DB delete epoch: %',
+        user_epoch, db_delete_epoch
         USING ERRCODE='PS001';
 END;
 $func$ LANGUAGE PLPGSQL;
-COMMENT ON FUNCTION _prom_catalog.epoch_abort(BIGINT)
+COMMENT ON FUNCTION _prom_catalog.epoch_abort(TIMESTAMPTZ)
 IS 'ABORT an INSERT transaction due to the ID epoch being out of date';
-GRANT EXECUTE ON FUNCTION _prom_catalog.epoch_abort TO prom_writer;
+GRANT EXECUTE ON FUNCTION _prom_catalog.epoch_abort(TIMESTAMPTZ) TO prom_writer;
 
 -- Given a `metric_schema`, `metric_table`, and `series_table`, this function
 -- returns all series ids in `potential_series_ids` which are not referenced by
@@ -2113,9 +2113,9 @@ BEGIN
             SELECT _prom_catalog.get_confirmed_unused_series('%1$s','%2$s','%3$s', array_agg(series_id), %5$L) as ids
             FROM potentially_drop_series
         ) -- we want this next statement to be the last one in the txn since it could block series fetch (both of them update delete_epoch)
-        UPDATE prom_data_series.%3$I SET delete_epoch = current_epoch+1
-        FROM _prom_catalog.ids_epoch
-        WHERE delete_epoch IS NULL
+        UPDATE prom_data_series.%3$I SET mark_for_deletion_epoch = current_epoch
+        FROM _prom_catalog.global_epoch
+        WHERE mark_for_deletion_epoch IS NULL
             AND id IN (SELECT unnest(ids) FROM confirmed_drop_series)
     $query$, metric_schema, metric_table, metric_series_table, drop_point, check_time);
 END
@@ -2137,7 +2137,7 @@ chunks, see `_prom_catalog.drop_metric_chunks`.
 ';
 
 CREATE OR REPLACE FUNCTION _prom_catalog.delete_expired_series(
-    metric_schema TEXT, metric_table TEXT, metric_series_table TEXT, ran_at TIMESTAMPTZ, present_epoch BIGINT, last_updated_epoch TIMESTAMPTZ
+    metric_schema TEXT, metric_table TEXT, metric_series_table TEXT, ran_at TIMESTAMPTZ
 )
     RETURNS VOID
     --security definer to add jobs as the logged-in user
@@ -2147,21 +2147,13 @@ CREATE OR REPLACE FUNCTION _prom_catalog.delete_expired_series(
 AS $func$
 DECLARE
     label_array int[];
-    next_epoch BIGINT;
-    deletion_epoch BIGINT;
+    max_deletion_time TIMESTAMPTZ;
+    deletion_time TIMESTAMPTZ;
     epoch_duration INTERVAL;
 BEGIN
-    next_epoch := present_epoch + 1;
-    -- technically we can delete any ID <= current_epoch - 1
-    -- but it's always safe to leave them around for a bit longer
-    deletion_epoch := present_epoch - 4;
-
     SELECT _prom_catalog.get_default_value('epoch_duration')::INTERVAL INTO STRICT epoch_duration;
 
-    -- we don't want to delete too soon
-    IF ran_at < last_updated_epoch + epoch_duration THEN
-        RETURN;
-    END IF;
+    deletion_time := ran_at - epoch_duration;
 
     EXECUTE format($query$
         -- recheck that the series IDs we might delete are actually dead
@@ -2171,7 +2163,7 @@ BEGIN
             (
                 SELECT id
                 FROM prom_data_series.%3$I
-                WHERE delete_epoch <= %4$L
+                WHERE mark_for_deletion_epoch < %4$L
             ) as potential
             LEFT JOIN LATERAL (
                 SELECT 1
@@ -2182,19 +2174,21 @@ BEGIN
             WHERE indicator IS NULL
         ), deleted_series AS (
             DELETE FROM prom_data_series.%3$I
-            WHERE delete_epoch <= %4$L
+            WHERE mark_for_deletion_epoch < %4$L
                 AND id IN (SELECT id FROM dead_series) -- concurrency means we need this qual in both
-            RETURNING id, labels
+            RETURNING id, labels, mark_for_deletion_epoch
         ), resurrected_series AS (
             UPDATE prom_data_series.%3$I
-            SET delete_epoch = NULL
-            WHERE delete_epoch <= %4$L
+            SET mark_for_deletion_epoch = NULL
+            WHERE mark_for_deletion_epoch < %4$L
                 AND id NOT IN (SELECT id FROM dead_series) -- concurrency means we need this qual in both
         )
-        SELECT ARRAY(SELECT DISTINCT unnest(labels) as label_id
-            FROM deleted_series)
-    $query$, metric_schema, metric_table, metric_series_table, deletion_epoch) INTO label_array;
-
+        SELECT
+          array_agg(DISTINCT labels.label) as label_id
+        , max(mark_for_deletion_epoch) as max_deletion_time
+        FROM deleted_series d,
+        LATERAL unnest(d.labels) as labels(label)
+    $query$, metric_schema, metric_table, metric_series_table, deletion_time) INTO label_array, max_deletion_time;
 
     IF array_length(label_array, 1) > 0 THEN
         --jit interacts poorly why the multi-partition query below
@@ -2233,16 +2227,15 @@ BEGIN
         SET LOCAL jit = DEFAULT;
     END IF;
 
-    UPDATE _prom_catalog.ids_epoch
-        SET (current_epoch, last_update_time) = (next_epoch, now())
-        WHERE current_epoch < next_epoch;
+    UPDATE _prom_catalog.global_epoch e
+        SET (current_epoch, delete_epoch) = (ran_at, COALESCE(max_deletion_time, (SELECT delete_epoch FROM _prom_catalog.global_epoch)));
     RETURN;
 END
 $func$
 LANGUAGE PLPGSQL;
 --redundant given schema settings but extra caution for security definers
-REVOKE ALL ON FUNCTION _prom_catalog.delete_expired_series(text, text, text, timestamptz, BIGINT, timestamptz) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION _prom_catalog.delete_expired_series(text, text, text, timestamptz, BIGINT, timestamptz) TO prom_maintenance;
+REVOKE ALL ON FUNCTION _prom_catalog.delete_expired_series(text, text, text, timestamptz) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION _prom_catalog.delete_expired_series(text, text, text, timestamptz) TO prom_maintenance;
 
 CREATE OR REPLACE FUNCTION _prom_catalog.set_app_name(full_name text)
     RETURNS VOID
@@ -2491,7 +2484,7 @@ BEGIN
             %2$s
         FROM
             prom_data_series.%1$I AS series
-        WHERE delete_epoch IS NULL
+        WHERE mark_for_deletion_epoch IS NULL
     $$, view_name, label_value_cols);
 
     IF NOT view_exists THEN
