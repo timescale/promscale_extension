@@ -31,10 +31,12 @@ DO $doit$
         EXECUTE FORMAT($$ ALTER TABLE prom_data.%I RESET (autovacuum_vacuum_threshold) $$, r.table_name);
 
         SELECT c.schema_name, c.table_name
-        INTO STRICT _compressed_schema, _compressed_hypertable
+        INTO _compressed_schema, _compressed_hypertable
         FROM _timescaledb_catalog.hypertable h
         INNER JOIN _timescaledb_catalog.hypertable c ON (h.compressed_hypertable_id= c.id)
         WHERE h.schema_name = 'prom_data' AND h.table_name = r.table_name;
+
+        CONTINUE WHEN NOT FOUND;
 
         IF current_setting('server_version_num')::integer >= 130000 THEN
             EXECUTE FORMAT($$

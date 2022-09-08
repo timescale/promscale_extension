@@ -16,7 +16,7 @@ Run `make devenv` to build the docker image, start it, and expose it on port
 54321 on your local machine. This docker image mounts the current directory
 into the `/code` directory in the container. By default, it runs postgres 14
 and continually recompiles and reinstalls the promscale extension on source
-modifications. This means that you can edit the sources locally, and run SQL 
+modifications. This means that you can edit the sources locally, and run SQL
 tests against the container.
 
 You can adjust the postgres version through the `DEVENV_PG_VERSION` env var,
@@ -45,7 +45,7 @@ proceeding further.
 ### Running SQL tests
 
 After you modified or added migration tests can be executed in the devcontainer
-by running `make dev-sql-tests`. Our approach to adding tests is described 
+by running `make dev-sql-tests`. Our approach to adding tests is described
 [below](#testing).
 
 ### Updating public API documentation
@@ -96,7 +96,7 @@ Firstly, you'll need to install and configure PGX:
 - `cargo pgx init`
 
 Then you can run PGX tests by executing: `cargo pgx test`. If you need to run
-them against a specific PostgreSQL version you can use a corresponding feature 
+them against a specific PostgreSQL version you can use a corresponding feature
 flag: `cargo pgx test pg12`.
 
 ### Running end-to-end Rust tests
@@ -111,3 +111,15 @@ but could be finicky.
 
 To run the e2e tests against the locally build image run: `cargo test -p e2e`.
 Further details could be found in the [corresponding document](./e2e/README.md).
+
+## Known Issues
+
+Older versions of Rust misbehaved on Apple Sillicon during panic unwind. Leading to
+errors like `(signal: 11, SIGSEGV: invalid memory reference)` during test failures.
+The solution is to upgrade to Rust >1.64 via:
+- `rustup toolchain install nightly`
+- `rustup default nightly`
+
+## Tips and tricks
+
+Use `RUST_LOG=DEBUG` to get more test output from cargo tests
