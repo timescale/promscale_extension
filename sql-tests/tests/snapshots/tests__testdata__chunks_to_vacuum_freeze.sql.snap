@@ -1,0 +1,74 @@
+---
+source: sql-tests/tests/tests.rs
+expression: query_result
+---
+ plan 
+------
+ 1..8
+(1 row)
+
+   create_hypertable   
+-----------------------
+ (13,public,metric1,t)
+(1 row)
+
+ add_compression_policy 
+------------------------
+                   1005
+(1 row)
+
+   create_hypertable   
+-----------------------
+ (15,public,metric2,t)
+(1 row)
+
+ add_compression_policy 
+------------------------
+                   1006
+(1 row)
+
+         isnt_empty         
+----------------------------
+ ok 1 - chunks were created
+(1 row)
+
+                   is_empty                    
+-----------------------------------------------
+ ok 2 - zero results when no chunks compressed
+(1 row)
+
+                      results_eq                      
+------------------------------------------------------
+ ok 3 - 5 uncompressed chunks should have been chosen
+(1 row)
+
+                        results_eq                        
+----------------------------------------------------------
+ ok 4 - view should return the 5 chosen compressed chunks
+(1 row)
+
+                   is_empty                   
+----------------------------------------------
+ ok 5 - zero results after chunks were frozen
+(1 row)
+
+                      results_eq                      
+------------------------------------------------------
+ ok 6 - 5 uncompressed chunks should have been chosen
+(1 row)
+
+                        results_eq                        
+----------------------------------------------------------
+ ok 7 - view should return the 5 chosen compressed chunks
+(1 row)
+
+                   is_empty                   
+----------------------------------------------
+ ok 8 - zero results after chunks were frozen
+(1 row)
+
+ finish 
+--------
+(0 rows)
+
+

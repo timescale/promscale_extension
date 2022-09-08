@@ -14,6 +14,10 @@ We use the following categories for changes:
 
 ## [Unreleased]
 
+### Added
+
+- Added `_ps_catalog.chunks_to_vacuum_freeze` to identify compressed chunks containing tuples not yet frozen
+
 ## [0.6.0] - 2022-08-25
 
 ### Added
