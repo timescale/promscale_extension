@@ -87,8 +87,9 @@ select
     case
         -- we don't care about comparing the applied_at_version and applied_at columns of the migration table
         -- the 001-extension.sql script is problematic because we keep on changing the .so that functions point to, so skip it
+        -- the 024-adjust_autovacuum.sql script had a bug and had to be modified, so skip it
         when n.nspname = '_ps_catalog'::name and k.relname = 'migration'::name
-            then 'select name, body from _ps_catalog.migration where name != ''001-extension.sql'' order by name, body;'
+            then 'select name, body from _ps_catalog.migration where name != ''001-extension.sql'' AND name != ''024-adjust_autovacuum.sql'' order by name, body;'
         when n.nspname = '_timescaledb_internal' and (k.relname like '_compressed_hypertable_%' or k.relname like 'compress_hyper_%_chunk')
             -- cannot order by tbl on compressed hypertables
             then format('select * from %I.%I', n.nspname, k.relname)

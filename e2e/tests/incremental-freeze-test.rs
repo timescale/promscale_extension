@@ -81,7 +81,7 @@ fn incremental_freeze_test() {
         ("023-privileges.sql", "7a810fe5538653ce6e06674dbbdf7451"),
         (
             "024-adjust_autovacuum.sql",
-            "0fe28659efa74be9663cc158f84294cb",
+            "de0600ff3288e6fb3aa8dafc279bd5ff",
         ),
         // ↓↓↓ frozen in 0.5.2 ↓↓↓
         (

@@ -15,7 +15,8 @@ BEGIN
     IF _migration_name IS NOT NULL THEN
         RAISE LOG 'Migration "{{filename}}" already applied, skipping';
         -- 001-extension.sql changes are expected until this issue is resolved: https://github.com/timescale/promscale_extension/issues/350
-        IF _body_differs AND _migration_name != '001-extension.sql' THEN
+        -- 024-adjust_autovacuum.sql had a bug in it and had to be changed
+        IF _body_differs AND _migration_name != '001-extension.sql' and _migration_name != '024-adjust_autovacuum.sql' THEN
             RAISE WARNING 'The contents of migration "{{filename}}" have changed';
         END IF;
         RETURN;

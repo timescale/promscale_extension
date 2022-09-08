@@ -460,6 +460,7 @@ fn psql_file(container: &PostgresContainer, db: &str, username: &str, path: &Pat
     )
     .stderr_to_stdout()
     .stdout_capture()
+    .unchecked()
     .run()
     .unwrap();
     debug_lines(output.stdout);
