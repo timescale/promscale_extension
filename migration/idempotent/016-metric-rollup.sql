@@ -1,13 +1,3 @@
-CREATE OR REPLACE FUNCTION _prom_catalog.get_pending_rollup_metrics(rollup_schema_name TEXT) RETURNS TABLE (metric_name TEXT, table_name TEXT) AS
-$func$
-    SELECT metric_name, table_name FROM _prom_catalog.metric
-        WHERE
-            supported_rollup_schemas IS NULL
-        OR
-            NOT ( rollup_schema_name = ANY (supported_rollup_schemas) )
-$func$
-LANGUAGE sql;
-
 CREATE OR REPLACE PROCEDURE _prom_catalog.create_rollup_for_gauge(rollup_schema TEXT, table_name TEXT, resolution INTERVAL)
 AS
 $$
@@ -31,7 +21,7 @@ $$
 $$
 LANGUAGE plpgsql;
 
-CREATE OR REPLACE PROCEDURE _prom_catalog.scan_and_create_new_metric_rollups() AS
+CREATE OR REPLACE PROCEDURE _prom_catalog.create_new_metric_rollups_from_pending() AS
 $$
 DECLARE
     rollup RECORD;
@@ -97,17 +87,28 @@ $$
 $$
 LANGUAGE plpgsql;
 
-CREATE OR REPLACE PROCEDURE _prom_catalog.create_metric_rollup(rollup_name TEXT, resolution INTERVAL, retention INTERVAL) AS
+CREATE OR REPLACE PROCEDURE _prom_catalog.prepare_new_pending_metric_rollups_if_any(rollup_name TEXT, resolution INTERVAL, retention INTERVAL) AS
 $$
     DECLARE
         schema_name TEXT := 'ps_' || rollup_name;
         rollup_exists BOOLEAN;
+        new_rollups_created INTEGER := 0;
         r RECORD;
 
     BEGIN
         EXECUTE FORMAT('SELECT count(*) > 0 FROM _prom_catalog.rollup WHERE name = %L', rollup_name) INTO rollup_exists;
         IF ( rollup_exists ) THEN
-            RAISE EXCEPTION 'ERROR: cannot create metric rollup. Reason: rollup % already exists.', rollup_name;
+            -- Check for new metrics that are pending for this.
+            FOR r IN
+                EXECUTE FORMAT('select metric_name, table_name FROM _prom_catalog.metric where metric_name NOT IN (
+                    SELECT metric_name FROM _prom_catalog.metric_with_rollup WHERE rollup_schema_name = %L
+                )', schema_name)
+            LOOP
+                EXECUTE FORMAT('INSERT INTO _prom_catalog.metric_with_rollup VALUES (%L, %L, %L, FALSE)', schema_name, r.metric_name, r.table_name);
+                new_rollups_created := new_rollups_created + 1;
+            END LOOP;
+            RAISE WARNING 'New rollups created for % => %', rollup_name, new_rollups_created;
+            RETURN;
         END IF;
 
         EXECUTE FORMAT('INSERT INTO _prom_catalog.rollup VALUES (%L, %L, %L::INTERVAL, %L::INTERVAL)', rollup_name, schema_name, resolution, retention);
