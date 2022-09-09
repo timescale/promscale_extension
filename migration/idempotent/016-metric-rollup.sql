@@ -1,3 +1,97 @@
+-- This func prepares the given rollup. The actual rollup views are created by _prom_catalog.scan_for_new_rollups()
+CREATE OR REPLACE PROCEDURE _prom_catalog.create_metric_rollup(name TEXT, resolution INTERVAL, retention INTERVAL) AS
+$$
+    DECLARE
+        schema_name TEXT := 'ps_' || name;
+        exists BOOLEAN;
+
+    BEGIN
+        EXECUTE FORMAT('SELECT count(*) > 0 FROM _prom_catalog.rollup WHERE name = %L', name) INTO exists;
+        IF exists THEN
+            RAISE EXCEPTION 'ERROR: cannot create metric rollup for %. REASON: already exists.', name;
+        END IF;
+        EXECUTE FORMAT('CREATE SCHEMA IF NOT EXISTS %s', schema_name);
+        PERFORM add_job('_prom_catalog.rollup_maintenance', resolution, FORMAT('{"schema_name": "%s"}', schema_name)::jsonb);
+        INSERT INTO _prom_catalog.rollup VALUES (name, schema_name, resolution, retention);
+    END;
+$$
+LANGUAGE PLPGSQL;
+
+-- This func should be called in regular intervals to scan for either new metrics
+-- or for new resolution and prepare them for metric rollup.
+CREATE OR REPLACE PROCEDURE _prom_catalog.scan_for_new_rollups() AS
+$$
+    DECLARE
+        r RECORD;
+        m RECORD;
+        rollup_exists BOOLEAN;
+        new_rollups_created INTEGER := 0;
+        rollup_view_created BOOLEAN;
+
+    BEGIN
+        FOR r IN
+            SELECT * FROM _prom_catalog.rollup
+        LOOP
+            rollup_view_created := FALSE;
+            EXECUTE FORMAT('SELECT count(*) > 0 FROM _prom_catalog.rollup WHERE name = %L', r.name) INTO rollup_exists;
+            IF ( rollup_exists ) THEN
+                -- Check for new metrics that are pending for this.
+                FOR m IN
+                    EXECUTE FORMAT('select metric_name, table_name FROM _prom_catalog.metric where metric_name NOT IN (
+                        SELECT metric_name FROM _prom_catalog.metric_with_rollup WHERE rollup_schema = %L
+                    )', r.schema_name)
+                LOOP
+                    SELECT INTO rollup_view_created _prom_catalog.create_metric_rollup_view(r.schema_name, m.metric_name, m.table_name, r.resolution);
+                    IF rollup_view_created THEN
+                        EXECUTE FORMAT('INSERT INTO _prom_catalog.metric_with_rollup VALUES (%L, %L, %L)', r.schema_name, m.metric_name, m.table_name);
+                        new_rollups_created := new_rollups_created + 1;
+                    END IF;
+                END LOOP;
+                RAISE WARNING 'New rollups created for rollup % => %', r.name, new_rollups_created;
+                CONTINUE;
+            END IF;
+
+            -- Rollup is new. Hence, create the rollup for all metrics..
+            FOR m IN
+                SELECT metric_name, table_name FROM _prom_catalog.metric
+            LOOP
+                SELECT INTO rollup_view_created _prom_catalog.create_metric_rollup_view(r.schema_name, m.metric_name, m.table_name, r.resolution);
+                IF rollup_view_created THEN
+                    EXECUTE FORMAT('INSERT INTO _prom_catalog.metric_with_rollup VALUES (%L, %L, %L)', r.schema_name, m.metric_name, m.table_name);
+                    new_rollups_created := new_rollups_created + 1;
+                END IF;
+            END LOOP;
+            RAISE WARNING 'New rollups created for rollup % => %', r.name, new_rollups_created;
+        END LOOP;
+    END;
+$$
+LANGUAGE PLPGSQL;
+
+-- Returns true if metric rollup was created.
+CREATE OR REPLACE FUNCTION _prom_catalog.create_metric_rollup_view(rollup_schema TEXT, metric_name TEXT, table_name TEXT, resolution INTERVAL)
+RETURNS BOOLEAN AS
+$$
+    DECLARE
+        metric_type TEXT;
+
+    BEGIN
+        EXECUTE FORMAT('SELECT type FROM _prom_catalog.metadata WHERE metric_family = %L', metric_name) INTO metric_type;
+        IF metric_type IS NULL THEN
+            RAISE WARNING 'Skipping creation of metric rollup for %. REASON: metric_type not found', metric_name;
+            RETURN FALSE;
+        END IF;
+
+        IF metric_type <> 'GAUGE' THEN
+            -- For PoC, we are only targetting GAUGE.
+            RETURN FALSE;
+        END IF;
+
+        CALL _prom_catalog.create_rollup_for_gauge(rollup_schema, table_name, resolution);
+        RETURN TRUE;
+    END;
+$$
+LANGUAGE PLPGSQL;
+
 CREATE OR REPLACE PROCEDURE _prom_catalog.create_rollup_for_gauge(rollup_schema TEXT, table_name TEXT, resolution INTERVAL)
 AS
 $$
@@ -21,49 +115,6 @@ $$
 $$
 LANGUAGE plpgsql;
 
-CREATE OR REPLACE PROCEDURE _prom_catalog.create_new_metric_rollups_from_pending() AS
-$$
-DECLARE
-    rollup RECORD;
-    resolution INTERVAL;
-    metric_type TEXT;
-    rollup_created_count INTEGER := 0;
-    rollup_skipped_count INTEGER := 0;
-
-BEGIN
-    IF (SELECT count(*) = 0 FROM _prom_catalog.rollup) THEN
-        -- No metric rollup task if no resolution exist.
-        RAISE WARNING 'No rollup resolution found. Skipping metric rollup creation';
-        RETURN;
-    END IF;
-
-    IF (SELECT count(*) = 0 FROM _prom_catalog.metric) THEN
-        -- No metric exist.
-        RAISE WARNING 'No metric found. Skipping metric rollup creation';
-        RETURN;
-    END IF;
-
-    for rollup in
-        select rollup_schema_name, metric_name, table_name FROM _prom_catalog.metric_with_rollup WHERE initialized IS FALSE
-        loop
-            EXECUTE FORMAT('SELECT type FROM _prom_catalog.metadata WHERE metric_family = %L', rollup.metric_name) INTO metric_type;
-            IF (metric_type IS NULL) OR (metric_type <> 'GAUGE') THEN
-                rollup_skipped_count := rollup_skipped_count + 1;
-                CONTINUE;
-            end if;
-
-            EXECUTE FORMAT('SELECT resolution FROM _prom_catalog.rollup WHERE schema_name = %L', rollup.rollup_schema_name) INTO resolution;
-
-            CALL _prom_catalog.create_rollup_for_gauge(rollup.rollup_schema_name, rollup.table_name, resolution);
-            rollup_created_count := rollup_created_count + 1;
-            EXECUTE FORMAT('UPDATE _prom_catalog.metric_with_rollup SET initialized = TRUE WHERE table_name = %L AND rollup_schema_name = %L', rollup.table_name, rollup.rollup_schema_name);
-        end loop;
-    raise warning 'total rollups created for "%" schema => %', rollup.rollup_schema_name, rollup_created_count;
-    raise warning 'total rollups skipped => %', rollup_skipped_count;
-END;
-$$
-LANGUAGE plpgsql;
-
 CREATE OR REPLACE PROCEDURE _prom_catalog.rollup_maintenance(job_id int, config jsonb) AS
 $$
     DECLARE
@@ -73,54 +124,16 @@ $$
 
     BEGIN
         IF schema_name IS NULL THEN
-            RAISE EXCEPTION 'ERROR: schema_name is null in rollup_maintenance';
+            RAISE EXCEPTION 'ERROR: Maintenance of metric rollups not possible with job id %. REASON: schema_name is null in rollup_maintenance.', job_id;
         END IF;
 
         FOR r IN
-            EXECUTE FORMAT('SELECT rollup_schema_name, table_name FROM _prom_catalog.metric_with_rollup WHERE initialized IS TRUE AND rollup_schema_name = %L', schema_name)
-        LOOP
-                EXECUTE FORMAT('REFRESH MATERIALIZED VIEW %s.%s', r.rollup_schema_name, r.table_name);
+            EXECUTE FORMAT('SELECT table_name FROM _prom_catalog.metric_with_rollup WHERE rollup_schema = %L', schema_name)
+            LOOP
+                EXECUTE FORMAT('REFRESH MATERIALIZED VIEW %s.%s', schema_name, r.table_name);
                 refreshed_count := refreshed_count + 1;
-        END LOOP;
+            END LOOP;
         raise warning 'refreshed % metric rollups by job id %', refreshed_count, job_id;
     END;
 $$
 LANGUAGE plpgsql;
-
-CREATE OR REPLACE PROCEDURE _prom_catalog.prepare_new_pending_metric_rollups_if_any(rollup_name TEXT, resolution INTERVAL, retention INTERVAL) AS
-$$
-    DECLARE
-        schema_name TEXT := 'ps_' || rollup_name;
-        rollup_exists BOOLEAN;
-        new_rollups_created INTEGER := 0;
-        r RECORD;
-
-    BEGIN
-        EXECUTE FORMAT('SELECT count(*) > 0 FROM _prom_catalog.rollup WHERE name = %L', rollup_name) INTO rollup_exists;
-        IF ( rollup_exists ) THEN
-            -- Check for new metrics that are pending for this.
-            FOR r IN
-                EXECUTE FORMAT('select metric_name, table_name FROM _prom_catalog.metric where metric_name NOT IN (
-                    SELECT metric_name FROM _prom_catalog.metric_with_rollup WHERE rollup_schema_name = %L
-                )', schema_name)
-            LOOP
-                EXECUTE FORMAT('INSERT INTO _prom_catalog.metric_with_rollup VALUES (%L, %L, %L, FALSE)', schema_name, r.metric_name, r.table_name);
-                new_rollups_created := new_rollups_created + 1;
-            END LOOP;
-            RAISE WARNING 'New rollups created for % => %', rollup_name, new_rollups_created;
-            RETURN;
-        END IF;
-
-        EXECUTE FORMAT('INSERT INTO _prom_catalog.rollup VALUES (%L, %L, %L::INTERVAL, %L::INTERVAL)', rollup_name, schema_name, resolution, retention);
-        EXECUTE FORMAT('CREATE SCHEMA IF NOT EXISTS %s', schema_name);
-
-        FOR r IN
-            SELECT metric_name, table_name FROM _prom_catalog.metric
-        LOOP
-            EXECUTE FORMAT('INSERT INTO _prom_catalog.metric_with_rollup VALUES (%L, %L, %L, FALSE)', schema_name, r.metric_name, r.table_name);
-        END LOOP;
-
-        PERFORM add_job('_prom_catalog.rollup_maintenance', resolution, FORMAT('{"schema_name": "%s"}', schema_name)::jsonb);
-    END;
-$$
-LANGUAGE PLPGSQL;

@@ -8,11 +8,10 @@ GRANT SELECT ON TABLE _prom_catalog.rollup TO prom_reader;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _prom_catalog.rollup TO prom_writer;
 
 CREATE TABLE _prom_catalog.metric_with_rollup (
-    rollup_schema_name  TEXT,
-    metric_name         TEXT,
-    table_name          TEXT,
-    initialized         BOOLEAN DEFAULT FALSE,
-    PRIMARY KEY         (metric_name, table_name, rollup_schema_name)
+    rollup_schema   TEXT,
+    metric_name     TEXT,
+    table_name      TEXT,
+    PRIMARY KEY     (metric_name, table_name, rollup_schema)
 );
 GRANT SELECT ON TABLE _prom_catalog.metric_with_rollup TO prom_reader;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _prom_catalog.metric_with_rollup TO prom_writer;
