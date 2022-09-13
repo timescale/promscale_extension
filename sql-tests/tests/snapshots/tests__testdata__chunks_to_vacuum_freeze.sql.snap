@@ -2,9 +2,9 @@
 source: sql-tests/tests/tests.rs
 expression: query_result
 ---
- plan 
-------
- 1..8
+ plan  
+-------
+ 1..14
 (1 row)
 
    create_hypertable   
@@ -62,9 +62,40 @@ expression: query_result
  ok 7 - view should return the 5 chosen compressed chunks
 (1 row)
 
-                   is_empty                   
-----------------------------------------------
- ok 8 - zero results after chunks were frozen
+psql:testdata/chunks_to_vacuum_freeze.sql:162: NOTICE:  table "_the_one" does not exist, skipping
+                      set_hasnt                       
+------------------------------------------------------
+ ok 8 - vacuumed chunk should disappear from the view
+(1 row)
+
+                     results_eq                     
+----------------------------------------------------
+ ok 9 - unvacuumed chunks should remain in the view
+(1 row)
+
+                       set_hasnt                       
+-------------------------------------------------------
+ ok 10 - vacuumed chunk should disappear from the view
+(1 row)
+
+                     results_eq                      
+-----------------------------------------------------
+ ok 11 - unvacuumed chunks should remain in the view
+(1 row)
+
+                       set_hasnt                       
+-------------------------------------------------------
+ ok 12 - vacuumed chunk should disappear from the view
+(1 row)
+
+                     results_eq                      
+-----------------------------------------------------
+ ok 13 - unvacuumed chunks should remain in the view
+(1 row)
+
+                   is_empty                    
+-----------------------------------------------
+ ok 14 - zero results after chunks were frozen
 (1 row)
 
  finish 

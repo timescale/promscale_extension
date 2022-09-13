@@ -2,7 +2,7 @@
 \set QUIET 1
 \i 'testdata/scripts/pgtap-1.2.0.sql'
 
-SELECT * FROM plan(8);
+SELECT * FROM plan(14);
 
 /*
     create two hypertables and load them with enough data to create a couple thousand chunks
@@ -95,7 +95,7 @@ inner join _timescaledb_catalog.chunk cc on (c.compressed_chunk_id = cc.id)
 
 -- view should return the 5 chosen compressed chunks
 select results_eq(
-    'select compressed_chunk_id from _ps_catalog.chunks_to_vacuum_freeze order by compressed_chunk_id',
+    'select id from _ps_catalog.chunks_to_vacuum_freeze order by id',
     'select id from pg_temp._chosen_compressed_chunks order by id',
     'view should return the 5 chosen compressed chunks'
 );
@@ -153,12 +153,87 @@ inner join _timescaledb_catalog.chunk cc on (c.compressed_chunk_id = cc.id)
 
 -- view should return the 5 chosen compressed chunks
 select results_eq(
-    'select compressed_chunk_id from _ps_catalog.chunks_to_vacuum_freeze order by compressed_chunk_id',
+    'select id from _ps_catalog.chunks_to_vacuum_freeze order by id',
     'select id from pg_temp._chosen_compressed_chunks order by id',
     'view should return the 5 chosen compressed chunks'
 );
 
--- vacuum freeze the chosen
+-- pick one
+drop table if exists pg_temp._the_one;
+create temporary table pg_temp._the_one as
+select *
+from _chosen_compressed_chunks
+order by random()
+limit 1;
+delete from _chosen_compressed_chunks where id in (select id from pg_temp._the_one);
+
+-- vacuum freeze the one
+select format('vacuum (freeze, analyze) %I.%I', schema_name, table_name)
+from pg_temp._the_one
+\gexec
+
+select set_hasnt(
+     'select id from _ps_catalog.chunks_to_vacuum_freeze',
+     'select id from pg_temp._the_one',
+     'vacuumed chunk should disappear from the view'
+);
+select results_eq(
+     'select id from _ps_catalog.chunks_to_vacuum_freeze order by id',
+     'select id from pg_temp._chosen_compressed_chunks order by id',
+     'unvacuumed chunks should remain in the view'
+);
+
+-- pick another one
+drop table if exists pg_temp._the_one;
+create temporary table pg_temp._the_one as
+select *
+from _chosen_compressed_chunks
+order by random()
+limit 1;
+delete from _chosen_compressed_chunks where id in (select id from pg_temp._the_one);
+
+-- vacuum freeze the one
+select format('vacuum (freeze, analyze) %I.%I', schema_name, table_name)
+from pg_temp._the_one
+\gexec
+
+select set_hasnt(
+     'select id from _ps_catalog.chunks_to_vacuum_freeze',
+     'select id from pg_temp._the_one',
+     'vacuumed chunk should disappear from the view'
+);
+select results_eq(
+     'select id from _ps_catalog.chunks_to_vacuum_freeze order by id',
+     'select id from pg_temp._chosen_compressed_chunks order by id',
+     'unvacuumed chunks should remain in the view'
+);
+
+-- pick another other one
+drop table if exists pg_temp._the_one;
+create temporary table pg_temp._the_one as
+select *
+from _chosen_compressed_chunks
+order by random()
+limit 1;
+delete from _chosen_compressed_chunks where id in (select id from pg_temp._the_one);
+
+-- vacuum freeze the one
+select format('vacuum (freeze, analyze) %I.%I', schema_name, table_name)
+from pg_temp._the_one
+\gexec
+
+select set_hasnt(
+     'select id from _ps_catalog.chunks_to_vacuum_freeze',
+     'select id from pg_temp._the_one',
+     'vacuumed chunk should disappear from the view'
+);
+select results_eq(
+     'select id from _ps_catalog.chunks_to_vacuum_freeze order by id',
+     'select id from pg_temp._chosen_compressed_chunks order by id',
+     'unvacuumed chunks should remain in the view'
+);
+
+-- vacuum freeze the remaining
 select format('vacuum (freeze, analyze) %I.%I', schema_name, table_name)
 from pg_temp._chosen_compressed_chunks
 \gexec
