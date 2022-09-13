@@ -4,7 +4,7 @@ expression: query_result
 ---
  plan 
 ------
- 1..8
+ 1..5
 (1 row)
 
    create_hypertable   
@@ -37,34 +37,19 @@ expression: query_result
  ok 2 - zero results when no chunks compressed
 (1 row)
 
-                      results_eq                      
-------------------------------------------------------
- ok 3 - 5 uncompressed chunks should have been chosen
-(1 row)
-
-                        results_eq                        
-----------------------------------------------------------
- ok 4 - view should return the 5 chosen compressed chunks
-(1 row)
-
-                   is_empty                   
-----------------------------------------------
- ok 5 - zero results after chunks were frozen
+                      results_eq                       
+-------------------------------------------------------
+ ok 3 - 15 uncompressed chunks should have been chosen
 (1 row)
 
                       results_eq                      
 ------------------------------------------------------
- ok 6 - 5 uncompressed chunks should have been chosen
+ ok 4 - 15 compressed chunks should have been created
 (1 row)
 
-                        results_eq                        
-----------------------------------------------------------
- ok 7 - view should return the 5 chosen compressed chunks
-(1 row)
-
-                   is_empty                   
-----------------------------------------------
- ok 8 - zero results after chunks were frozen
+                        results_eq                         
+-----------------------------------------------------------
+ ok 5 - view should return the 15 chosen compressed chunks
 (1 row)
 
  finish 
