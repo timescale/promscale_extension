@@ -129,23 +129,43 @@ LANGUAGE plpgsql;
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.rollup_maintenance(job_id int, config jsonb) AS
 $$
-    DECLARE
-        schema_name TEXT := config ->> 'schema_name';
-        refreshed_count INTEGER := 0;
-        r RECORD;
+DECLARE
+    schema_name TEXT := config ->> 'schema_name';
+    refreshed_count INTEGER := 0;
+    r RECORD;
+    resolution INTERVAL;
+    retention INTERVAL;
 
-    BEGIN
-        IF schema_name IS NULL THEN
-            RAISE EXCEPTION 'ERROR: Maintenance of metric rollups not possible with job id %. REASON: schema_name is null in rollup_maintenance.', job_id;
+BEGIN
+    IF schema_name IS NULL THEN
+        RAISE EXCEPTION 'ERROR: Maintenance of metric rollups not possible with job id %. REASON: schema_name is null in rollup_maintenance.', job_id;
+    END IF;
+
+    FOR r IN
+        SELECT table_name FROM _prom_catalog.metric_with_rollup WHERE rollup_schema = schema_name
+    LOOP
+        -- Task: The maintenance jobs for metric rollups have 3 tasks to do:
+        -- 1. Refresh
+        -- 2. Compress
+        -- 3. Retention
+        EXECUTE FORMAT('SELECT resolution, retention FROM _prom_catalog.rollup WHERE schema_name = %L', schema_name) INTO resolution, retention;
+        IF (resolution IS NULL OR retention IS NULL) THEN
+            RAISE EXCEPTION 'Cannot perform rollup_maintenance for job id %. Reason: either resolution or retention for rollup schema % is NULL', job_id, schema_name;
         END IF;
 
-        FOR r IN
-            EXECUTE FORMAT('SELECT table_name FROM _prom_catalog.metric_with_rollup WHERE rollup_schema = %L', schema_name)
-            LOOP
-                EXECUTE FORMAT('REFRESH MATERIALIZED VIEW %s.%s', schema_name, r.table_name);
-                refreshed_count := refreshed_count + 1;
-            END LOOP;
-        raise warning 'refreshed % metric rollups by job id %', refreshed_count, job_id;
-    END;
+        -- Refresh.
+        CALL refresh_continuous_aggregate(schema_name || '.' || r.table_name, current_timestamp - 3 * resolution, current_timestamp - resolution);
+        refreshed_count := refreshed_count + 1;
+
+        -- Compress.
+        -- Note: The rollup is refreshed every 'resolution', which means, it adds a sample every 'resolution' (as resolution is same or time_bucket),
+        -- it basically means we are adding X samples for compression, for X is `X * resolution` below.
+        PERFORM compress_chunk(show_chunks(schema_name || '.' || r.table_name, older_than => 1000 * resolution));
+
+        -- Retention.
+        PERFORM drop_chunks(schema_name || '.' || r.table_name, older_than => retention);
+    END LOOP;
+    raise warning 'job id %: refreshed % metric rollups by for rollups under %', job_id, refreshed_count, schema_name;
+END;
 $$
-LANGUAGE plpgsql;
+LANGUAGE PLPGSQL;
