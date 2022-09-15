@@ -11,6 +11,7 @@ CREATE TABLE _prom_catalog.metric_with_rollup (
     rollup_schema   TEXT,
     metric_name     TEXT,
     table_name      TEXT,
+    refresh_pending BOOLEAN DEFAULT TRUE,
     PRIMARY KEY     (metric_name, table_name, rollup_schema)
 );
 GRANT SELECT ON TABLE _prom_catalog.metric_with_rollup TO prom_reader;

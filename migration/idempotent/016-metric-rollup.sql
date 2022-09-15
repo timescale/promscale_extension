@@ -57,11 +57,22 @@ $$
             LOOP
                 SELECT INTO rollup_view_created _prom_catalog.create_metric_rollup_view(r.schema_name, m.metric_name, m.table_name, r.resolution);
                 IF rollup_view_created THEN
-                    EXECUTE FORMAT('INSERT INTO _prom_catalog.metric_with_rollup VALUES (%L, %L, %L)', r.schema_name, m.metric_name, m.table_name);
+                    EXECUTE FORMAT('INSERT INTO _prom_catalog.metric_with_rollup VALUES (%L, %L, %L, TRUE)', r.schema_name, m.metric_name, m.table_name);
                     new_rollups_created := new_rollups_created + 1;
+                    CALL refresh_continuous_aggregate(r.schema_name || '.' || r.table_name, NULL, NULL);
                 END IF;
             END LOOP;
             RAISE WARNING 'New rollups created for rollup % => %', r.name, new_rollups_created;
+        END LOOP;
+
+        COMMIT;
+
+        -- Refresh the newly added Caggs.
+        FOR r IN
+            SELECT rollup_schema, table_name FROM _prom_catalog.metric_with_rollup WHERE refresh_pending = TRUE
+        LOOP
+                CALL refresh_continuous_aggregate(r.rollup_schema || '.' || r.table_name, NULL, NULL);
+                UPDATE _prom_catalog.metric_with_rollup SET refresh_pending = FALSE WHERE rollup_schema = r.rollup_schema AND table_name = r.table_name;
         END LOOP;
     END;
 $$
@@ -96,22 +107,23 @@ CREATE OR REPLACE PROCEDURE _prom_catalog.create_rollup_for_gauge(rollup_schema 
 AS
 $$
     BEGIN
-        execute FORMAT(
-            'CREATE MATERIALIZED VIEW %1$I.%2$I AS
-                SELECT
-                    timezone(
-                        %3$L,
-                        time_bucket(%4$L::interval, time) AT TIME ZONE %3$L + %4$L::interval
-                    ) as time,
-                    series_id,
-                    sum(value) as sum,
-                    count(value) as count,
-                    min(value) as min,
-                    max(value) as max
-                FROM prom_data.%2$I
-                GROUP BY 1, 2
-        ', rollup_schema, table_name, 'UTC', resolution);
-    END
+        EXECUTE FORMAT(
+                'CREATE MATERIALIZED VIEW %1$I.%2$I WITH (timescaledb.continuous, timescaledb.materialized_only=true) AS
+                    SELECT
+                        timezone(
+                            %3$L,
+                            time_bucket(%4$L, time) AT TIME ZONE %3$L + %4$L
+                        ) as time,
+                        series_id,
+                        sum(value) as sum,
+                        count(value) as count,
+                        min(value) as min,
+                        max(value) as max
+                    FROM prom_data.%2$I
+                    GROUP BY time_bucket(%4$L, time), series_id WITH NO DATA
+            ', rollup_schema, table_name, 'UTC', resolution::text);
+        EXECUTE FORMAT('ALTER MATERIALIZED VIEW %1$I.%2$I SET (timescaledb.compress = true)', rollup_schema, table_name);
+    END;
 $$
 LANGUAGE plpgsql;
 
