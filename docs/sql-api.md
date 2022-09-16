@@ -621,6 +621,11 @@ Finalizes metric creation. This procedure should be run by the connector automat
 ```
 procedure void **_prom_catalog.finalize_metric_creation**()
 ```
+### _prom_catalog.get_advisory_lock_id_vacuum_engine
+Returns the lock id used to coordinate runs of the vacuum engine
+```
+function bigint **_prom_catalog.get_advisory_lock_id_vacuum_engine**()
+```
 ### _prom_catalog.get_advisory_lock_prefix_job
 
 ```
@@ -901,6 +906,11 @@ function SETOF anyelement **_prom_catalog.label_unnest**(label_array anyarray)
 ```
 function boolean **_prom_catalog.label_value_contains**(labels label_value_array, label_value text)
 ```
+### _prom_catalog.lock_for_vacuum_engine
+Attempts to acquire an advisory lock for the vacuum engine
+```
+function boolean **_prom_catalog.lock_for_vacuum_engine**()
+```
 ### _prom_catalog.lock_metric_for_maintenance
 
 ```
@@ -988,6 +998,11 @@ function void **_prom_catalog.set_default_value**(_key text, _value text)
 
 ```
 function _prom_catalog.ha_leases **_prom_catalog.try_change_leader**(cluster text, new_leader text, max_time timestamp with time zone)
+```
+### _prom_catalog.unlock_for_vacuum_engine
+Releases the advisory lock used by the vacuum engine
+```
+function void **_prom_catalog.unlock_for_vacuum_engine**()
 ```
 ### _prom_catalog.unlock_metric_for_maintenance
 
