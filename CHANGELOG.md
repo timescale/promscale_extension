@@ -16,7 +16,12 @@ We use the following categories for changes:
 
 ### Added
 
-- Added `_ps_catalog.chunks_to_vacuum_freeze` to identify compressed chunks containing tuples not yet frozen
+- Added `_ps_catalog.chunks_to_vacuum_freeze` to identify compressed chunks 
+  containing tuples not yet frozen [#503] and [#509]
+- Added three functions used for coordinating the vacuum engine 
+  `_prom_catalog.get_advisory_lock_id_vacuum_engine`,
+  `_prom_catalog.lock_for_vacuum_engine`, and 
+  `_prom_catalog.unlock_for_vacuum_engine()` [#511]
 
 ## [0.6.0] - 2022-08-25
 

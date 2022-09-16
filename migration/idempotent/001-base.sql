@@ -185,6 +185,41 @@ LANGUAGE SQL;
 --only used for setting chunk interval, and admin function
 GRANT EXECUTE ON FUNCTION _prom_catalog.get_staggered_chunk_interval(INTERVAL) TO prom_admin;
 
+CREATE OR REPLACE FUNCTION _prom_catalog.get_advisory_lock_id_vacuum_engine()
+    RETURNS BIGINT
+    SET search_path = pg_catalog, pg_temp
+AS $func$
+SELECT 1237719821982;
+$func$
+    LANGUAGE SQL IMMUTABLE PARALLEL SAFE;
+GRANT EXECUTE ON FUNCTION _prom_catalog.get_advisory_lock_id_vacuum_engine() TO prom_writer;
+COMMENT ON FUNCTION _prom_catalog.get_advisory_lock_id_vacuum_engine()
+IS 'Returns the lock id used to coordinate runs of the vacuum engine';
+
+CREATE OR REPLACE FUNCTION _prom_catalog.lock_for_vacuum_engine()
+    RETURNS BOOLEAN
+    VOLATILE
+    SET search_path = pg_catalog, pg_temp
+AS $func$
+    SELECT pg_try_advisory_lock(_prom_catalog.get_advisory_lock_id_vacuum_engine())
+$func$
+LANGUAGE SQL;
+GRANT EXECUTE ON FUNCTION _prom_catalog.lock_for_vacuum_engine() TO prom_maintenance;
+COMMENT ON FUNCTION _prom_catalog.lock_for_vacuum_engine()
+IS 'Attempts to acquire an advisory lock for the vacuum engine';
+
+CREATE OR REPLACE FUNCTION _prom_catalog.unlock_for_vacuum_engine()
+    RETURNS VOID
+    VOLATILE
+    SET search_path = pg_catalog, pg_temp
+AS $func$
+    SELECT pg_advisory_unlock(_prom_catalog.get_advisory_lock_id_vacuum_engine())
+$func$
+LANGUAGE SQL;
+GRANT EXECUTE ON FUNCTION _prom_catalog.unlock_for_vacuum_engine() TO prom_maintenance;
+COMMENT ON FUNCTION _prom_catalog.unlock_for_vacuum_engine()
+IS 'Releases the advisory lock used by the vacuum engine';
+
 CREATE OR REPLACE FUNCTION _prom_catalog.get_advisory_lock_prefix_job()
     RETURNS INTEGER
     SET search_path = pg_catalog, pg_temp
@@ -3426,7 +3461,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.create_ingest_temp_table(table_name TEX
     SET search_path = pg_catalog, pg_temp
 AS $func$
 DECLARE
-    temp_table TEXT;         
+    temp_table TEXT;
 BEGIN
     SET LOCAL log_statement = 'none';
     temp_table := left(CONCAT(table_prefix, table_name), 62);
