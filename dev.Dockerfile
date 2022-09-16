@@ -18,7 +18,7 @@ RUN echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -c -s)-pgdg
 RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
 RUN echo "deb [signed-by=/usr/share/keyrings/timescale.keyring] https://packagecloud.io/timescale/timescaledb/ubuntu/ $(lsb_release -c -s) main" > /etc/apt/sources.list.d/timescaledb.list
 RUN wget --quiet -O - https://packagecloud.io/timescale/timescaledb/gpgkey | gpg --dearmor -o /usr/share/keyrings/timescale.keyring
-RUN apt-get update && apt-get install -y timescaledb-2-postgresql-{12,13,14}
+RUN apt-get update && apt-get install -y timescaledb-2{,-loader}-postgresql-{12,13,14}='2.7.2*'
 RUN apt-get install -y build-essential clang libssl-dev pkg-config libreadline-dev zlib1g-dev postgresql-server-dev-{12,13,14}
 
 # These directories need to be writeable for pgx to install the extension into
