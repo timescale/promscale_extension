@@ -121,7 +121,6 @@ jobs:
         PACKAGE_TO_TEST: artifacts/${{ steps.metadata.outputs.outfile }}
         IMAGE_BASE: ${{ steps.metadata.outputs.image }}-test
         DOCKER_FILE: dist/${{ matrix.os.pkg_type }}.test.dockerfile
-        CONNECTOR_DOCKER_IMAGE: "timescale/promscale:0.11.0-alpha"
       run: |
         for pkg_cloud_tag in ${{ join(matrix.os.pkg_cloud_tags, ' ') }}; do \
           DISTRO=$(echo ${pkg_cloud_tag} | cut -d'/' -f 1 | sed 's/el/centos/'); \
@@ -135,7 +134,7 @@ jobs:
             -t ${EXTENSION_DOCKER_IMAGE} \
             -f ${DOCKER_FILE} \
             . ; \
-          ./tools/smoke-test "${EXTENSION_DOCKER_IMAGE}" "${CONNECTOR_DOCKER_IMAGE}" "${DOCKER_PLATFORM}"; \
+          ./tools/smoke-test "${EXTENSION_DOCKER_IMAGE}" "${DOCKER_PLATFORM}"; \
         done
 
     - name: Upload Artifact for Job

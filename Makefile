@@ -151,7 +151,7 @@ endif
 
 .PHONY: release-test
 release-test: release-tester ## Test the currently selected release package
-	./tools/smoke-test "$(RELEASE_IMAGE_NAME)-test" "timescale/promscale:0.11.0-alpha" $(DOCKER_PLATFORM)
+	./tools/smoke-test "$(RELEASE_IMAGE_NAME)-test" $(DOCKER_PLATFORM)
 
 .PHONY: post-release
 post-release: promscale.control
