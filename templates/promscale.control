@@ -6,6 +6,9 @@ default_version = '@CARGO_VERSION@'
 relocatable = false
 schema = public
 superuser = true
+{%if requires_timescaledb -%}
+requires = 'timescaledb'
+{%-endif%}
 {%if !is_pg_12 -%}
 trusted = true
 {%-endif%}

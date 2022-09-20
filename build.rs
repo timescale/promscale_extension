@@ -24,6 +24,7 @@ struct IdempotentWrapper<'a> {
 #[derive(Template)]
 #[template(path = "promscale.control", escape = "none")]
 struct ControlFile {
+    requires_timescaledb: bool,
     is_pg_12: bool,
 }
 
@@ -77,15 +78,24 @@ fn generate_promscale_000_sql(manifest_dir: &str) {
         .expect("unable to write control file contents");
 }
 
-/// This procedure generates promscale.control file based on postgresql version.
-/// Specifically, PostgreSQL 12 doesn't support 'trusted' extension functionality.
+/// This procedure generates promscale.control file based on cargo features.
+/// Specifically:
+///  - PostgreSQL 12 doesn't support 'trusted' extension functionality.
+///  - When we run `cargo pgx test`, we don't want a dependency on the timescaledb extension.
 fn generate_control_file(manifest_dir: &str) {
     let features: std::collections::HashSet<String> = env::vars()
         .filter(|(k, _)| k.starts_with("CARGO_FEATURE_"))
         .map(|(k, _)| k.replace("CARGO_FEATURE_", "").to_ascii_lowercase())
         .collect();
     let is_pg_12 = features.contains(&"pg12".to_string());
-    let control_file_contents = ControlFile { is_pg_12 }.render().unwrap();
+    let is_release_build = env::var("PROFILE").unwrap() == "release";
+    let requires_timescaledb = is_release_build && !features.contains("pg_test");
+    let control_file_contents = ControlFile {
+        is_pg_12,
+        requires_timescaledb,
+    }
+    .render()
+    .unwrap();
 
     let mut control_file_path = PathBuf::from(manifest_dir);
     control_file_path.push(CONTROL_FILE_NAME);
