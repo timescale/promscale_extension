@@ -23,6 +23,10 @@ We use the following categories for changes:
   `_prom_catalog.lock_for_vacuum_engine`, and 
   `_prom_catalog.unlock_for_vacuum_engine()` [#511]
 
+### Changed
+
+- The timescaledb extension is now a mandatory prerequisite [#515].
+
 ### Fixed
 
 - Correctly remove all expired series [#521]
