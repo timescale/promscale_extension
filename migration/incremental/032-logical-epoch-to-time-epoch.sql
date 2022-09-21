@@ -1,13 +1,10 @@
 CREATE TABLE _prom_catalog.global_epoch (
     current_epoch TIMESTAMPTZ NOT NULL,
-    delete_epoch TIMESTAMPTZ NOT NULL,
-    -- force there to only be a single row
-    is_unique BOOLEAN NOT NULL DEFAULT true CHECK (is_unique = true),
-    UNIQUE (is_unique)
+    delete_epoch TIMESTAMPTZ NOT NULL
 );
 GRANT SELECT ON TABLE _prom_catalog.global_epoch TO prom_reader;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _prom_catalog.global_epoch TO prom_writer;
-
+-- set the correct initial value for global_epoch
 DO $block$
     DECLARE
         _is_restore_in_progress boolean = false;
@@ -20,10 +17,12 @@ DO $block$
         END IF;
         -- this ensures that pristine and migrated DBs have the same values
         -- it's also important that current_epoch > delete_epoch
-        INSERT INTO _prom_catalog.global_epoch (current_epoch, delete_epoch, is_unique)
-            VALUES ('2020-01-01 00:00:00 UTC', '1970-01-01 00:00:00 UTC', true);
+        INSERT INTO _prom_catalog.global_epoch (current_epoch, delete_epoch)
+            VALUES ('epoch', '-infinity');
     END;
 $block$;
+-- now that we have a row in the table, force it to only be able to contain one row
+CREATE UNIQUE INDEX global_epoch_unique_idx ON _prom_catalog.global_epoch ((true));
 
 ALTER TABLE _prom_catalog.series ADD COLUMN
     mark_for_deletion_epoch TIMESTAMPTZ NULL DEFAULT NULL;
@@ -36,7 +35,6 @@ DROP FUNCTION IF EXISTS _prom_catalog.delete_expired_series(text, text, text, ti
 
 UPDATE _prom_catalog.series s
 SET mark_for_deletion_epoch = now() -- NOTE: we can't use current_epoch because we've initialized it to a value in the past
-FROM (SELECT current_epoch FROM _prom_catalog.global_epoch) as global_epoch
 WHERE s.delete_epoch IS NOT NULL;
 
 DROP TABLE _prom_catalog.ids_epoch;
@@ -57,7 +55,8 @@ DO $block$
             EXECUTE format($$
                 CREATE INDEX IF NOT EXISTS
                     series_mark_for_deletion_epoch_id_%s
-                ON prom_data_series.%I (mark_for_deletion_epoch, id)
+                ON prom_data_series.%I (mark_for_deletion_epoch)
+                INCLUDE (id)
                 WHERE mark_for_deletion_epoch IS NOT NULL
                 $$, _rec.id, _rec.table_name);
 

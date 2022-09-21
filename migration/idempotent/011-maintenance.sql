@@ -86,7 +86,7 @@ CREATE OR REPLACE FUNCTION _prom_catalog.initialize_current_epoch()
     SET search_path = pg_catalog, pg_temp
 AS $func$
     UPDATE _prom_catalog.global_epoch e SET current_epoch = now()
-    WHERE e.current_epoch = '2020-01-01 00:00:00'::TIMESTAMPTZ;
+    WHERE e.current_epoch = 'epoch'::TIMESTAMPTZ;
 $func$
 LANGUAGE SQL;
 --redundant given schema settings but extra caution for security definers
