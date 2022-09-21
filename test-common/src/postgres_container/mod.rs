@@ -1,3 +1,4 @@
+use log::{error, info};
 use postgres::Client;
 use std::fmt::{Display, Formatter};
 use testcontainers::images::generic::GenericImage;
@@ -71,5 +72,24 @@ pub fn connect(pg_blueprint: &PostgresContainerBlueprint, container: &PostgresCo
         container.get_host_port_ipv4(5432),
         pg_blueprint.db()
     );
-    Client::connect(&connection_string, postgres::NoTls).unwrap()
+    retry(|| Client::connect(&connection_string, postgres::NoTls), 3).unwrap()
+}
+
+fn retry<T, E, F>(operation: F, count: i32) -> Result<T, E>
+where
+    E: Display,
+    F: Fn() -> Result<T, E>,
+{
+    let result: Result<T, E> = operation();
+    match result {
+        Ok(result) => Ok(result),
+        Err(error) => {
+            if count == 1 {
+                error!("encountered error '{}', no more retries", error);
+                return Err(error);
+            }
+            info!("encountered error '{}', will retry", error);
+            return retry(operation, count - 1);
+        }
+    }
 }
