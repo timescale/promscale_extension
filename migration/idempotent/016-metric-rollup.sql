@@ -136,6 +136,9 @@ DECLARE
     resolution INTERVAL;
     retention INTERVAL;
 
+    dropped_chunks_count INTEGER := 0;
+    temp INTEGER := 0;
+
 BEGIN
     IF schema_name IS NULL THEN
         RAISE EXCEPTION 'ERROR: Maintenance of metric rollups not possible with job id %. REASON: schema_name is null in rollup_maintenance.', job_id;
@@ -160,12 +163,15 @@ BEGIN
         -- Compress.
         -- Note: The rollup is refreshed every 'resolution', which means, it adds a sample every 'resolution' (as resolution is same or time_bucket),
         -- it basically means we are adding X samples for compression, for X is `X * resolution` below.
+        -- Note: This query is wrong for compression. For some reason, PERFORM does not do its job properly. Replacing with SELECT works fine.
         PERFORM compress_chunk(show_chunks(schema_name || '.' || r.table_name, older_than => 1000 * resolution));
 
         -- Retention.
-        PERFORM drop_chunks(schema_name || '.' || r.table_name, older_than => retention);
+        SELECT count(*) INTO temp FROM (SELECT drop_chunks(schema_name || '.' || r.table_name, older_than => retention)) a;
+        dropped_chunks_count = dropped_chunks_count + temp;
+        temp := 0;
     END LOOP;
-    raise warning 'job id %: refreshed % metric rollups by for rollups under %', job_id, refreshed_count, schema_name;
+    raise warning 'job id %: refreshed % metric rollups by for rollups under %; Dropped % chunks', job_id, refreshed_count, schema_name, dropped_chunks_count;
 END;
 $$
 LANGUAGE PLPGSQL;
