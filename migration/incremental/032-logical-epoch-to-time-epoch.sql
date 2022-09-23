@@ -4,7 +4,7 @@ CREATE TABLE _prom_catalog.global_epoch (
 );
 GRANT SELECT ON TABLE _prom_catalog.global_epoch TO prom_reader;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _prom_catalog.global_epoch TO prom_writer;
--- set the correct initial value for global_epoch
+-- Set the correct initial value for global_epoch.
 DO $block$
     DECLARE
         _is_restore_in_progress boolean = false;
@@ -21,9 +21,19 @@ DO $block$
             VALUES ('epoch', '-infinity');
     END;
 $block$;
--- now that we have a row in the table, force it to only be able to contain one row
+-- Now that we have a row in the table, force it to only contain one row.
 CREATE UNIQUE INDEX global_epoch_unique_idx ON _prom_catalog.global_epoch ((true));
 
+-- We know that we have exclusive access to the DB, so it's safe to purge all
+-- series which were marked for deletion. This optimization ensures that we
+-- don't have to rewrite a potentially large table.
+DELETE FROM _prom_catalog.series s
+WHERE s.delete_epoch IS NOT NULL;
+
+-- This cascades to prom_series.<metric_name> views, which we recreate below.
+ALTER TABLE _prom_catalog.series DROP COLUMN delete_epoch CASCADE;
+
+-- Add the new delete epoch column
 ALTER TABLE _prom_catalog.series ADD COLUMN
     mark_for_deletion_epoch TIMESTAMPTZ NULL DEFAULT NULL;
 
@@ -33,13 +43,7 @@ DROP FUNCTION IF EXISTS _prom_catalog.epoch_abort(BIGINT);
 
 DROP FUNCTION IF EXISTS _prom_catalog.delete_expired_series(text, text, text, timestamptz, BIGINT, timestamptz);
 
-UPDATE _prom_catalog.series s
-SET mark_for_deletion_epoch = now() -- NOTE: we can't use current_epoch because we've initialized it to a value in the past
-WHERE s.delete_epoch IS NOT NULL;
-
 DROP TABLE _prom_catalog.ids_epoch;
--- This cascades to the prom_series.<metric_name> views
-ALTER TABLE _prom_catalog.series DROP COLUMN delete_epoch CASCADE;
 
 DO $block$
     DECLARE
