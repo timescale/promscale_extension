@@ -78,55 +78,6 @@ $$
 $$
 LANGUAGE PLPGSQL;
 
--- Returns true if metric rollup was created.
-CREATE OR REPLACE FUNCTION _prom_catalog.create_metric_rollup_view(rollup_schema TEXT, metric_name TEXT, table_name TEXT, resolution INTERVAL)
-RETURNS BOOLEAN AS
-$$
-    DECLARE
-        metric_type TEXT;
-
-    BEGIN
-        EXECUTE FORMAT('SELECT type FROM _prom_catalog.metadata WHERE metric_family = %L', metric_name) INTO metric_type;
-        IF metric_type IS NULL THEN
-            RAISE WARNING 'Skipping creation of metric rollup for %. REASON: metric_type not found', metric_name;
-            RETURN FALSE;
-        END IF;
-
-        IF metric_type <> 'GAUGE' THEN
-            -- For PoC, we are only targetting GAUGE.
-            RETURN FALSE;
-        END IF;
-
-        CALL _prom_catalog.create_rollup_for_gauge(rollup_schema, table_name, resolution);
-        RETURN TRUE;
-    END;
-$$
-LANGUAGE PLPGSQL;
-
-CREATE OR REPLACE PROCEDURE _prom_catalog.create_rollup_for_gauge(rollup_schema TEXT, table_name TEXT, resolution INTERVAL)
-AS
-$$
-    BEGIN
-        EXECUTE FORMAT(
-                'CREATE MATERIALIZED VIEW %1$I.%2$I WITH (timescaledb.continuous, timescaledb.materialized_only=true) AS
-                    SELECT
-                        timezone(
-                            %3$L,
-                            time_bucket(%4$L, time) AT TIME ZONE %3$L + %4$L
-                        ) as time,
-                        series_id,
-                        sum(value) as sum,
-                        count(value) as count,
-                        min(value) as min,
-                        max(value) as max
-                    FROM prom_data.%2$I
-                    GROUP BY time_bucket(%4$L, time), series_id WITH NO DATA
-            ', rollup_schema, table_name, 'UTC', resolution::text);
-        EXECUTE FORMAT('ALTER MATERIALIZED VIEW %1$I.%2$I SET (timescaledb.compress = true)', rollup_schema, table_name);
-    END;
-$$
-LANGUAGE plpgsql;
-
 CREATE OR REPLACE PROCEDURE _prom_catalog.rollup_maintenance(job_id int, config jsonb) AS
 $$
 DECLARE
@@ -137,6 +88,7 @@ DECLARE
     retention INTERVAL;
 
     dropped_chunks_count INTEGER := 0;
+    compressed_chunks_count INTEGER := 0;
     temp INTEGER := 0;
 
 BEGIN
@@ -164,14 +116,157 @@ BEGIN
         -- Note: The rollup is refreshed every 'resolution', which means, it adds a sample every 'resolution' (as resolution is same or time_bucket),
         -- it basically means we are adding X samples for compression, for X is `X * resolution` below.
         -- Note: This query is wrong for compression. For some reason, PERFORM does not do its job properly. Replacing with SELECT works fine.
-        PERFORM compress_chunk(show_chunks(schema_name || '.' || r.table_name, older_than => 1000 * resolution));
+        SELECT count(*) INTO temp FROM (
+            SELECT compress_chunk(
+            _prom_catalog.pending_rollup_chunks_for_compression(schema_name, r.table_name, 2*resolution)
+            )
+        ) a;
+        compressed_chunks_count := compressed_chunks_count + temp;
 
         -- Retention.
         SELECT count(*) INTO temp FROM (SELECT drop_chunks(schema_name || '.' || r.table_name, older_than => retention)) a;
-        dropped_chunks_count = dropped_chunks_count + temp;
-        temp := 0;
+        dropped_chunks_count := dropped_chunks_count + temp;
     END LOOP;
-    raise warning 'job id %: refreshed % metric rollups by for rollups under %; Dropped % chunks', job_id, refreshed_count, schema_name, dropped_chunks_count;
+    raise warning '[JOB ID %] Running on % schema => Refreshed % metric rollups ; Compressed % chunks ; Dropped % chunks', job_id, schema_name, refreshed_count, compressed_chunks_count, dropped_chunks_count;
 END;
 $$
 LANGUAGE PLPGSQL;
+
+CREATE OR REPLACE FUNCTION _prom_catalog.pending_rollup_chunks_for_compression(rollup_schema TEXT, rollup_table TEXT, older_than INTERVAL)
+RETURNS TABLE ( chunk_name REGCLASS ) AS
+$$
+    SELECT
+        a.compressible AS chunk_name
+    FROM
+        (
+            SELECT (schema_name || '.' || table_name)::REGCLASS AS compressible FROM _timescaledb_catalog.chunk
+                WHERE hypertable_id = (
+                    SELECT mat_hypertable_id FROM _timescaledb_catalog.continuous_agg WHERE user_view_schema = rollup_schema AND user_view_name = rollup_table
+                ) AND compressed_chunk_id IS NULL
+        ) a
+            INNER JOIN
+        show_chunks(
+                'ps_1_min.go_goroutines',
+                older_than => older_than
+            ) b
+        ON (a.compressible = b);
+$$
+language SQL;
+
+-- Returns true if metric rollup was created.
+CREATE OR REPLACE FUNCTION _prom_catalog.create_metric_rollup_view(rollup_schema TEXT, metric_name TEXT, table_name TEXT, resolution INTERVAL)
+    RETURNS BOOLEAN AS
+$$
+DECLARE
+    metric_type TEXT;
+
+BEGIN
+    EXECUTE FORMAT('SELECT type FROM _prom_catalog.metadata WHERE metric_family = %L', metric_name) INTO metric_type;
+    IF metric_type IS NULL THEN
+        RAISE WARNING 'Skipping creation of metric rollup for %. REASON: metric_type not found', metric_name;
+        RETURN FALSE;
+    END IF;
+
+    CASE
+        WHEN metric_type = 'GAUGE' THEN
+            CALL _prom_catalog.create_rollup_for_gauge(rollup_schema, table_name, resolution);
+        WHEN metric_type = 'COUNTER' OR metric_type = 'HISTOGRAM' THEN
+            CALL _prom_catalog.create_rollup_for_counter(rollup_schema, table_name, resolution);
+        WHEN metric_type = 'SUMMARY' THEN
+            CALL _prom_catalog.create_rollup_for_summary(rollup_schema, table_name, resolution);
+    END CASE;
+    RETURN TRUE;
+END;
+$$
+LANGUAGE PLPGSQL;
+
+CREATE OR REPLACE PROCEDURE _prom_catalog.create_rollup_for_gauge(rollup_schema TEXT, table_name TEXT, resolution INTERVAL)
+AS
+$$
+BEGIN
+    EXECUTE FORMAT(
+            'CREATE MATERIALIZED VIEW %1$I.%2$I WITH (timescaledb.continuous, timescaledb.materialized_only=true) AS
+                SELECT
+                    timezone(
+                        %3$L,
+                        time_bucket(%4$L, time) AT TIME ZONE %3$L + %4$L
+                    ) as time,
+                    series_id,
+                    sum(value) as sum,
+                    count(value) as count,
+                    min(value) as min,
+                    max(value) as max
+                FROM prom_data.%2$I
+                GROUP BY time_bucket(%4$L, time), series_id WITH NO DATA
+        ', rollup_schema, table_name, 'UTC', resolution::text);
+    EXECUTE FORMAT('ALTER MATERIALIZED VIEW %1$I.%2$I SET (timescaledb.compress = true)', rollup_schema, table_name);
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE OR REPLACE PROCEDURE _prom_catalog.create_rollup_for_counter(rollup_schema TEXT, table_name TEXT, resolution INTERVAL)
+AS
+$$
+BEGIN
+    EXECUTE FORMAT(
+            'CREATE MATERIALIZED VIEW %1$I.%2$I WITH (timescaledb.continuous, timescaledb.materialized_only=true) AS
+                SELECT
+                    timezone(
+                        %3$L,
+                        time_bucket(%4$L, time) AT TIME ZONE %3$L + %4$L
+                    ) as time,
+                    series_id,
+                    first(value, time),
+                    last(value, time) + _prom_catalog.counter_reset_sum(array_agg(value)) last_with_counter_reset
+                FROM prom_data.%2$I
+                GROUP BY time_bucket(%4$L, time), series_id WITH NO DATA
+        ', rollup_schema, table_name, 'UTC', resolution::text);
+    EXECUTE FORMAT('ALTER MATERIALIZED VIEW %1$I.%2$I SET (timescaledb.compress = true)', rollup_schema, table_name);
+END;
+$$
+LANGUAGE PLPGSQL;
+
+CREATE OR REPLACE PROCEDURE _prom_catalog.create_rollup_for_summary(rollup_schema TEXT, table_name TEXT, resolution INTERVAL)
+AS
+$$
+BEGIN
+    EXECUTE FORMAT(
+            'CREATE MATERIALIZED VIEW %1$I.%2$I WITH (timescaledb.continuous, timescaledb.materialized_only=true) AS
+                SELECT
+                    timezone(
+                        %3$L,
+                        time_bucket(%4$L, time) AT TIME ZONE %3$L + %4$L
+                    ) as time,
+                    series_id,
+                    sum(value) as sum,
+                    count(value) as count
+                FROM prom_data.%2$I
+                GROUP BY time_bucket(%4$L, time), series_id WITH NO DATA
+        ', rollup_schema, table_name, 'UTC', resolution::text);
+    EXECUTE FORMAT('ALTER MATERIALIZED VIEW %1$I.%2$I SET (timescaledb.compress = true)', rollup_schema, table_name);
+END;
+$$
+LANGUAGE PLPGSQL;
+
+CREATE FUNCTION _prom_catalog.counter_reset_sum(asc_ordered_v DOUBLE PRECISION[]) RETURNS DOUBLE PRECISION AS
+$$
+DECLARE
+    reset_sum DOUBLE PRECISION := 0;
+    length INTEGER := cardinality(asc_ordered_v);
+    i INTEGER := 1;
+    previous DOUBLE PRECISION;
+
+BEGIN
+    IF length < 2 THEN
+        RETURN 0;
+    END IF;
+    previous := asc_ordered_v[1];
+    FOR i IN 2..length LOOP
+        IF asc_ordered_v[i] < previous THEN
+            reset_sum := reset_sum + asc_ordered_v[i];
+        END IF;
+    END LOOP;
+    RETURN reset_sum;
+END;
+$$
+LANGUAGE PLPGSQL IMMUTABLE;
