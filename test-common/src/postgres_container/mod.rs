@@ -1,6 +1,8 @@
 use log::{error, info};
 use postgres::Client;
 use std::fmt::{Display, Formatter};
+use std::thread;
+use std::time::Duration;
 use testcontainers::images::generic::GenericImage;
 use testcontainers::Container;
 
@@ -75,7 +77,16 @@ pub fn connect(pg_blueprint: &PostgresContainerBlueprint, container: &PostgresCo
     retry(|| Client::connect(&connection_string, postgres::NoTls), 3).unwrap()
 }
 
-fn retry<T, E, F>(operation: F, count: i32) -> Result<T, E>
+fn retry<T, E, F>(operation: F, count: u32) -> Result<T, E>
+where
+    E: Display,
+    F: Fn() -> Result<T, E>,
+{
+    assert!(count > 0);
+    retry_inner(operation, 1, count)
+}
+
+fn retry_inner<T, E, F>(operation: F, cur_count: u32, max_count: u32) -> Result<T, E>
 where
     E: Display,
     F: Fn() -> Result<T, E>,
@@ -84,12 +95,18 @@ where
     match result {
         Ok(result) => Ok(result),
         Err(error) => {
-            if count == 1 {
+            if cur_count == max_count {
                 error!("encountered error '{}', no more retries", error);
                 return Err(error);
             }
-            info!("encountered error '{}', will retry", error);
-            return retry(operation, count - 1);
+            let sleep_duration = Duration::from_secs(u64::pow(2, cur_count - 1));
+            info!(
+                "encountered error '{}', will retry in '{}s'",
+                error,
+                sleep_duration.as_secs()
+            );
+            thread::sleep(sleep_duration);
+            return retry_inner(operation, cur_count + 1, max_count);
         }
     }
 }
