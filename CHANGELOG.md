@@ -27,6 +27,10 @@ We use the following categories for changes:
 
 - Correctly remove all expired series [#521]
 
+### Changed
+
+- Drop non empty span name check constraint from `_ps_trace.operation` table [#520]
+
 ## [0.6.0] - 2022-08-25
 
 ### Added
