@@ -23,6 +23,10 @@ We use the following categories for changes:
   `_prom_catalog.lock_for_vacuum_engine`, and 
   `_prom_catalog.unlock_for_vacuum_engine()` [#511]
 
+### Fixed
+
+- Correctly remove all expired series [#521]
+
 ## [0.6.0] - 2022-08-25
 
 ### Added

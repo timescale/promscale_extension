@@ -2156,13 +2156,6 @@ BEGIN
     -- but it's always safe to leave them around for a bit longer
     deletion_epoch := present_epoch - 4;
 
-    SELECT _prom_catalog.get_default_value('epoch_duration')::INTERVAL INTO STRICT epoch_duration;
-
-    -- we don't want to delete too soon
-    IF ran_at < last_updated_epoch + epoch_duration THEN
-        RETURN;
-    END IF;
-
     EXECUTE format($query$
         -- recheck that the series IDs we might delete are actually dead
         WITH dead_series AS (
@@ -2233,10 +2226,14 @@ BEGIN
         SET LOCAL jit = DEFAULT;
     END IF;
 
-    UPDATE _prom_catalog.ids_epoch
+    SELECT _prom_catalog.get_default_value('epoch_duration')::INTERVAL INTO STRICT epoch_duration;
+
+    IF ran_at > last_updated_epoch + epoch_duration THEN
+        -- we only want to increment the epoch every epoch_duration
+        UPDATE _prom_catalog.ids_epoch
         SET (current_epoch, last_update_time) = (next_epoch, now())
         WHERE current_epoch < next_epoch;
-    RETURN;
+    END IF;
 END
 $func$
 LANGUAGE PLPGSQL;
