@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-cargo install --locked cargo-pgx --git https://github.com/timescale/pgx --branch v0.4.5-create-replace-fix --rev 96ece243
+cargo install --locked cargo-pgx --git https://github.com/JamesGuthrie/pgx --branch fix-create-or-replace-sql --rev 7611c2c

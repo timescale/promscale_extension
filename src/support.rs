@@ -31,7 +31,7 @@ mod _prom_ext {
     /// arguments.
     ///
     /// [support function]: https://www.postgresql.org/docs/current/xfunc-optimization.html
-    #[pg_extern(immutable, strict)]
+    #[pg_extern(immutable, strict, create_or_replace)]
     pub unsafe fn rewrite_fn_call_to_subquery(input: Internal) -> Internal {
         let req = if let Some(r) = extract_simplify_request(input) {
             r
@@ -138,7 +138,7 @@ mod _prom_ext {
     /// SELECT * FROM some_table
     /// WHERE map_attribute @> (SELECT _ps_trace.OP_matching_tags(key, value))
     /// ```
-    #[pg_extern(immutable, strict)]
+    #[pg_extern(immutable, strict, create_or_replace)]
     pub unsafe fn tag_map_rewrite(input: Internal) -> Internal {
         // Wrapping core logic into a function, that returns a Result,
         // thus enabling ? shorthand for dealing with optionals.
@@ -249,7 +249,7 @@ mod _prom_ext {
                 (&mut sub_simplify_req as *mut pg_sys::SupportRequestSimplify).internal(),
             )
             .into_datum()
-            .map(|datum: pg_sys::Datum| datum as *mut pg_sys::FuncExpr)
+            .map(|datum: pg_sys::Datum| datum.cast_mut_ptr::<pg_sys::FuncExpr>())
             .filter(|&expr| !expr.is_null())
             .unwrap_or(helper_func_expr);
 
@@ -312,7 +312,7 @@ mod _prom_ext {
     unsafe fn extract_simplify_request(
         input: Internal,
     ) -> Option<*mut pg_sys::SupportRequestSimplify> {
-        let input: *mut pg_sys::Node = input.unwrap().unwrap() as _;
+        let input: *mut pg_sys::Node = input.unwrap().unwrap().cast_mut_ptr();
         if !pgx::is_a(input, pg_sys::NodeTag_T_SupportRequestSimplify) {
             return None;
         }

@@ -1,6 +1,8 @@
 use pg_sys::*;
 use pgx::FromDatum;
 use pgx::*;
+use pgx::utils::sql_entity_graph::metadata::SqlTranslatable;
+use crate::utils::sql_entity_graph::metadata::{ArgumentError, Returns, ReturnsError, SqlMapping};
 
 // Trick DDL generator into recognizing our implementation of a built-in type.
 extension_sql!(
@@ -35,16 +37,24 @@ impl<'a> Jsonb<'a> {
     }
 }
 
-impl<'a> FromDatum for Jsonb<'a> {
-    const NEEDS_TYPID: bool = false;
+unsafe impl<'a> SqlTranslatable for Jsonb<'a> {
+    fn argument_sql() -> std::result::Result<SqlMapping, ArgumentError> {
+        Ok(SqlMapping::literal("jsonb"))
+    }
 
+    fn return_sql() -> std::result::Result<Returns, ReturnsError> {
+        Ok(Returns::One(SqlMapping::literal("jsonb")))
+    }
+}
+
+impl<'a> FromDatum for Jsonb<'a> {
     unsafe fn from_datum(datum: Datum, is_null: bool, _: Oid) -> Option<Jsonb<'a>> {
         if is_null {
             None
-        } else if datum == 0 {
+        } else if datum.is_null() {
             panic!("a jsonb Datum was flagged as non-null but the datum is zero")
         } else {
-            let varlena = datum as *mut pg_sys::varlena;
+            let varlena = datum.cast_mut_ptr::<pg_sys::varlena>();
             let detoasted = pg_detoast_datum(varlena);
 
             Some(Jsonb {
@@ -58,17 +68,17 @@ impl<'a> FromDatum for Jsonb<'a> {
 
     unsafe fn from_datum_in_memory_context(
         mut memory_context: PgMemoryContexts,
-        datum: usize,
+        datum: Datum,
         is_null: bool,
         _typoid: u32,
     ) -> Option<Jsonb<'a>> {
         if is_null {
             None
-        } else if datum == 0 {
+        } else if datum.is_null() {
             panic!("a jsonb Datum was flagged as non-null but the datum is zero")
         } else {
             memory_context.switch_to(|_| {
-                let detoasted = pg_detoast_datum_copy(datum as *mut pg_sys::varlena);
+                let detoasted = pg_detoast_datum_copy(datum.cast_mut_ptr());
                 Some(Jsonb {
                     pg_jsonb: detoasted as *mut pg_sys::Jsonb,
                     needs_drop: true,
@@ -128,7 +138,7 @@ impl<'a> Iterator for TokenIterator<'a> {
         match r {
             JsonbIteratorToken_WJB_DONE => None,
             JsonbIteratorToken_WJB_BEGIN_ARRAY => {
-                if unsafe { jsonb_val.val.array.rawScalar } {
+                if unsafe { jsonb_val.val.array.as_ref().rawScalar } {
                     self.raw_scalar = true;
                     self.next()
                 } else {
@@ -172,7 +182,7 @@ impl<'a> TokenIterator<'a> {
     /// validated the [`JsonbValue`]'s type is [`jbvType_jbvString`].
     #[inline]
     unsafe fn extract_string_value(jsonb_val: &mut JsonbValue) -> &'a str {
-        let str_val = jsonb_val.val.string;
+        let str_val = jsonb_val.val.string.as_ref();
         std::str::from_utf8_unchecked(std::slice::from_raw_parts::<'a, _>(
             str_val.val as *mut u8,
             str_val.len as usize,
@@ -190,7 +200,7 @@ impl<'a> TokenIterator<'a> {
             jbvType_jbvNumeric => {
                 Token::Numeric(unsafe { JsonbNormalizedNumeric::extract_numeric_value(jsonb_val) })
             }
-            jbvType_jbvBool => Token::Bool(unsafe { jsonb_val.val.boolean }),
+            jbvType_jbvBool => Token::Bool(unsafe { *jsonb_val.val.boolean.as_ref() }),
             t => {
                 panic!("invalid scalar jsonb type: {}", t)
             }
@@ -222,7 +232,7 @@ impl JsonbNormalizedNumeric {
     /// validated the [`JsonbValue`]'s type is [`jbvType_jbvNumeric`].
     #[inline]
     unsafe fn extract_numeric_value(jsonb_val: &mut JsonbValue) -> JsonbNormalizedNumeric {
-        let numeric_str = numeric_normalize(jsonb_val.val.numeric);
+        let numeric_str = numeric_normalize(*jsonb_val.val.numeric.as_ref());
         JsonbNormalizedNumeric { numeric_str }
     }
 
