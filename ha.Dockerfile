@@ -36,7 +36,7 @@ RUN chown postgres:postgres /home/promscale
 
 USER postgres
 
-ENV RUST_VERSION=1.58.1
+ENV RUST_VERSION=1.64.0
 
 RUN \
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --profile minimal --component rustfmt --default-toolchain ${RUST_VERSION} && \
