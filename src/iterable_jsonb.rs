@@ -1,8 +1,8 @@
+use crate::utils::sql_entity_graph::metadata::{ArgumentError, Returns, ReturnsError, SqlMapping};
 use pg_sys::*;
+use pgx::utils::sql_entity_graph::metadata::SqlTranslatable;
 use pgx::FromDatum;
 use pgx::*;
-use pgx::utils::sql_entity_graph::metadata::SqlTranslatable;
-use crate::utils::sql_entity_graph::metadata::{ArgumentError, Returns, ReturnsError, SqlMapping};
 
 // Trick DDL generator into recognizing our implementation of a built-in type.
 extension_sql!(
