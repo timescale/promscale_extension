@@ -526,6 +526,7 @@ DO $block$
 DECLARE
     obj_owner_oid oid;
     is_super boolean;
+    is_db_owner boolean;
     errors text[];
 BEGIN
     --the owner of extension objects is whoever is executing this script
@@ -539,8 +540,14 @@ BEGIN
     --in general, it seems using the session_user is safer than other alternatives.
     SELECT usesuper INTO STRICT is_super FROM pg_user WHERE usename = session_user;
 
+    --is user db owner? On cloud, tsdbadmin is db owner and should be able to opt out of security
+    --checks.
+    SELECT datdba = (SELECT usesysid FROM pg_user WHERE usename = session_user) INTO STRICT is_db_owner
+    FROM pg_database
+    WHERE datname = current_database();
+
     --way out of these checks for superusers
-    IF NOT (is_super AND coalesce(current_setting('promscale.disable_security_check', true)::boolean, false))
+    IF NOT ((is_super  OR is_db_owner) AND coalesce(current_setting('promscale.disable_security_check', true)::boolean, false))
     THEN
         --the basic approach here is find all objects depending on our extension and make sure they have the right owner
         --the first query handles most types of object but some objects need special handling.
