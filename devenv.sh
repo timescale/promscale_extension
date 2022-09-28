@@ -42,7 +42,7 @@ export ENTR_INOTIFY_WORKAROUND=true
 
 # Note: this is not a comprehensive list of source files, if you think one is missing, add it
 SOURCE_FILES="src migration"
-find ${SOURCE_FILES} | entr cargo pgx install --force-create-or-replace --features="pg${DEVENV_PG_VERSION}" > "${HOME}/compile.log" &
+find ${SOURCE_FILES} | entr cargo pgx install --features="pg${DEVENV_PG_VERSION}" > "${HOME}/compile.log" &
 
 tail -f "${HOME}/.pgx/${DEVENV_PG_VERSION}.log" "${HOME}/compile.log" &
 
