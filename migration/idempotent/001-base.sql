@@ -3462,7 +3462,7 @@ DECLARE
 BEGIN
     SET LOCAL log_statement = 'none';
     temp_table := left(CONCAT(table_prefix, table_name), 62);
-    EXECUTE format($sql$CREATE TEMPORARY TABLE IF NOT EXISTS %I (LIKE %I.%I) ON COMMIT DROP$sql$,
+    EXECUTE format($sql$CREATE TEMPORARY TABLE IF NOT EXISTS %I (LIKE %I.%I) ON COMMIT DELETE ROWS$sql$,
                  temp_table, schema_name, table_name);
     EXECUTE format($sql$GRANT SELECT, INSERT ON TABLE %I TO prom_writer$sql$,
                  temp_table);

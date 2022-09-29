@@ -27,6 +27,7 @@ We use the following categories for changes:
 ### Changed
 
 - The timescaledb extension is now a mandatory prerequisite [#515].
+- Reuse ingestion temp tables across batches [#526]
 
 ### Fixed
 
