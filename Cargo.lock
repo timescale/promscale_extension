@@ -1261,7 +1261,7 @@ dependencies = [
 [[package]]
 name = "pgx"
 version = "0.5.0-beta.1"
-source = "git+https://github.com/JamesGuthrie/pgx?rev=7611c2c#7611c2c5a4053ff20b921586c5e69c8bf340335f"
+source = "git+https://github.com/JamesGuthrie/pgx?rev=a0b17db#a0b17db0c82ad7c3e1452b5d9475e512b3bb9141"
 dependencies = [
  "atomic-traits",
  "bitflags",
@@ -1290,7 +1290,7 @@ dependencies = [
 [[package]]
 name = "pgx-macros"
 version = "0.5.0-beta.1"
-source = "git+https://github.com/JamesGuthrie/pgx?rev=7611c2c#7611c2c5a4053ff20b921586c5e69c8bf340335f"
+source = "git+https://github.com/JamesGuthrie/pgx?rev=a0b17db#a0b17db0c82ad7c3e1452b5d9475e512b3bb9141"
 dependencies = [
  "pgx-utils",
  "proc-macro2 1.0.44",
@@ -1302,7 +1302,7 @@ dependencies = [
 [[package]]
 name = "pgx-pg-config"
 version = "0.5.0-beta.1"
-source = "git+https://github.com/JamesGuthrie/pgx?rev=7611c2c#7611c2c5a4053ff20b921586c5e69c8bf340335f"
+source = "git+https://github.com/JamesGuthrie/pgx?rev=a0b17db#a0b17db0c82ad7c3e1452b5d9475e512b3bb9141"
 dependencies = [
  "dirs",
  "eyre",
@@ -1318,7 +1318,7 @@ dependencies = [
 [[package]]
 name = "pgx-pg-sys"
 version = "0.5.0-beta.1"
-source = "git+https://github.com/JamesGuthrie/pgx?rev=7611c2c#7611c2c5a4053ff20b921586c5e69c8bf340335f"
+source = "git+https://github.com/JamesGuthrie/pgx?rev=a0b17db#a0b17db0c82ad7c3e1452b5d9475e512b3bb9141"
 dependencies = [
  "bindgen",
  "build-deps",
@@ -1342,7 +1342,7 @@ dependencies = [
 [[package]]
 name = "pgx-tests"
 version = "0.5.0-beta.1"
-source = "git+https://github.com/JamesGuthrie/pgx?rev=7611c2c#7611c2c5a4053ff20b921586c5e69c8bf340335f"
+source = "git+https://github.com/JamesGuthrie/pgx?rev=a0b17db#a0b17db0c82ad7c3e1452b5d9475e512b3bb9141"
 dependencies = [
  "eyre",
  "libc",
@@ -1364,7 +1364,7 @@ dependencies = [
 [[package]]
 name = "pgx-utils"
 version = "0.5.0-beta.1"
-source = "git+https://github.com/JamesGuthrie/pgx?rev=7611c2c#7611c2c5a4053ff20b921586c5e69c8bf340335f"
+source = "git+https://github.com/JamesGuthrie/pgx?rev=a0b17db#a0b17db0c82ad7c3e1452b5d9475e512b3bb9141"
 dependencies = [
  "atty",
  "convert_case",

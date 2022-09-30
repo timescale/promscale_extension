@@ -138,7 +138,7 @@ impl<'a> Iterator for TokenIterator<'a> {
         match r {
             JsonbIteratorToken_WJB_DONE => None,
             JsonbIteratorToken_WJB_BEGIN_ARRAY => {
-                if unsafe { jsonb_val.val.array.as_ref().rawScalar } {
+                if unsafe { jsonb_val.val.array.rawScalar } {
                     self.raw_scalar = true;
                     self.next()
                 } else {
@@ -182,7 +182,7 @@ impl<'a> TokenIterator<'a> {
     /// validated the [`JsonbValue`]'s type is [`jbvType_jbvString`].
     #[inline]
     unsafe fn extract_string_value(jsonb_val: &mut JsonbValue) -> &'a str {
-        let str_val = jsonb_val.val.string.as_ref();
+        let str_val = jsonb_val.val.string;
         std::str::from_utf8_unchecked(std::slice::from_raw_parts::<'a, _>(
             str_val.val as *mut u8,
             str_val.len as usize,
@@ -200,7 +200,7 @@ impl<'a> TokenIterator<'a> {
             jbvType_jbvNumeric => {
                 Token::Numeric(unsafe { JsonbNormalizedNumeric::extract_numeric_value(jsonb_val) })
             }
-            jbvType_jbvBool => Token::Bool(unsafe { *jsonb_val.val.boolean.as_ref() }),
+            jbvType_jbvBool => Token::Bool(unsafe { jsonb_val.val.boolean }),
             t => {
                 panic!("invalid scalar jsonb type: {}", t)
             }
@@ -232,7 +232,7 @@ impl JsonbNormalizedNumeric {
     /// validated the [`JsonbValue`]'s type is [`jbvType_jbvNumeric`].
     #[inline]
     unsafe fn extract_numeric_value(jsonb_val: &mut JsonbValue) -> JsonbNormalizedNumeric {
-        let numeric_str = numeric_normalize(*jsonb_val.val.numeric.as_ref());
+        let numeric_str = numeric_normalize(jsonb_val.val.numeric);
         JsonbNormalizedNumeric { numeric_str }
     }
 
