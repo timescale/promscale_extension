@@ -114,6 +114,11 @@ fn incremental_freeze_test() {
             "031-remove-superfluous-tag_v-ops.sql",
             "d22c77ead3e203f579aceeb239c4751c",
         ),
+        // ↓↓↓ frozen in 0.7.0 ↓↓↓
+        (
+            "032-remove-non-empty-span-name-constraint.sql",
+            "1bc2088a9738f36d8e6006b5ad066f02",
+        ),
         // ↓↓↓ frozen in x.x.x ↓↓↓
     ];
     for (filename, expected) in frozen_files {

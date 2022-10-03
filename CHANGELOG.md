@@ -14,6 +14,8 @@ We use the following categories for changes:
 
 ## [Unreleased]
 
+## [0.7.0 - 2022-10-03]
+
 ### Added
 
 - Added `_ps_catalog.chunks_to_vacuum_freeze` to identify compressed chunks
@@ -32,6 +34,7 @@ We use the following categories for changes:
 ### Fixed
 
 - Correctly remove all expired series [#521]
+- Fix migration when a metric is not compressed [#505]
 
 ### Changed
 
