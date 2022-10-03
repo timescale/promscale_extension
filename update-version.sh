@@ -17,9 +17,13 @@ NEW_VERSION=$(echo "$1" | sed ${SED_ESCAPE_DOTS})
 OLD_VERSION=$(bash extract-extension-version.sh | tr -d '\n' | sed ${SED_ESCAPE_DOTS})
 
 # replace current version with new version in Cargo.toml
-sed -i'' "s/^version.*=.*\"${OLD_VERSION}\"\$/version = \"${NEW_VERSION}\"/g" Cargo.toml
+# Note: some care has been taken to make this command portable between Unix and
+# BSD sed, hence the "slightly weird" invocation here.
+sed -i.bak -e "s/^version.*=.*\"${OLD_VERSION}\"\$/version = \"${NEW_VERSION}\"/g" Cargo.toml && rm Cargo.toml.bak
 
 cargo update --workspace
 
 # replace current version with new version in *.md
-sed -i'' "s/${OLD_VERSION}/${NEW_VERSION}/g" INSTALL.md
+# Note: some care has been taken to make this command portable between Unix and
+# BSD sed, hence the "slightly weird" invocation here.
+sed -i.bak -e "s/${OLD_VERSION}/${NEW_VERSION}/g" INSTALL.md && rm INSTALL.md.bak
