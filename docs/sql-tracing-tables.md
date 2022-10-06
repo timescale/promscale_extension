@@ -24,7 +24,7 @@ tuple would contain: `key_id=1, key='service.name', value='foo'` and it will be
 assigned an `id`, say `114`. Finally, we can replace our raw JSON tag
 `{"service.name": "foo"}` with the `{"1": 114}`. And this form is what we store
 in `span` and other tables. To denormalize and enable intuitive querying the views 
-rely on `_ps_trace`.tag_map_denormalize` which performs lookups and returns a raw
+rely on `_ps_trace.tag_map_denormalize` which performs lookups and returns a raw
 JSON tag map.
 
 The `tag_map` type itself is merely a wrapper around built-in `jsonb`, but some
