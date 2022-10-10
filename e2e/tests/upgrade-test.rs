@@ -142,7 +142,7 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     let _ = pretty_env_logger::try_init();
 
     // in local development, we want local/dev_promscale_extension:head-ts2-pg<version>
-    // in ci, we want ghcr.io/timescale/dev_promscale_extension:<branch-name>-ts2.7.2-pg<version>
+    // in ci, we want ghcr.io/timescale/dev_promscale_extension:<branch-name>-ts2.<minor>.<patch>-pg<version>
     // this image will be used for the baseline and for upgrading the version of promscale
     let to_image_uri = env::var("TS_DOCKER_IMAGE")
         .unwrap_or_else(|_| "local/dev_promscale_extension:head-ts2-pg14".to_string());

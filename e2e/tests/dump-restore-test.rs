@@ -71,6 +71,7 @@ fn psql_file(container: &PostgresContainer, db: &str, username: &str, path: &Pat
     )
     .stderr_to_stdout()
     .stdout_capture()
+    .unchecked()
     .run()
     .unwrap();
     debug_lines(output.stdout);
@@ -137,6 +138,7 @@ fn psql_cmd(container: &PostgresContainer, db: &str, username: &str, cmd: &str) 
     )
     .stderr_to_stdout()
     .stdout_capture()
+    .unchecked()
     .run()
     .unwrap();
     debug_lines(output.stdout);
@@ -255,6 +257,7 @@ fn snapshot_db(container: &PostgresContainer, db: &str, username: &str, path: &P
     )
     .stderr_to_stdout()
     .stdout_capture()
+    .unchecked()
     .run()
     .unwrap();
     debug_lines(output.stdout);
@@ -297,6 +300,7 @@ fn dump_db(container: &PostgresContainer, db: &str, username: &str, path: &Path)
     )
     .stderr_to_stdout()
     .stdout_capture()
+    .unchecked()
     .run()
     .unwrap();
     debug_lines(output.stdout);
@@ -321,6 +325,7 @@ fn dump_db(container: &PostgresContainer, db: &str, username: &str, path: &Path)
 ///
 fn restore_db(container: &PostgresContainer, db: &str, username: &str, path: &Path) {
     let dump = Path::new("/tmp/dump.sql");
+    info!("restoring database {} via {} user...", db, username);
     copy_in(container, path, dump);
     let output = cmd!(
         "docker",
@@ -346,6 +351,7 @@ fn restore_db(container: &PostgresContainer, db: &str, username: &str, path: &Pa
     )
     .stderr_to_stdout()
     .stdout_capture()
+    .unchecked()
     .run()
     .unwrap();
     debug_lines(output.stdout);
