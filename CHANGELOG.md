@@ -31,6 +31,7 @@ We use the following categories for changes:
   `_prom_catalog.lock_for_vacuum_engine`, and
   `_prom_catalog.unlock_for_vacuum_engine()` [#511]
 - Added ability for database owners to override security checks in script migrating from Promscale < 0.10.0 [#524]
+- Added telemetry for active series for Promscale [#534]
 
 ### Changed
 
