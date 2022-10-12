@@ -17,7 +17,7 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.PROMSCALE_EXTENSION_SCCACHE_AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.PROMSCALE_EXTENSION_SCCACHE_AWS_SECRET_ACCESS_KEY }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install latest nightly
         uses: actions-rs/toolchain@v1
         with:
@@ -39,7 +39,7 @@ jobs:
 
       - name: Cache pgx
         id: cache-pgx
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: ~/.pgx
           key: dot-pgx-${{ matrix.postgres.version }}-cargo-${{ hashFiles('**/Cargo.*') }}
