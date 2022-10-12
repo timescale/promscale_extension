@@ -23,7 +23,11 @@ sed -i.bak -e "s/^version.*=.*\"${OLD_VERSION}\"\$/version = \"${NEW_VERSION}\"/
 
 cargo update --workspace
 
-# replace current version with new version in *.md
-# Note: some care has been taken to make this command portable between Unix and
-# BSD sed, hence the "slightly weird" invocation here.
-sed -i.bak -e "s/${OLD_VERSION}/${NEW_VERSION}/g" INSTALL.md && rm INSTALL.md.bak
+if [ -z "${NEW_VERSION##*-dev}" ]; then
+    echo "Skipping INSTALL.md because it's a dev version."
+else
+    # replace current version with new version in *.md
+    # Note: some care has been taken to make this command portable between Unix and
+    # BSD sed, hence the "slightly weird" invocation here.
+    sed -i.bak -e "s/${OLD_VERSION}/${NEW_VERSION}/g" INSTALL.md && rm INSTALL.md.bak
+fi
