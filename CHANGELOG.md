@@ -20,6 +20,9 @@ We use the following categories for changes:
   Added `prom_info.metric_detail` which includes the disk size related columns. 
   Improved the performance of these. [#547]
 
+### Added
+- Telemetry for active series and last updated [#534]
+
 ## [0.7.0 - 2022-10-03]
 
 ### Added
@@ -31,7 +34,6 @@ We use the following categories for changes:
   `_prom_catalog.lock_for_vacuum_engine`, and
   `_prom_catalog.unlock_for_vacuum_engine()` [#511]
 - Added ability for database owners to override security checks in script migrating from Promscale < 0.10.0 [#524]
-- Added telemetry for active series for Promscale [#534]
 
 ### Changed
 
