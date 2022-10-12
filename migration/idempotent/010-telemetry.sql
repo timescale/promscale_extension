@@ -143,6 +143,9 @@ $$
 
         SELECT count(*)::TEXT INTO result FROM timescaledb_information.data_nodes;
         PERFORM _ps_catalog.apply_telemetry('db_node_count', result);
+
+        SELECT current_timestamp::TEXT INTO result; -- UTC timestamp.
+        PERFORM _ps_catalog.apply_telemetry('telemetry_last_updated', result);
     END;
 $$
 LANGUAGE PLPGSQL;
