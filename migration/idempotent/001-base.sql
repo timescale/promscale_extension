@@ -12,7 +12,8 @@ FROM
     ('trace_retention_period'   , (30 * INTERVAL '1 days')::text),
     ('ha_lease_timeout'         , '1m'),
     ('ha_lease_refresh'         , '10s'),
-    ('epoch_duration'           , (INTERVAL '12 hours')::text)
+    ('epoch_duration'           , (INTERVAL '12 hours')::text),
+    ('metric_rollup'           , 'true')
 ) d(key, value)
 ;
 GRANT SELECT ON _prom_catalog.initial_default TO prom_reader;
