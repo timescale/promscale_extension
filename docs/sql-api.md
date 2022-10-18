@@ -954,10 +954,10 @@ function boolean **_prom_catalog.match_regexp_matches**(labels label_array, _op 
 ```
 function boolean **_prom_catalog.match_regexp_not_matches**(labels label_array, _op tag_op_regexp_not_matches)
 ```
-### _prom_catalog.metric_view
-
+### _prom_catalog.metric_detail
+Returns details describing each metric table including disk sizes
 ```
-function TABLE(id integer, metric_name text, table_name text, label_keys text[], retention_period interval, chunk_interval interval, compressed_interval interval, total_interval interval, before_compression_bytes bigint, after_compression_bytes bigint, total_size_bytes bigint, total_size text, compression_ratio numeric, total_chunks bigint, compressed_chunks bigint) **_prom_catalog.metric_view**()
+function TABLE(id integer, metric_name text, table_name text, label_keys text[], retention_period interval, chunk_interval interval, compressed_interval interval, total_interval interval, before_compression_bytes bigint, after_compression_bytes bigint, total_size_bytes bigint, total_size text, compression_ratio numeric, total_chunks bigint, compressed_chunks bigint) **_prom_catalog.metric_detail**()
 ```
 ### _prom_catalog.pg_name_unique
 

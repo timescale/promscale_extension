@@ -14,6 +14,12 @@ We use the following categories for changes:
 
 ## [Unreleased]
 
+### Changed
+
+- Removed disk size related columns from `prom_info.metric`. 
+  Added `prom_info.metric_detail` which includes the disk size related columns. 
+  Improved the performance of these. [#547]
+
 ## [0.7.0 - 2022-10-03]
 
 ### Added
