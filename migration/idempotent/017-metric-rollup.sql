@@ -18,6 +18,27 @@ $$
 $$
 LANGUAGE PLPGSQL;
 
+-- delete_metric_rollup deletes everything related to the given metric rollup label name. It does the following:
+-- 1. Delete the entries in _prom_catalog.rollup
+-- 2. Delete the entries in _prom_catalog.metric_with_rollup
+-- 3. Delete the actual Cagg views that represent the rollups. This is done by directing deleting the entire rollup schema
+CREATE OR REPLACE PROCEDURE _prom_catalog.delete_metric_rollup(rollup_name TEXT) AS
+$$
+    DECLARE
+        rollup_schema_name TEXT;
+
+    BEGIN
+        EXECUTE FORMAT('SELECT schema_name FROM _prom_catalog.rollup WHERE name = %L', rollup_name) INTO rollup_schema_name;
+        IF rollup_schema_name IS NULL THEN
+            RAISE EXCEPTION '[Rollup] Cannot delete metric rollup due to rollup_schema_name being NULL';
+        END IF;
+        EXECUTE FORMAT('DELETE FROM _prom_catalog.rollup WHERE name = %L', rollup_name);
+        EXECUTE FORMAT('DELETE FROM _prom_catalog.metric_with_rollup WHERE rollup_schema = %L', rollup_schema_name);
+        EXECUTE FORMAT('DROP SCHEMA %I CASCADE', rollup_schema_name);
+    END;
+$$
+LANGUAGE PLPGSQL;
+
 -- scan_for_new_rollups is called in regular intervals to scan for either new metrics or for new resolution
 -- and create metric rollups for them.
 CREATE OR REPLACE PROCEDURE _prom_catalog.scan_for_new_rollups(job_id int, config jsonb) AS
@@ -29,7 +50,7 @@ DECLARE
     rollup_view_created BOOLEAN;
 
 BEGIN
-    IF ( SELECT _prom_catalog.get_default_value('metric_rollup') IS NULL OR _prom_catalog.get_default_value('metric_rollup') = 'false' ) THEN
+    IF ( SELECT _prom_catalog.get_default_value('automatic_downsample') != 'true' ) THEN
         RETURN;
     END IF;
 
@@ -64,6 +85,54 @@ BEGIN
 END;
 $$
 LANGUAGE PLPGSQL;
+
+CREATE OR REPLACE FUNCTION prom_api.set_automatic_downsample(state BOOLEAN)
+RETURNS BOOLEAN
+VOLATILE
+SET search_path = pg_catalog, pg_temp
+AS $$
+    SELECT _prom_catalog.set_default_value('automatic_downsample', state::text);
+    SELECT true;
+$$
+LANGUAGE SQL;
+COMMENT ON FUNCTION prom_api.set_automatic_downsample(BOOLEAN)
+    IS 'Set automatic downsample state for metrics (a.k.a. metric rollups). Metric rollups will be created only if this is true';
+GRANT EXECUTE ON FUNCTION prom_api.set_automatic_downsample(BOOLEAN) TO prom_admin;
+
+CREATE OR REPLACE FUNCTION prom_api.get_automatic_downsample()
+RETURNS BOOLEAN
+SET search_path = pg_catalog, pg_temp
+AS $func$
+    SELECT _prom_catalog.get_default_value('automatic_downsample')::boolean;
+$func$
+LANGUAGE SQL;
+COMMENT ON FUNCTION prom_api.get_automatic_downsample()
+    IS 'Get automatic downsample state for metrics (a.k.a. metric rollups)';
+GRANT EXECUTE ON FUNCTION prom_api.get_automatic_downsample() TO prom_admin;
+
+CREATE OR REPLACE FUNCTION prom_api.set_downsample_resolution(resolutions TEXT)
+    RETURNS BOOLEAN
+    VOLATILE
+    SET search_path = pg_catalog, pg_temp
+AS $$
+    SELECT _prom_catalog.set_default_value('downsample_resolution', resolutions::text);
+SELECT true;
+$$
+LANGUAGE SQL;
+COMMENT ON FUNCTION prom_api.set_downsample_resolution(TEXT)
+    IS 'Set downsample resolution for metric rollups. This must be a comma separated string of label:resolution:retention';
+GRANT EXECUTE ON FUNCTION prom_api.set_downsample_resolution(TEXT) TO prom_admin;
+
+CREATE OR REPLACE FUNCTION prom_api.get_downsample_resolution()
+    RETURNS TEXT
+    SET search_path = pg_catalog, pg_temp
+AS $func$
+    SELECT _prom_catalog.get_default_value('downsample_resolution')::TEXT;
+$func$
+LANGUAGE SQL;
+COMMENT ON FUNCTION prom_api.get_downsample_resolution()
+    IS 'Get downsample resolution for metric rollups';
+GRANT EXECUTE ON FUNCTION prom_api.get_downsample_resolution() TO prom_admin;
 
 DO $$
 BEGIN

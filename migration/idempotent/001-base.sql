@@ -13,7 +13,7 @@ FROM
     ('ha_lease_timeout'         , '1m'),
     ('ha_lease_refresh'         , '10s'),
     ('epoch_duration'           , (INTERVAL '12 hours')::text),
-    ('metric_rollup'           , 'true')
+    ('automatic_downsample'     , 'true')
 ) d(key, value)
 ;
 GRANT SELECT ON _prom_catalog.initial_default TO prom_reader;
