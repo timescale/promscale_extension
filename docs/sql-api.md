@@ -57,6 +57,11 @@ get the default retention period for all metrics
 ```
 function interval **prom_api.get_default_metric_retention_period**()
 ```
+### prom_api.get_downsample_resolution
+Get downsample resolution for metric rollups
+```
+function text **prom_api.get_downsample_resolution**()
+```
 ### prom_api.get_metric_chunk_interval
 Get the chunk interval for a specific metric, or the default chunk interval if not explicitly set
 ```
@@ -157,6 +162,11 @@ resets the retention period for a specific metric to using the default
 ```
 function boolean **prom_api.reset_metric_retention_period**(schema_name text, metric_name text)
 ```
+### prom_api.set_automatic_downsample
+Set automatic downsample state for metrics (a.k.a. metric rollups). Metric rollups will be created only if this is true
+```
+function boolean **prom_api.set_automatic_downsample**(state boolean)
+```
 ### prom_api.set_compression_on_metric_table
 set a compression for a specific metric table
 ```
@@ -176,6 +186,11 @@ function boolean **prom_api.set_default_compression_setting**(compression_settin
 set the retention period for any metrics (existing and new) without an explicit override
 ```
 function boolean **prom_api.set_default_retention_period**(retention_period interval)
+```
+### prom_api.set_downsample_resolution
+Set downsample resolution for metric rollups. This must be a comma separated string of label:resolution:retention
+```
+function boolean **prom_api.set_downsample_resolution**(resolutions text)
 ```
 ### prom_api.set_metric_chunk_interval
 set a chunk interval for a specific metric (this overrides the default)
@@ -517,6 +532,11 @@ procedure void **_prom_catalog.compress_old_chunks**(IN _hypertable_schema_name 
 ```
 function integer **_prom_catalog.count_jsonb_keys**(j jsonb)
 ```
+### _prom_catalog.counter_reset_sum
+
+```
+function double precision **_prom_catalog.counter_reset_sum**(v double precision[])
+```
 ### _prom_catalog.create_exemplar_table_if_not_exists
 
 ```
@@ -537,6 +557,16 @@ function text **_prom_catalog.create_ingest_temp_table**(table_name text, schema
 ```
 function record **_prom_catalog.create_label_key**(new_key text, OUT id integer, OUT value_column_name name, OUT id_column_name name)
 ```
+### _prom_catalog.create_metric_rollup
+
+```
+procedure void **_prom_catalog.create_metric_rollup**(IN name text, IN resolution interval, IN retention interval)
+```
+### _prom_catalog.create_metric_rollup_view
+
+```
+function boolean **_prom_catalog.create_metric_rollup_view**(rollup_schema text, metric_name text, table_name text, resolution interval)
+```
 ### _prom_catalog.create_metric_table
 
 ```
@@ -546,6 +576,21 @@ function record **_prom_catalog.create_metric_table**(metric_name_arg text, OUT 
 
 ```
 function boolean **_prom_catalog.create_metric_view**(metric_name text)
+```
+### _prom_catalog.create_rollup_for_counter
+
+```
+procedure void **_prom_catalog.create_rollup_for_counter**(IN rollup_schema text, IN table_name text, IN resolution interval)
+```
+### _prom_catalog.create_rollup_for_gauge
+
+```
+procedure void **_prom_catalog.create_rollup_for_gauge**(IN rollup_schema text, IN table_name text, IN resolution interval)
+```
+### _prom_catalog.create_rollup_for_summary
+
+```
+procedure void **_prom_catalog.create_rollup_for_summary**(IN rollup_schema text, IN table_name text, IN resolution interval)
 ```
 ### _prom_catalog.create_series
 
@@ -576,6 +621,11 @@ function void **_prom_catalog.delay_compression_job**(ht_table text, new_start t
 
 ```
 function void **_prom_catalog.delete_expired_series**(metric_schema text, metric_table text, metric_series_table text, ran_at timestamp with time zone, present_epoch bigint, last_updated_epoch timestamp with time zone)
+```
+### _prom_catalog.delete_metric_rollup
+
+```
+procedure void **_prom_catalog.delete_metric_rollup**(IN rollup_name text)
 ```
 ### _prom_catalog.delete_series_catalog_row
 
@@ -842,6 +892,11 @@ function bigint **_prom_catalog.insert_metric_metadatas**(t timestamp with time 
 ```
 function bigint **_prom_catalog.insert_metric_row**(metric_table text, time_array timestamp with time zone[], value_array double precision[], series_id_array bigint[])
 ```
+### _prom_catalog.irate
+
+```
+function double precision **_prom_catalog.irate**(v double precision[])
+```
 ### _prom_catalog.is_multinode
 
 ```
@@ -989,6 +1044,11 @@ function void **_prom_catalog.resurrect_series_ids**(metric_table text, series_i
 
 ```
 function bigint **_prom_catalog.safe_approximate_row_count**(table_name_input regclass)
+```
+### _prom_catalog.scan_for_new_rollups
+
+```
+procedure void **_prom_catalog.scan_for_new_rollups**(IN job_id integer, IN config jsonb)
 ```
 ### _prom_catalog.set_app_name
 
