@@ -15,7 +15,8 @@ from
     ('trace_retention_period'   , (30 * INTERVAL '1 days')::text),
     ('ha_lease_timeout'         , '1m'),
     ('ha_lease_refresh'         , '10s'),
-    ('epoch_duration'           , (INTERVAL '12 hours')::text)
+    ('epoch_duration'           , (INTERVAL '12 hours')::text),
+    ('automatic_downsample'     , 'true')
 ) x(key, value)
 ;
 
