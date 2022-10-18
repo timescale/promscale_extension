@@ -1,20 +1,100 @@
--- create_metric_rollup prepares the given rollup. The actual rollup views are created by _prom_catalog.scan_for_new_rollups()
-CREATE OR REPLACE PROCEDURE _prom_catalog.create_metric_rollup(name TEXT, resolution INTERVAL, retention INTERVAL) AS
+-- Metric rollup creation by metric type
+CREATE OR REPLACE PROCEDURE _prom_catalog.create_rollup_for_gauge(rollup_schema TEXT, table_name TEXT, resolution INTERVAL)
+AS
 $$
-    DECLARE
-        schema_name TEXT := 'ps_' || name;
-        exists BOOLEAN;
+BEGIN
+    EXECUTE FORMAT(
+            'CREATE MATERIALIZED VIEW %1$I.%2$I WITH (timescaledb.continuous, timescaledb.materialized_only=true) AS
+                SELECT
+                    timezone(
+                        %3$L,
+                        time_bucket(%4$L, time) AT TIME ZONE %3$L + %4$L
+                    ) as time,
+                    series_id,
+                    sum(value) as sum,
+                    count(value) as count,
+                    min(value) as min,
+                    max(value) as max
+                FROM prom_data.%2$I
+                GROUP BY time_bucket(%4$L, time), series_id WITH NO DATA
+            ', rollup_schema, table_name, 'UTC', resolution::text);
+    EXECUTE FORMAT('ALTER MATERIALIZED VIEW %1$I.%2$I SET (timescaledb.compress = true)', rollup_schema, table_name);
+END;
+$$
+LANGUAGE plpgsql;
 
-    BEGIN
-        EXECUTE FORMAT('SELECT count(*) > 0 FROM _prom_catalog.rollup WHERE name = %L', name) INTO exists;
-        IF exists THEN
-            RAISE EXCEPTION 'ERROR: cannot create metric rollup for %. REASON: already exists.', name;
-        END IF;
-        -- We do not use IF NOT EXISTS (below) since we want to stop creation process if the schema already exists.
-        -- This forces the user to delete the conflicting schema before proceeding ahead.
-        EXECUTE FORMAT('CREATE SCHEMA %s', schema_name);
-        INSERT INTO _prom_catalog.rollup VALUES (name, schema_name, resolution, retention);
-    END;
+CREATE OR REPLACE PROCEDURE _prom_catalog.create_rollup_for_counter(rollup_schema TEXT, table_name TEXT, resolution INTERVAL)
+AS
+$$
+BEGIN
+    EXECUTE FORMAT(
+            'CREATE MATERIALIZED VIEW %1$I.%2$I WITH (timescaledb.continuous, timescaledb.materialized_only=true) AS
+                SELECT
+                    timezone(
+                        %3$L,
+                        time_bucket(%4$L, time) AT TIME ZONE %3$L + %4$L
+                    ) as time,
+                    series_id,
+                    first(value, time),
+                    last(value, time) + _prom_catalog.counter_reset_sum(array_agg(value)) last,
+                    _prom_catalog.irate(array_agg(value)) irate
+                FROM prom_data.%2$I
+                GROUP BY time_bucket(%4$L, time), series_id WITH NO DATA
+            ', rollup_schema, table_name, 'UTC', resolution::text);
+    EXECUTE FORMAT('ALTER MATERIALIZED VIEW %1$I.%2$I SET (timescaledb.compress = true)', rollup_schema, table_name);
+END;
+$$
+LANGUAGE PLPGSQL;
+
+CREATE OR REPLACE PROCEDURE _prom_catalog.create_rollup_for_summary(rollup_schema TEXT, table_name TEXT, resolution INTERVAL)
+AS
+$$
+BEGIN
+    EXECUTE FORMAT(
+            'CREATE MATERIALIZED VIEW %1$I.%2$I WITH (timescaledb.continuous, timescaledb.materialized_only=true) AS
+                SELECT
+                    timezone(
+                        %3$L,
+                        time_bucket(%4$L, time) AT TIME ZONE %3$L + %4$L
+                    ) as time,
+                    series_id,
+                    sum(value) as sum,
+                    count(value) as count
+                FROM prom_data.%2$I
+                GROUP BY time_bucket(%4$L, time), series_id WITH NO DATA
+            ', rollup_schema, table_name, 'UTC', resolution::text);
+    EXECUTE FORMAT('ALTER MATERIALIZED VIEW %1$I.%2$I SET (timescaledb.compress = true)', rollup_schema, table_name);
+END;
+$$
+LANGUAGE PLPGSQL;
+
+-- create_metric_rollup_view decides which rollup query should be used for creation of the given rollup metric depending of metric type
+-- and calls the respective creation function. It returns true if metric rollup was created.
+CREATE OR REPLACE FUNCTION _prom_catalog.create_metric_rollup_view(_rollup_schema TEXT, _metric_name TEXT, _table_name TEXT, _resolution INTERVAL)
+    RETURNS BOOLEAN AS
+$$
+DECLARE
+    _metric_type TEXT;
+
+BEGIN
+   SELECT type INTO _metric_type FROM _prom_catalog.metadata WHERE metric_family = _metric_name;
+    IF _metric_type IS NULL THEN
+        RAISE DEBUG '[Rollup] Skipping creation of metric rollup for %. REASON: metric_type not found', _metric_name;
+        RETURN FALSE;
+    END IF;
+
+    CASE
+        WHEN _metric_type = 'GAUGE' THEN
+            CALL _prom_catalog.create_rollup_for_gauge(_rollup_schema, _table_name, _resolution);
+        WHEN _metric_type = 'COUNTER' OR _metric_type = 'HISTOGRAM' THEN
+            CALL _prom_catalog.create_rollup_for_counter(_rollup_schema, _table_name, _resolution);
+        WHEN _metric_type = 'SUMMARY' THEN
+            CALL _prom_catalog.create_rollup_for_summary(_rollup_schema, _table_name, _resolution);
+        ELSE
+            RAISE WARNING '[Rollup] Skipping creation of metric rollup for %. REASON: invalid metric_type. Wanted {GAUGE, COUNTER, HISTOGRAM, SUMMARY}, received %', _metric_name, _metric_type;
+        END CASE;
+    RETURN TRUE;
+END;
 $$
 LANGUAGE PLPGSQL;
 
@@ -29,7 +109,7 @@ DECLARE
     rollup_view_created BOOLEAN;
 
 BEGIN
-    IF ( SELECT _prom_catalog.get_default_value('metric_rollup') IS NULL OR _prom_catalog.get_default_value('metric_rollup') = 'false' ) THEN
+    IF ( SELECT prom_api.get_automatic_downsample()::BOOLEAN IS FALSE ) THEN
         RETURN;
     END IF;
 
@@ -39,13 +119,13 @@ BEGIN
         rollup_view_created := FALSE;
         new_rollups_created := 0;
         FOR m IN
-            EXECUTE FORMAT('select metric_name, table_name FROM _prom_catalog.metric where metric_name NOT IN (
-                SELECT metric_name FROM _prom_catalog.metric_with_rollup WHERE rollup_schema = %L
-            )', r.schema_name) -- Get metric names that have a pending rollup creation.
+            select id, metric_name, table_name FROM _prom_catalog.metric where id NOT IN (
+                SELECT metric_id FROM _prom_catalog.metric_rollup WHERE rollup_id = r.id
+            ) -- Get metric names that have a pending rollup creation.
         LOOP
             SELECT INTO rollup_view_created _prom_catalog.create_metric_rollup_view(r.schema_name, m.metric_name, m.table_name, r.resolution);
             IF rollup_view_created THEN
-                EXECUTE FORMAT('INSERT INTO _prom_catalog.metric_with_rollup VALUES (%L, %L, %L, TRUE)', r.schema_name, m.metric_name, m.table_name);
+                INSERT INTO _prom_catalog.metric_rollup(rollup_id, metric_id, refresh_pending) VALUES (r.id, m.id, TRUE);
                 new_rollups_created := new_rollups_created + 1;
             END IF;
         END LOOP;
@@ -56,51 +136,102 @@ BEGIN
 
     -- Refresh the newly added rollups for entire duration of data.
     FOR r IN
-        SELECT rollup_schema, table_name FROM _prom_catalog.metric_with_rollup WHERE refresh_pending = TRUE
+        SELECT mr.id as id, rollup.schema_name as schema_name, mt.table_name as table_name
+        FROM _prom_catalog.metric_rollup mr
+                 INNER JOIN _prom_catalog.rollup rollup ON (mr.rollup_id = rollup.id)
+                 INNER JOIN _prom_catalog.metric mt ON (mr.metric_id = mt.id)
+        WHERE mr.refresh_pending = TRUE
     LOOP
-        CALL refresh_continuous_aggregate(r.rollup_schema || '.' || r.table_name, NULL, NULL);
-        UPDATE _prom_catalog.metric_with_rollup SET refresh_pending = FALSE WHERE rollup_schema = r.rollup_schema AND table_name = r.table_name;
+        CALL public.refresh_continuous_aggregate(r.schema_name || '.' || r.table_name, NULL, NULL);
+        UPDATE _prom_catalog.metric_rollup SET refresh_pending = FALSE WHERE id = r.id;
+        COMMIT;
     END LOOP;
 END;
 $$
 LANGUAGE PLPGSQL;
 
-DO $$
-BEGIN
-    -- Scan and create metric rollups regularly for pending metrics.
-    PERFORM public.add_job('_prom_catalog.scan_for_new_rollups', INTERVAL '30 minutes');
-END;
-$$;
-
--- create_metric_rollup_view decides which rollup query should be used for creation of the given rollup metric depending of metric type
--- and calls the respective creation function. It returns true if metric rollup was created.
-CREATE OR REPLACE FUNCTION _prom_catalog.create_metric_rollup_view(rollup_schema TEXT, metric_name TEXT, table_name TEXT, resolution INTERVAL)
-RETURNS BOOLEAN AS
+-- create_metric_rollup prepares the given rollup. The actual rollup views are created by _prom_catalog.scan_for_new_rollups()
+CREATE OR REPLACE PROCEDURE _prom_catalog.create_rollup(_name TEXT, _resolution INTERVAL, _retention INTERVAL) AS
 $$
     DECLARE
-        metric_type TEXT;
+        _schema_name constant TEXT := 'ps_' || _name;
+        _exists BOOLEAN;
 
     BEGIN
-        EXECUTE FORMAT('SELECT type FROM _prom_catalog.metadata WHERE metric_family = %L', metric_name) INTO metric_type;
-        IF metric_type IS NULL THEN
-            RAISE DEBUG '[Rollup] Skipping creation of metric rollup for %. REASON: metric_type not found', metric_name;
-            RETURN FALSE;
+        EXECUTE FORMAT('SELECT EXISTS( SELECT 1 FROM _prom_catalog.rollup WHERE name = %L )', _name) INTO _exists;
+        IF _exists THEN
+            RAISE EXCEPTION 'ERROR: cannot create metric rollup for %. REASON: already exists.', name;
         END IF;
-
-        CASE
-            WHEN metric_type = 'GAUGE' THEN
-                CALL _prom_catalog.create_rollup_for_gauge(rollup_schema, table_name, resolution);
-            WHEN metric_type = 'COUNTER' OR metric_type = 'HISTOGRAM' THEN
-                CALL _prom_catalog.create_rollup_for_counter(rollup_schema, table_name, resolution);
-            WHEN metric_type = 'SUMMARY' THEN
-                CALL _prom_catalog.create_rollup_for_summary(rollup_schema, table_name, resolution);
-            ELSE
-                RAISE WARNING '[Rollup] Skipping creation of metric rollup for %. REASON: invalid metric_type. Wanted {GAUGE, COUNTER, HISTOGRAM, SUMMARY}, received %', metric_name, metric_type;
-            END CASE;
-        RETURN TRUE;
+        -- We do not use IF NOT EXISTS (below) since we want to stop creation process if the schema already exists.
+        -- This forces the user to delete the conflicting schema before proceeding ahead.
+        EXECUTE FORMAT('CREATE SCHEMA %I', _schema_name);
+        INSERT INTO _prom_catalog.rollup(name, schema_name, resolution, retention) VALUES (_name, _schema_name, _resolution, _retention);
     END;
 $$
 LANGUAGE PLPGSQL;
+GRANT EXECUTE ON PROCEDURE _prom_catalog.create_rollup(text, interval, interval) TO prom_writer;
+
+-- delete_metric_rollup deletes everything related to the given metric rollup label name. It does the following:
+-- 1. Delete the entries in _prom_catalog.rollup
+-- 2. Delete the entries in _prom_catalog.metric_rollup
+-- 3. Delete the actual Cagg views that represent the rollups. This is done by directing deleting the entire rollup schema
+CREATE OR REPLACE PROCEDURE _prom_catalog.delete_rollup(_rollup_name TEXT) AS
+$$
+    DECLARE
+        _rollup_id INTEGER;
+        _rollup_schema_name TEXT;
+
+    BEGIN
+        SELECT id, schema_name INTO _rollup_id, _rollup_schema_name FROM _prom_catalog.rollup WHERE name = _rollup_name;
+        IF _rollup_id IS NULL THEN
+            RAISE EXCEPTION '% rollup not found', _rollup_name;
+        END IF;
+        DELETE FROM _prom_catalog.rollup WHERE id = _rollup_id;
+        DELETE FROM _prom_catalog.metric_rollup WHERE rollup_id = _rollup_id;
+        EXECUTE FORMAT('DROP SCHEMA %I CASCADE', _rollup_schema_name);
+    END;
+$$
+LANGUAGE PLPGSQL;
+GRANT EXECUTE ON PROCEDURE _prom_catalog.delete_rollup(text) TO prom_writer;
+
+CREATE OR REPLACE FUNCTION prom_api.set_automatic_downsample(_state BOOLEAN)
+RETURNS BOOLEAN
+VOLATILE
+SET search_path = pg_catalog, pg_temp
+AS $$
+    SELECT _prom_catalog.set_default_value('automatic_downsample', _state::text);
+    SELECT true;
+$$
+LANGUAGE SQL;
+COMMENT ON FUNCTION prom_api.set_automatic_downsample(BOOLEAN)
+    IS 'Set automatic downsample state for metrics (a.k.a. metric rollups). Metric rollups will be created only if this returns true';
+GRANT EXECUTE ON FUNCTION prom_api.set_automatic_downsample(BOOLEAN) TO prom_admin;
+
+CREATE OR REPLACE FUNCTION prom_api.get_automatic_downsample()
+RETURNS BOOLEAN
+SET search_path = pg_catalog, pg_temp
+AS $func$
+    SELECT _prom_catalog.get_default_value('automatic_downsample')::boolean;
+$func$
+LANGUAGE SQL;
+COMMENT ON FUNCTION prom_api.get_automatic_downsample()
+    IS 'Get automatic downsample state for metrics (a.k.a. metric rollups)';
+GRANT EXECUTE ON FUNCTION prom_api.get_automatic_downsample() TO prom_admin;
+
+DO $$
+DECLARE
+    _is_restore_in_progress boolean = false;
+BEGIN
+    _is_restore_in_progress = coalesce((SELECT setting::boolean from pg_catalog.pg_settings where name = 'timescaledb.restoring'), false);
+    IF  NOT _prom_catalog.is_timescaledb_oss()
+        AND _prom_catalog.get_timescale_major_version() >= 2
+        AND NOT _is_restore_in_progress
+    THEN
+        -- Scan and create metric rollups regularly for pending metrics.
+        PERFORM public.add_job('_prom_catalog.scan_for_new_rollups', INTERVAL '30 minutes');
+    END IF;
+END;
+$$;
 
 -- TODO: Temporary utilities for creation of metric rollups. These MUST be removed once we have SQL aggregate in Rust,
 -- since their behaviour is unreliable.
@@ -141,73 +272,3 @@ $$
     END;
 $$
 LANGUAGE PLPGSQL IMMUTABLE;
-
--- Metric rollup creation by metric type
-CREATE OR REPLACE PROCEDURE _prom_catalog.create_rollup_for_gauge(rollup_schema TEXT, table_name TEXT, resolution INTERVAL)
-AS
-$$
-BEGIN
-    EXECUTE FORMAT(
-        'CREATE MATERIALIZED VIEW %1$I.%2$I WITH (timescaledb.continuous, timescaledb.materialized_only=true) AS
-            SELECT
-                timezone(
-                    %3$L,
-                    time_bucket(%4$L, time) AT TIME ZONE %3$L + %4$L
-                ) as time,
-                series_id,
-                sum(value) as sum,
-                count(value) as count,
-                min(value) as min,
-                max(value) as max
-            FROM prom_data.%2$I
-            GROUP BY time_bucket(%4$L, time), series_id WITH NO DATA
-        ', rollup_schema, table_name, 'UTC', resolution::text);
-    EXECUTE FORMAT('ALTER MATERIALIZED VIEW %1$I.%2$I SET (timescaledb.compress = true)', rollup_schema, table_name);
-END;
-$$
-LANGUAGE plpgsql;
-
-CREATE OR REPLACE PROCEDURE _prom_catalog.create_rollup_for_counter(rollup_schema TEXT, table_name TEXT, resolution INTERVAL)
-AS
-$$
-BEGIN
-    EXECUTE FORMAT(
-        'CREATE MATERIALIZED VIEW %1$I.%2$I WITH (timescaledb.continuous, timescaledb.materialized_only=true) AS
-            SELECT
-                timezone(
-                    %3$L,
-                    time_bucket(%4$L, time) AT TIME ZONE %3$L + %4$L
-                ) as time,
-                series_id,
-                first(value, time),
-                last(value, time) + _prom_catalog.counter_reset_sum(array_agg(value)) last,
-                _prom_catalog.irate(array_agg(value)) irate
-            FROM prom_data.%2$I
-            GROUP BY time_bucket(%4$L, time), series_id WITH NO DATA
-        ', rollup_schema, table_name, 'UTC', resolution::text);
-    EXECUTE FORMAT('ALTER MATERIALIZED VIEW %1$I.%2$I SET (timescaledb.compress = true)', rollup_schema, table_name);
-END;
-$$
-LANGUAGE PLPGSQL;
-
-CREATE OR REPLACE PROCEDURE _prom_catalog.create_rollup_for_summary(rollup_schema TEXT, table_name TEXT, resolution INTERVAL)
-AS
-$$
-BEGIN
-    EXECUTE FORMAT(
-        'CREATE MATERIALIZED VIEW %1$I.%2$I WITH (timescaledb.continuous, timescaledb.materialized_only=true) AS
-            SELECT
-                timezone(
-                    %3$L,
-                    time_bucket(%4$L, time) AT TIME ZONE %3$L + %4$L
-                ) as time,
-                series_id,
-                sum(value) as sum,
-                count(value) as count
-            FROM prom_data.%2$I
-            GROUP BY time_bucket(%4$L, time), series_id WITH NO DATA
-        ', rollup_schema, table_name, 'UTC', resolution::text);
-    EXECUTE FORMAT('ALTER MATERIALIZED VIEW %1$I.%2$I SET (timescaledb.compress = true)', rollup_schema, table_name);
-END;
-$$
-LANGUAGE PLPGSQL;
