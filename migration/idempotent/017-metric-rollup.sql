@@ -135,9 +135,17 @@ COMMENT ON FUNCTION prom_api.get_downsample_resolution()
 GRANT EXECUTE ON FUNCTION prom_api.get_downsample_resolution() TO prom_admin;
 
 DO $$
+DECLARE
+    _is_restore_in_progress boolean = false;
 BEGIN
-    -- Scan and create metric rollups regularly for pending metrics.
-    PERFORM public.add_job('_prom_catalog.scan_for_new_rollups', INTERVAL '30 minutes');
+    _is_restore_in_progress = coalesce((SELECT setting::boolean from pg_catalog.pg_settings where name = 'timescaledb.restoring'), false);
+    IF  NOT _prom_catalog.is_timescaledb_oss()
+        AND _prom_catalog.get_timescale_major_version() >= 2
+        AND NOT _is_restore_in_progress
+    THEN
+        -- Scan and create metric rollups regularly for pending metrics.
+        PERFORM public.add_job('_prom_catalog.scan_for_new_rollups', INTERVAL '30 minutes');
+    END IF;
 END;
 $$;
 
