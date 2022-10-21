@@ -60,7 +60,7 @@ macro_rules! raw_type {
 #[derive(Clone, Copy)]
 pub struct bytea(pub Datum);
 
-#[allow(clippy::extra-unused-lifetimes)] // pgx sorcery caused this
+#[allow(clippy::extra_unused_lifetimes)] // pgx sorcery caused this
 unsafe impl<'a> SqlTranslatable for bytea {
     fn argument_sql() -> Result<SqlMapping, ArgumentError> {
         Ok(SqlMapping::literal("bytea"))

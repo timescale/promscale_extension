@@ -23,8 +23,9 @@ fn init_lock() -> &'static Mutex<()> {
     }
 }
 
-#[test_resources("testdata/*.sql")]
-fn sql_tests(resource: &str) {
+// TODO fix how test_resources works in nexted workspaces
+#[test_resources("sql-tests/testdata/*.sql")]
+fn sql_tests(full_resource: &str) {
     let pg_blueprint = PostgresContainerBlueprint::new().with_testdata(TESTDATA);
     let test_pg_instance = new_test_instance_from_env(&pg_blueprint);
     let mut init_conn = test_pg_instance.connect();
@@ -39,6 +40,11 @@ fn sql_tests(resource: &str) {
             .expect("Unable to create extension promscale.");
     }
 
+    let resource = if let Some((_, rest)) = full_resource.split_once('/') {
+        rest
+    } else {
+        full_resource
+    };
     let query_result = test_pg_instance.exec_sql_script(resource);
     assert_snapshot!(resource, query_result);
 }
