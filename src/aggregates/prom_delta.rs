@@ -167,7 +167,7 @@ mod tests {
         )
     }
 
-    #[pg_test(error = "sample_time is null")]
+    #[pg_test(error = "sample_time_ is null")]
     fn test_prom_delta_with_null_time_fails() {
         setup();
         Spi::get_one::<Vec<f64>>(&*prepare_query("'2000-01-02 15:00:00 UTC'", "NULL"));

@@ -48,7 +48,7 @@ unsafe impl<'a> SqlTranslatable for Jsonb<'a> {
 }
 
 impl<'a> FromDatum for Jsonb<'a> {
-    unsafe fn from_datum(datum: Datum, is_null: bool, _: Oid) -> Option<Jsonb<'a>> {
+    unsafe fn from_polymorphic_datum(datum: Datum, is_null: bool, _: Oid) -> Option<Jsonb<'a>> {
         if is_null {
             None
         } else if datum.is_null() {
