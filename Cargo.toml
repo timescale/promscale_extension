@@ -18,11 +18,11 @@ codegen-units = 1
 
 [profile.dev]
 panic = "unwind"
-# It's currently broken on Apple Silicon. 1.64 seems to include a fix.
-# If your tests fail with SIGSEGV try and use 1.64 or newer.
-# Sadly, we can't just drop it because it's a workaround for
-# another issue https://github.com/tcdi/pgx/pull/208
-lto = "thin"
+# It's currently broken on Apple Silicon. Nightly seems to include a fix.
+# If your tests fail with SIGSEGV try and use 1.64 or nightly.
+# Finally, we can just comment it out because it no longer serves as 
+# a workaround for another issue https://github.com/tcdi/pgx/pull/208
+# lto = "thin"
 
 [features]
 default = ["pg14", "serde_json", "proptest"] # used by rust-analyzer in VSCode
@@ -34,8 +34,8 @@ pg_test = ["serde_json", "proptest"]
 [dependencies]
 bincode = "1.3.1"
 num_cpus = "1.13.1"
-pgx = "0.4.5"
-pgx-macros = "0.4.5"
+pgx = "0.5.4"
+pgx-macros = "0.5.4"
 proptest  = { version = "1.0.0", optional = true }
 regex = "1.5.6"
 sha2 = "0.10.2"
@@ -47,12 +47,7 @@ uluru = "3.0.0"
 askama = "0.11.0"
 
 [dev-dependencies]
-pgx-tests = "0.4.5"
-
-[patch.crates-io]
-pgx = { git = "https://github.com/timescale/pgx", rev = "96ece243" }
-pgx-macros = { git = "https://github.com/timescale/pgx", rev = "96ece243" }
-pgx-tests = { git = "https://github.com/timescale/pgx", rev = "96ece243" }
+pgx-tests = "0.5.4"
 
 # from e2e workspace
 test-generator = { git = "https://github.com/JamesGuthrie/test-generator" }

@@ -1,4 +1,6 @@
+use crate::utils::sql_entity_graph::metadata::{ArgumentError, Returns, ReturnsError, SqlMapping};
 use pg_sys::*;
+use pgx::utils::sql_entity_graph::metadata::SqlTranslatable;
 use pgx::FromDatum;
 use pgx::*;
 
@@ -35,16 +37,24 @@ impl<'a> Jsonb<'a> {
     }
 }
 
-impl<'a> FromDatum for Jsonb<'a> {
-    const NEEDS_TYPID: bool = false;
+unsafe impl<'a> SqlTranslatable for Jsonb<'a> {
+    fn argument_sql() -> std::result::Result<SqlMapping, ArgumentError> {
+        Ok(SqlMapping::literal("jsonb"))
+    }
 
-    unsafe fn from_datum(datum: Datum, is_null: bool, _: Oid) -> Option<Jsonb<'a>> {
+    fn return_sql() -> std::result::Result<Returns, ReturnsError> {
+        Ok(Returns::One(SqlMapping::literal("jsonb")))
+    }
+}
+
+impl<'a> FromDatum for Jsonb<'a> {
+    unsafe fn from_polymorphic_datum(datum: Datum, is_null: bool, _: Oid) -> Option<Jsonb<'a>> {
         if is_null {
             None
-        } else if datum == 0 {
+        } else if datum.is_null() {
             panic!("a jsonb Datum was flagged as non-null but the datum is zero")
         } else {
-            let varlena = datum as *mut pg_sys::varlena;
+            let varlena = datum.cast_mut_ptr::<pg_sys::varlena>();
             let detoasted = pg_detoast_datum(varlena);
 
             Some(Jsonb {
@@ -58,17 +68,17 @@ impl<'a> FromDatum for Jsonb<'a> {
 
     unsafe fn from_datum_in_memory_context(
         mut memory_context: PgMemoryContexts,
-        datum: usize,
+        datum: Datum,
         is_null: bool,
         _typoid: u32,
     ) -> Option<Jsonb<'a>> {
         if is_null {
             None
-        } else if datum == 0 {
+        } else if datum.is_null() {
             panic!("a jsonb Datum was flagged as non-null but the datum is zero")
         } else {
             memory_context.switch_to(|_| {
-                let detoasted = pg_detoast_datum_copy(datum as *mut pg_sys::varlena);
+                let detoasted = pg_detoast_datum_copy(datum.cast_mut_ptr());
                 Some(Jsonb {
                     pg_jsonb: detoasted as *mut pg_sys::Jsonb,
                     needs_drop: true,

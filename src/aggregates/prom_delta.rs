@@ -17,24 +17,24 @@ mod _prom_ext {
     //  | a b c d e | f g h i | j   k |   m    |
     //  |   e - a   |  i - f  | k - j | <null> |
     #[allow(clippy::too_many_arguments)]
-    #[pg_extern(immutable, parallel_safe)]
+    #[pg_extern(immutable, parallel_safe, create_or_replace)]
     pub fn prom_delta_transition(
         state: Internal,
-        lowest_time: pg_sys::TimestampTz,
-        greatest_time: pg_sys::TimestampTz,
+        lowest_time: TimestampWithTimeZone,
+        greatest_time: TimestampWithTimeZone,
         step_size: Milliseconds, // `prev_now - step_size` is where the next window starts
         range: Milliseconds,     // the size of a window to delta over
-        sample_time: pg_sys::TimestampTz,
+        sample_time: TimestampWithTimeZone,
         sample_value: f64,
         fc: pg_sys::FunctionCallInfo,
     ) -> Internal {
         prom_delta_transition_inner(
             unsafe { state.to_inner() },
-            lowest_time,
-            greatest_time,
+            lowest_time.into(),
+            greatest_time.into(),
             step_size,
             range,
-            sample_time,
+            sample_time.into(),
             sample_value,
             fc,
         )
@@ -44,11 +44,11 @@ mod _prom_ext {
     #[allow(clippy::too_many_arguments)]
     fn prom_delta_transition_inner(
         state: Option<Inner<GapfillDeltaTransition>>,
-        lowest_time: pg_sys::TimestampTz,
-        greatest_time: pg_sys::TimestampTz,
+        lowest_time: i64,
+        greatest_time: i64,
         step_size: Milliseconds, // `prev_now - step` is where the next window starts
         range: Milliseconds,     // the size of a window to delta over
-        sample_time: pg_sys::TimestampTz,
+        sample_time: i64,
         sample_value: f64,
         fc: pg_sys::FunctionCallInfo,
     ) -> Option<Inner<GapfillDeltaTransition>> {
@@ -167,7 +167,7 @@ mod tests {
         )
     }
 
-    #[pg_test(error = "sample_time is null")]
+    #[pg_test(error = "sample_time_ is null")]
     fn test_prom_delta_with_null_time_fails() {
         setup();
         Spi::get_one::<Vec<f64>>(&*prepare_query("'2000-01-02 15:00:00 UTC'", "NULL"));

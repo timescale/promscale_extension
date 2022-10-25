@@ -154,24 +154,24 @@ mod _prom_ext {
     /// Note that for performance, this aggregate is parallel-izable, combinable, and does not expect
     /// ordered inputs.
     #[allow(clippy::too_many_arguments)]
-    #[pg_extern(immutable, parallel_safe)]
+    #[pg_extern(immutable, parallel_safe, create_or_replace)]
     pub fn vector_selector_transition(
         state: Internal,
-        start_time: pg_sys::TimestampTz,
-        end_time: pg_sys::TimestampTz,
+        start_time: TimestampWithTimeZone,
+        end_time: TimestampWithTimeZone,
         bucket_width: Milliseconds,
         lookback: Milliseconds,
-        time: pg_sys::TimestampTz,
+        time: TimestampWithTimeZone,
         value: f64,
         fcinfo: pg_sys::FunctionCallInfo,
     ) -> Internal {
         vector_selector_transition_inner(
             unsafe { state.to_inner() },
-            start_time,
-            end_time,
+            start_time.into(),
+            end_time.into(),
             bucket_width,
             lookback,
-            time,
+            time.into(),
             value,
             fcinfo,
         )
@@ -181,11 +181,11 @@ mod _prom_ext {
     #[allow(clippy::too_many_arguments)]
     fn vector_selector_transition_inner(
         state: Option<Inner<VectorSelector>>,
-        start_time: pg_sys::TimestampTz,
-        end_time: pg_sys::TimestampTz,
+        start_time: i64,
+        end_time: i64,
         bucket_width: Milliseconds,
         lookback: Milliseconds,
-        time: pg_sys::TimestampTz,
+        time: i64,
         value: f64,
         fcinfo: pg_sys::FunctionCallInfo,
     ) -> Option<Inner<VectorSelector>> {
@@ -204,7 +204,7 @@ mod _prom_ext {
         }
     }
 
-    #[pg_extern(immutable, parallel_safe)]
+    #[pg_extern(immutable, parallel_safe, create_or_replace)]
     pub fn vector_selector_final(
         state: Internal, /* Option<Inner<VectorSelector>> */
     ) -> Option<Vec<Option<f64>>> {
@@ -212,7 +212,7 @@ mod _prom_ext {
         state.map(|s| s.to_pg_array())
     }
 
-    #[pg_extern(immutable, parallel_safe, strict)]
+    #[pg_extern(immutable, parallel_safe, strict, create_or_replace)]
     pub fn vector_selector_serialize(state: Internal) -> bytea {
         let state: &mut VectorSelector = unsafe {
             // This is safe as long as this function is defined as `strict`, in
@@ -223,13 +223,13 @@ mod _prom_ext {
         crate::do_serialize!(state)
     }
 
-    #[pg_extern(immutable, parallel_safe, strict)]
+    #[pg_extern(immutable, parallel_safe, strict, create_or_replace)]
     pub fn vector_selector_deserialize(bytes: bytea, _internal: Internal) -> Internal {
         let v: VectorSelector = crate::do_deserialize!(bytes, VectorSelector);
         Inner::from(v).internal()
     }
 
-    #[pg_extern(immutable, parallel_safe)]
+    #[pg_extern(immutable, parallel_safe, create_or_replace)]
     pub fn vector_selector_combine(
         state1: Internal,
         state2: Internal,
@@ -307,19 +307,19 @@ mod _prom_ext {
     // the value stored inside the bucket is the last sample in the bucket (sample with highest timestamp)
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct VectorSelector {
-        first_bucket_max_time: pg_sys::TimestampTz,
-        last_bucket_max_time: pg_sys::TimestampTz,
-        end_time: pg_sys::TimestampTz,
+        first_bucket_max_time: i64,
+        last_bucket_max_time: i64,
+        end_time: i64,
         //only used for error checking
         bucket_width: Milliseconds,
         lookback: Milliseconds,
-        elements: Vec<Option<(pg_sys::TimestampTz, f64)>>,
+        elements: Vec<Option<(i64, f64)>>,
     }
 
     impl VectorSelector {
         pub fn new(
-            start_time: pg_sys::TimestampTz,
-            end_time: pg_sys::TimestampTz,
+            start_time: i64,
+            end_time: i64,
             bucket_width: Milliseconds,
             lookback: Milliseconds,
         ) -> Self {
@@ -362,8 +362,8 @@ mod _prom_ext {
                     (Some(_), None) => (),
                     (None, Some(other)) => *s = Some(*other),
                     (Some(mine), Some(other)) => {
-                        let (my_t, _): (pg_sys::TimestampTz, f64) = mine;
-                        let (other_t, _): (pg_sys::TimestampTz, f64) = *other;
+                        let (my_t, _): (i64, f64) = mine;
+                        let (other_t, _): (i64, f64) = *other;
                         if other_t > my_t {
                             *s = Some(*other)
                         }
@@ -372,7 +372,7 @@ mod _prom_ext {
             }
         }
 
-        fn insert(&mut self, time: pg_sys::TimestampTz, val: f64) {
+        fn insert(&mut self, time: i64, val: f64) {
             if time > self.end_time {
                 error!("input time greater than expected")
             }
@@ -394,7 +394,7 @@ mod _prom_ext {
             }
         }
 
-        fn get_bucket(&self, time: pg_sys::TimestampTz) -> usize {
+        fn get_bucket(&self, time: i64) -> usize {
             if time < self.first_bucket_max_time - (self.lookback * USECS_PER_MS) {
                 error!("input time less than expected")
             }
@@ -433,7 +433,7 @@ mod _prom_ext {
                     /* if current bucket is empty, last value may still apply */
                     None => {
                         if let Some(tuple) = last {
-                            let (t, v): (pg_sys::TimestampTz, f64) = tuple;
+                            let (t, v): (i64, f64) = tuple;
                             if t >= ts - (self.lookback * USECS_PER_MS) && v.to_bits() != STALE_NAN
                             {
                                 pushed = true;
@@ -442,7 +442,7 @@ mod _prom_ext {
                         }
                     }
                     Some(tuple) => {
-                        let (t, v2): &(pg_sys::TimestampTz, f64) = tuple;
+                        let (t, v2): &(i64, f64) = tuple;
                         //if buckets > lookback, timestamp in bucket may still be out of lookback
                         if *t >= ts - (self.lookback * USECS_PER_MS) && v2.to_bits() != STALE_NAN {
                             pushed = true;
@@ -502,7 +502,7 @@ mod tests {
     ///       |------lookback-----|------lookback-----|
     /// ```
     #[pg_test]
-    fn test_vector_selector_bucket_and_lookback_size_exact_match_beginning_end() {
+    fn test_vs_bucket_and_lookback_size_exact_match() {
         setup();
         let result = Spi::get_one::<Vec<Option<f64>>>(
             r#"
@@ -531,7 +531,7 @@ mod tests {
     ///       |--lookback--|       |--lookback--|       |--lookback--|
     /// ```
     #[pg_test]
-    fn test_vector_selector_lookback_smaller_than_bucket_with_and_without_results_in_lookback() {
+    fn test_vs_lookback_smaller_bucket_and_no_results_in_lookback() {
         Spi::run(
             r#"
             CREATE TABLE gfv_test_table(t TIMESTAMPTZ, v DOUBLE PRECISION);
@@ -571,7 +571,7 @@ mod tests {
     ///                                     |-------lookback-------|
     /// ```                                                |-------lookback-------|
     #[pg_test]
-    fn test_vector_selector_lookback_larger_than_bucket_width() {
+    fn test_vs_lookback_larger_than_bucket_width() {
         setup();
         let result = Spi::get_one::<Vec<Option<f64>>>(
             r#"
@@ -606,7 +606,7 @@ mod tests {
     ///       |------lookback-----|------lookback-----|
     /// ```
     #[pg_test]
-    fn test_vector_selector_start_end_not_aligned_with_timeseries_data() {
+    fn test_vs_start_end_not_aligned_with_timeseries_data() {
         setup();
         let result = Spi::get_one::<Vec<Option<f64>>>(
             r#"
@@ -635,7 +635,7 @@ mod tests {
     ///     lookbacks:  |---|---|---|---|---|---|
     /// ```
     #[pg_test]
-    fn test_vector_selector_smaller_bucket_and_lookback_size() {
+    fn test_vs_smaller_bucket_and_lookback_size() {
         setup();
         let result = Spi::get_one::<Vec<Option<f64>>>(
             r#"
@@ -674,7 +674,7 @@ mod tests {
     ///     lookbacks:  |---|---|---|---|---|---|
     /// ```
     #[pg_test]
-    fn test_vector_selector_smaller_bucket_and_lookback_size_randomized_input() {
+    fn test_vs_smaller_bucket_and_lookback_rand_input() {
         setup();
         Spi::run(
             r#"
@@ -717,7 +717,7 @@ mod tests {
     ///       |------lookback-----|
     /// ```
     #[pg_test]
-    fn test_vector_selector_instant_vector() {
+    fn test_vs_instant_vector() {
         setup();
         let result = Spi::get_one::<Vec<Option<f64>>>(
             r#"
@@ -738,7 +738,7 @@ mod tests {
     }
 
     #[pg_test]
-    fn test_vector_selector_instant_vector_bucket_nonzero() {
+    fn test_vs_instant_vector_bucket_nonzero() {
         setup();
         let result = Spi::get_one::<Vec<Option<f64>>>(
             r#"
@@ -759,7 +759,7 @@ mod tests {
     }
 
     #[pg_test]
-    fn test_vector_selector_instant_vector_start_neq_end() {
+    fn test_vs_instant_vector_start_neq_end() {
         setup();
         let result = Spi::get_one::<Vec<Option<f64>>>(
             r#"
@@ -789,7 +789,7 @@ mod tests {
     ///     lookbacks:  |---|---|---|---|---|---|
     /// ```
     #[pg_test]
-    fn test_vector_selector_parallel_execution_smaller_bucket_lookback() {
+    fn test_vs_parallel_execution_smaller_bucket_lookback() {
         setup();
 
         // Force parallel execution

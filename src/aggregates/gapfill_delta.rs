@@ -8,7 +8,7 @@ pub mod _prom_ext {
     use serde::{Deserialize, Serialize};
     use std::collections::VecDeque;
 
-    #[pg_extern(immutable, parallel_safe)]
+    #[pg_extern(immutable, parallel_safe, create_or_replace)]
     pub fn prom_extrapolate_final(state: Internal) -> Option<Vec<Option<f64>>> {
         prom_extrapolate_final_inner(unsafe { state.to_inner() })
     }
@@ -34,22 +34,22 @@ pub mod _prom_ext {
     #[derive(Serialize, Deserialize, PostgresType, Debug)]
     #[pgx(sql = false)]
     pub struct GapfillDeltaTransition {
-        window: VecDeque<(pg_sys::TimestampTz, f64)>,
+        window: VecDeque<(i64, f64)>,
         // a Datum for each index in the array, 0 by convention if the value is NULL
         deltas: Vec<Option<f64>>,
-        current_window_max: pg_sys::TimestampTz,
-        current_window_min: pg_sys::TimestampTz,
+        current_window_max: i64,
+        current_window_min: i64,
         step_size: Microseconds,
         range: Microseconds,
-        greatest_time: pg_sys::TimestampTz,
+        greatest_time: i64,
         is_counter: bool,
         is_rate: bool,
     }
 
     impl GapfillDeltaTransition {
         pub fn new(
-            lowest_time: pg_sys::TimestampTz,
-            greatest_time: pg_sys::TimestampTz,
+            lowest_time: i64,
+            greatest_time: i64,
             range: Milliseconds,
             step_size: Milliseconds,
             is_counter: bool,
@@ -72,7 +72,7 @@ pub mod _prom_ext {
             }
         }
 
-        pub(crate) fn add_data_point(&mut self, time: pg_sys::TimestampTz, val: f64) {
+        pub(crate) fn add_data_point(&mut self, time: i64, val: f64) {
             // skip stale NaNs
             if val.to_bits() == STALE_NAN {
                 return;
@@ -90,7 +90,7 @@ pub mod _prom_ext {
             }
         }
 
-        fn in_current_window(&self, time: pg_sys::TimestampTz) -> bool {
+        fn in_current_window(&self, time: i64) -> bool {
             time <= self.current_window_max
         }
 

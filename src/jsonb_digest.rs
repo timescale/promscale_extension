@@ -30,8 +30,8 @@ mod _prom_ext {
     /// described above. Unfortunately, it is limited to 64 bit: good enough
     /// for hash tables, probably a bad idea for a UNIQUE index. This
     /// implementation is largely based on `jsonb_hash_extended`.
-    #[pg_extern(immutable, strict, parallel_safe)]
-    pub fn jsonb_digest(jsonb: Jsonb) -> Vec<u8> {
+    #[pg_extern(immutable, strict, parallel_safe, create_or_replace)]
+    pub fn jsonb_digest(jsonb: Jsonb<'_>) -> Vec<u8> {
         use Token::*;
 
         // Based on https://github.com/postgres/postgres/blob/27b77ecf9f4d5be211900eda54d8155ada50d696/src/include/utils/jsonb.h#L193

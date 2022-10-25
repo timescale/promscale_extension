@@ -1,5 +1,8 @@
 #![allow(non_camel_case_types)]
 
+use pgx::utils::sql_entity_graph::metadata::{
+    ArgumentError, Returns, ReturnsError, SqlMapping, SqlTranslatable,
+};
 use pgx::*;
 
 // TODO: Is this the right approach to declaring `bytea` and `TimestampTz`?
@@ -12,9 +15,7 @@ extension_sql!(
 macro_rules! raw_type {
     ($name:ident, $tyid: path, $arrayid: path) => {
         impl FromDatum for $name {
-            const NEEDS_TYPID: bool = false;
-
-            unsafe fn from_datum(
+            unsafe fn from_polymorphic_datum(
                 datum: pg_sys::Datum,
                 is_null: bool,
                 _typoid: pg_sys::Oid,
@@ -57,6 +58,16 @@ macro_rules! raw_type {
 }
 
 #[derive(Clone, Copy)]
-pub struct bytea(pub pg_sys::Datum);
+pub struct bytea(pub Datum);
+
+#[allow(clippy::extra_unused_lifetimes)] // pgx sorcery caused this
+unsafe impl<'a> SqlTranslatable for bytea {
+    fn argument_sql() -> Result<SqlMapping, ArgumentError> {
+        Ok(SqlMapping::literal("bytea"))
+    }
+    fn return_sql() -> Result<Returns, ReturnsError> {
+        Ok(Returns::One(SqlMapping::literal("bytea")))
+    }
+}
 
 raw_type!(bytea, pg_sys::BYTEAOID, pg_sys::BYTEAARRAYOID);

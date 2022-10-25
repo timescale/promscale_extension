@@ -11,24 +11,24 @@ mod _prom_ext {
     use crate::palloc::{Inner, InternalAsValue, ToInternal};
 
     #[allow(clippy::too_many_arguments)]
-    #[pg_extern(immutable, parallel_safe)]
+    #[pg_extern(immutable, parallel_safe, create_or_replace)]
     pub fn prom_increase_transition(
         state: Internal,
-        lowest_time: pg_sys::TimestampTz,
-        greatest_time: pg_sys::TimestampTz,
+        lowest_time: TimestampWithTimeZone,
+        greatest_time: TimestampWithTimeZone,
         step_size: Milliseconds, // `prev_now - step_size` is where the next window starts
         range: Milliseconds,     // the size of a window to delta over
-        sample_time: pg_sys::TimestampTz,
+        sample_time: TimestampWithTimeZone,
         sample_value: f64,
         fc: pg_sys::FunctionCallInfo,
     ) -> Internal {
         prom_increase_transition_inner(
             unsafe { state.to_inner() },
-            lowest_time,
-            greatest_time,
+            lowest_time.into(),
+            greatest_time.into(),
             step_size,
             range,
-            sample_time,
+            sample_time.into(),
             sample_value,
             fc,
         )
@@ -38,11 +38,11 @@ mod _prom_ext {
     #[allow(clippy::too_many_arguments)]
     fn prom_increase_transition_inner(
         state: Option<Inner<GapfillDeltaTransition>>,
-        lowest_time: pg_sys::TimestampTz,
-        greatest_time: pg_sys::TimestampTz,
+        lowest_time: i64,
+        greatest_time: i64,
         step_size: Milliseconds, // `prev_now - step` is where the next window starts
         range: Milliseconds,     // the size of a window to delta over
-        sample_time: pg_sys::TimestampTz,
+        sample_time: i64,
         sample_value: f64,
         fc: pg_sys::FunctionCallInfo,
     ) -> Option<Inner<GapfillDeltaTransition>> {

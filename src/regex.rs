@@ -41,7 +41,7 @@ mod _prom_ext {
     /// re2_match matches `string` against `pattern` using an [RE2-like][re2]
     /// regular expression engine, returning a `BOOLEAN`.
     /// [re2]: https://github.com/google/re2
-    #[pg_extern(immutable, parallel_safe)]
+    #[pg_extern(immutable, parallel_safe, create_or_replace)]
     fn re2_match(string: &str, pattern: &str) -> bool {
         CACHE.with(|cache| {
             let mut cache = cache.borrow_mut();

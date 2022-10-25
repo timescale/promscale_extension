@@ -14,7 +14,7 @@ regex = "1.5.5"
 semver = "1.0.12"
 similar = "2.1.0"
 tempdir = "0.3.7"
-test-common = "0.1.0"
+test-common = { path = "../test-common" }
 
 [build-dependencies]
 build-deps = "^0.1"

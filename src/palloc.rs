@@ -48,7 +48,8 @@ pub unsafe trait InternalAsValue {
 
 unsafe impl InternalAsValue for Internal {
     unsafe fn to_inner<T>(self) -> Option<Inner<T>> {
-        self.unwrap().map(|p| Inner(NonNull::new(p as _).unwrap()))
+        self.unwrap()
+            .map(|p| Inner(NonNull::new(p.cast_mut_ptr()).unwrap()))
     }
 }
 
@@ -75,13 +76,13 @@ impl<T> DerefMut for Inner<T> {
 
 unsafe impl<T> ToInternal for Option<Inner<T>> {
     fn internal(self) -> Internal {
-        self.map(|p| p.0.as_ptr() as pg_sys::Datum).into()
+        self.map(|p| Datum::from(p.0.as_ptr())).into()
     }
 }
 
 unsafe impl<T> ToInternal for Inner<T> {
     fn internal(self) -> Internal {
-        Some(self.0.as_ptr() as pg_sys::Datum).into()
+        Some(Datum::from(self.0.as_ptr())).into()
     }
 }
 
@@ -93,6 +94,6 @@ impl<T> From<T> for Inner<T> {
 
 unsafe impl<T> ToInternal for *mut T {
     fn internal(self) -> Internal {
-        Internal::from(Some(self as pg_sys::Datum))
+        Internal::from(Some(Datum::from(self)))
     }
 }
