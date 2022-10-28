@@ -158,7 +158,7 @@ $$
         _exists BOOLEAN;
 
     BEGIN
-        EXECUTE FORMAT('SELECT EXISTS( SELECT 1 FROM _prom_catalog.rollup WHERE name = %L )', _name) INTO _exists;
+        SELECT EXISTS( SELECT 1 FROM _prom_catalog.rollup WHERE name = _name) INTO _exists;
         IF _exists THEN
             RAISE EXCEPTION 'ERROR: cannot create metric rollup for %. REASON: already exists.', name;
         END IF;
@@ -186,8 +186,8 @@ $$
         IF _rollup_id IS NULL THEN
             RAISE EXCEPTION '% rollup not found', _rollup_name;
         END IF;
-        DELETE FROM _prom_catalog.rollup WHERE id = _rollup_id;
         DELETE FROM _prom_catalog.metric_rollup WHERE rollup_id = _rollup_id;
+        DELETE FROM _prom_catalog.rollup WHERE id = _rollup_id;
         EXECUTE FORMAT('DROP SCHEMA %I CASCADE', _rollup_schema_name);
     END;
 $$
@@ -221,11 +221,14 @@ GRANT EXECUTE ON FUNCTION prom_api.get_automatic_downsample() TO prom_admin;
 DO $$
 DECLARE
     _is_restore_in_progress boolean = false;
+    _maintenance_job_already_exists boolean := false;
 BEGIN
     _is_restore_in_progress = coalesce((SELECT setting::boolean from pg_catalog.pg_settings where name = 'timescaledb.restoring'), false);
+    _maintenance_job_already_exists = (SELECT EXISTS(SELECT * FROM timescaledb_information.jobs WHERE proc_name = 'scan_for_new_rollups')::boolean); -- prevents from registering 2 scan jobs.
     IF  NOT _prom_catalog.is_timescaledb_oss()
         AND _prom_catalog.get_timescale_major_version() >= 2
         AND NOT _is_restore_in_progress
+        AND NOT _maintenance_job_already_exists
     THEN
         -- Scan and create metric rollups regularly for pending metrics.
         PERFORM public.add_job('_prom_catalog.scan_for_new_rollups', INTERVAL '30 minutes');

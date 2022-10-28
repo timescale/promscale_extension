@@ -38,8 +38,8 @@ We use the following categories for changes:
 - Added `_ps_catalog.compressed_chunks_missing_stats` view [#595]
 
 ### Fixed
-- Column conflict when creating a metric view with a label called `series`
-  [#559]
+- Column conflict when creating a metric view with a label called `series` [#559]
+- Support to create and delete metric rollups based on metric types [#538]
 
 ## [0.7.0 - 2022-10-03]
 
