@@ -20,6 +20,10 @@ We use the following categories for changes:
   Added `prom_info.metric_detail` which includes the disk size related columns. 
   Improved the performance of these. [#547]
 
+### Added
+
+- Support to create and delete metric rollups based on metric types [#538] 
+
 ## [0.7.0 - 2022-10-03]
 
 ### Added
