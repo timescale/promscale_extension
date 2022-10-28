@@ -1,0 +1,52 @@
+---
+source: sql-tests/tests/tests.rs
+expression: query_result
+---
+ id | name | schema_name | resolution | retention 
+----+------+-------------+------------+-----------
+(0 rows)
+
+ exists 
+--------
+ f
+(1 row)
+
+DO
+CALL
+ id | name | schema_name | resolution | retention 
+----+------+-------------+------------+-----------
+  1 | test | ps_test     | 00:05:00   | 30 days
+(1 row)
+
+ exists 
+--------
+ t
+(1 row)
+
+ id | rollup_id | metric_id | refresh_pending 
+----+-----------+-----------+-----------------
+(0 rows)
+
+psql:testdata/metric_rollups.sql:25: NOTICE:  continuous aggregate "test" is already up-to-date
+CALL
+ id | rollup_id | metric_id | refresh_pending 
+----+-----------+-----------+-----------------
+  1 |         1 |         1 | f
+(1 row)
+
+psql:testdata/metric_rollups.sql:31: NOTICE:  drop cascades to view ps_test.test
+CALL
+ id | name | schema_name | resolution | retention 
+----+------+-------------+------------+-----------
+(0 rows)
+
+ id | rollup_id | metric_id | refresh_pending 
+----+-----------+-----------+-----------------
+(0 rows)
+
+ exists 
+--------
+ f
+(1 row)
+
+
