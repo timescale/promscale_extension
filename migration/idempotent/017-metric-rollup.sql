@@ -1,5 +1,6 @@
 -- Metric rollup creation by metric type
 CREATE OR REPLACE PROCEDURE _prom_catalog.create_rollup_for_gauge(rollup_schema TEXT, table_name TEXT, resolution INTERVAL)
+    SET search_path = pg_catalog, pg_temp
 AS
 $$
 BEGIN
@@ -8,7 +9,7 @@ BEGIN
                 SELECT
                     timezone(
                         %3$L,
-                        time_bucket(%4$L, time) AT TIME ZONE %3$L + %4$L
+                        public.time_bucket(%4$L, time) AT TIME ZONE %3$L + %4$L
                     ) as time,
                     series_id,
                     sum(value) as sum,
@@ -16,7 +17,7 @@ BEGIN
                     min(value) as min,
                     max(value) as max
                 FROM prom_data.%2$I
-                GROUP BY time_bucket(%4$L, time), series_id WITH NO DATA
+                GROUP BY public.time_bucket(%4$L, time), series_id WITH NO DATA
             ', rollup_schema, table_name, 'UTC', resolution::text);
     EXECUTE FORMAT('ALTER MATERIALIZED VIEW %1$I.%2$I SET (timescaledb.compress = true)', rollup_schema, table_name);
 END;
@@ -24,6 +25,7 @@ $$
 LANGUAGE plpgsql;
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.create_rollup_for_counter(rollup_schema TEXT, table_name TEXT, resolution INTERVAL)
+    SET search_path = pg_catalog, pg_temp
 AS
 $$
 BEGIN
@@ -32,14 +34,14 @@ BEGIN
                 SELECT
                     timezone(
                         %3$L,
-                        time_bucket(%4$L, time) AT TIME ZONE %3$L + %4$L
+                        public.time_bucket(%4$L, time) AT TIME ZONE %3$L + %4$L
                     ) as time,
                     series_id,
-                    first(value, time),
-                    last(value, time) + _prom_catalog.counter_reset_sum(array_agg(value)) last,
+                    public.first(value, time),
+                    public.last(value, time) + _prom_catalog.counter_reset_sum(array_agg(value)) last,
                     _prom_catalog.irate(array_agg(value)) irate
                 FROM prom_data.%2$I
-                GROUP BY time_bucket(%4$L, time), series_id WITH NO DATA
+                GROUP BY public.time_bucket(%4$L, time), series_id WITH NO DATA
             ', rollup_schema, table_name, 'UTC', resolution::text);
     EXECUTE FORMAT('ALTER MATERIALIZED VIEW %1$I.%2$I SET (timescaledb.compress = true)', rollup_schema, table_name);
 END;
@@ -47,6 +49,7 @@ $$
 LANGUAGE PLPGSQL;
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.create_rollup_for_summary(rollup_schema TEXT, table_name TEXT, resolution INTERVAL)
+    SET search_path = pg_catalog, pg_temp
 AS
 $$
 BEGIN
@@ -55,13 +58,13 @@ BEGIN
                 SELECT
                     timezone(
                         %3$L,
-                        time_bucket(%4$L, time) AT TIME ZONE %3$L + %4$L
+                        public.time_bucket(%4$L, time) AT TIME ZONE %3$L + %4$L
                     ) as time,
                     series_id,
                     sum(value) as sum,
                     count(value) as count
                 FROM prom_data.%2$I
-                GROUP BY time_bucket(%4$L, time), series_id WITH NO DATA
+                GROUP BY public.time_bucket(%4$L, time), series_id WITH NO DATA
             ', rollup_schema, table_name, 'UTC', resolution::text);
     EXECUTE FORMAT('ALTER MATERIALIZED VIEW %1$I.%2$I SET (timescaledb.compress = true)', rollup_schema, table_name);
 END;
@@ -71,7 +74,9 @@ LANGUAGE PLPGSQL;
 -- create_metric_rollup_view decides which rollup query should be used for creation of the given rollup metric depending of metric type
 -- and calls the respective creation function. It returns true if metric rollup was created.
 CREATE OR REPLACE FUNCTION _prom_catalog.create_metric_rollup_view(_rollup_schema TEXT, _metric_name TEXT, _table_name TEXT, _resolution INTERVAL)
-    RETURNS BOOLEAN AS
+    RETURNS BOOLEAN
+    SET search_path = pg_catalog, pg_temp
+AS
 $$
 DECLARE
     _metric_type TEXT;
@@ -100,7 +105,8 @@ LANGUAGE PLPGSQL;
 
 -- scan_for_new_rollups is called in regular intervals to scan for either new metrics or for new resolution
 -- and create metric rollups for them.
-CREATE OR REPLACE PROCEDURE _prom_catalog.scan_for_new_rollups(job_id int, config jsonb) AS
+CREATE OR REPLACE PROCEDURE _prom_catalog.scan_for_new_rollups(job_id int, config jsonb)
+AS
 $$
 DECLARE
     r RECORD;
@@ -109,6 +115,9 @@ DECLARE
     rollup_view_created BOOLEAN;
 
 BEGIN
+    -- Note: We cannot use SET in the procedure declaration because we do transaction control
+    -- and we can _only_ use SET LOCAL in a procedure which _does_ transaction control
+    SET LOCAL search_path = pg_catalog, pg_temp;
     IF ( SELECT prom_api.get_automatic_downsample()::BOOLEAN IS FALSE ) THEN
         RETURN;
     END IF;
@@ -133,6 +142,7 @@ BEGIN
     END LOOP;
 
     COMMIT;
+    SET LOCAL search_path = pg_catalog, pg_temp;
 
     -- Refresh the newly added rollups for entire duration of data.
     FOR r IN
@@ -145,13 +155,16 @@ BEGIN
         CALL public.refresh_continuous_aggregate(r.schema_name || '.' || r.table_name, NULL, NULL);
         UPDATE _prom_catalog.metric_rollup SET refresh_pending = FALSE WHERE id = r.id;
         COMMIT;
+        SET LOCAL search_path = pg_catalog, pg_temp;
     END LOOP;
 END;
 $$
 LANGUAGE PLPGSQL;
 
 -- create_metric_rollup prepares the given rollup. The actual rollup views are created by _prom_catalog.scan_for_new_rollups()
-CREATE OR REPLACE PROCEDURE _prom_catalog.create_rollup(_name TEXT, _resolution INTERVAL, _retention INTERVAL) AS
+CREATE OR REPLACE PROCEDURE _prom_catalog.create_rollup(_name TEXT, _resolution INTERVAL, _retention INTERVAL)
+    SET search_path = pg_catalog, pg_temp
+AS
 $$
     DECLARE
         _schema_name constant TEXT := 'ps_' || _name;
@@ -175,7 +188,9 @@ GRANT EXECUTE ON PROCEDURE _prom_catalog.create_rollup(text, interval, interval)
 -- 1. Delete the entries in _prom_catalog.rollup
 -- 2. Delete the entries in _prom_catalog.metric_rollup
 -- 3. Delete the actual Cagg views that represent the rollups. This is done by directing deleting the entire rollup schema
-CREATE OR REPLACE PROCEDURE _prom_catalog.delete_rollup(_rollup_name TEXT) AS
+CREATE OR REPLACE PROCEDURE _prom_catalog.delete_rollup(_rollup_name TEXT)
+    SET search_path = pg_catalog, pg_temp
+AS
 $$
     DECLARE
         _rollup_id INTEGER;
@@ -224,21 +239,24 @@ DECLARE
     _maintenance_job_already_exists boolean := false;
 BEGIN
     _is_restore_in_progress = coalesce((SELECT setting::boolean from pg_catalog.pg_settings where name = 'timescaledb.restoring'), false);
-    _maintenance_job_already_exists = (SELECT EXISTS(SELECT * FROM timescaledb_information.jobs WHERE proc_name = 'scan_for_new_rollups')::boolean); -- prevents from registering 2 scan jobs.
     IF  NOT _prom_catalog.is_timescaledb_oss()
         AND _prom_catalog.get_timescale_major_version() >= 2
         AND NOT _is_restore_in_progress
-        AND NOT _maintenance_job_already_exists
     THEN
-        -- Scan and create metric rollups regularly for pending metrics.
-        PERFORM public.add_job('_prom_catalog.scan_for_new_rollups', INTERVAL '30 minutes');
+        _maintenance_job_already_exists = (SELECT EXISTS(SELECT * FROM timescaledb_information.jobs WHERE proc_name = 'scan_for_new_rollups')::boolean); -- prevents from registering 2 scan jobs.
+        IF NOT _maintenance_job_already_exists THEN
+            -- Scan and create metric rollups regularly for pending metrics.
+            PERFORM public.add_job('_prom_catalog.scan_for_new_rollups', INTERVAL '30 minutes');
+        END IF;
     END IF;
 END;
 $$;
 
 -- TODO: Temporary utilities for creation of metric rollups. These MUST be removed once we have SQL aggregate in Rust,
--- since their behaviour is unreliable.
-CREATE FUNCTION _prom_catalog.counter_reset_sum(v DOUBLE PRECISION[]) RETURNS DOUBLE PRECISION AS
+-- since their behaviour is unreliable
+CREATE FUNCTION _prom_catalog.counter_reset_sum(v DOUBLE PRECISION[]) RETURNS DOUBLE PRECISION
+    SET search_path = pg_catalog, pg_temp
+AS
 $$
 DECLARE
     reset_sum DOUBLE PRECISION := 0;
@@ -262,7 +280,9 @@ $$
 LANGUAGE PLPGSQL IMMUTABLE;
 
 CREATE FUNCTION _prom_catalog.irate(v DOUBLE PRECISION[])
-RETURNS DOUBLE PRECISION AS
+RETURNS DOUBLE PRECISION
+    SET search_path = pg_catalog, pg_temp
+AS
 $$
     DECLARE
         length INTEGER := cardinality(v);
