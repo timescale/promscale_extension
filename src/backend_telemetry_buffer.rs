@@ -58,7 +58,7 @@ mod _prom_ext {
 
     impl<'a> Drop for BufferIter<'a> {
         fn drop(&mut self) {
-            // Drop on the list calls list_free(). For it to work without segfaults we first 
+            // Drop on the list calls list_free(). For it to work without segfaults we first
             // need to replace the list (triggering the Drop) and only then call mem_ctx.reset()
             self.buffer.list = PgMemoryContexts::CacheMemoryContext.switch_to(|_| PgList::new());
             self.buffer.mem_ctx.reset();

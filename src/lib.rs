@@ -3,6 +3,7 @@ use pgx::*;
 
 mod aggregate_utils;
 mod aggregates;
+mod backend_telemetry_buffer;
 mod iterable_jsonb;
 mod jsonb_digest;
 mod palloc;
@@ -11,7 +12,6 @@ mod raw;
 mod regex;
 mod schema;
 mod support;
-mod backend_telemetry_buffer;
 mod type_builder;
 mod util;
 

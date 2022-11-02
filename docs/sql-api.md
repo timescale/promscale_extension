@@ -1039,6 +1039,11 @@ function bytea **_prom_ext.jsonb_digest**(jsonb jsonb)
 ```
 function integer **_prom_ext.num_cpus**()
 ```
+### _prom_ext.pop_recs
+
+```
+function SETOF _prom_ext.backend_telemetry_rec **_prom_ext.pop_recs**()
+```
 ### _prom_ext.prom_delta
 
 ```
@@ -1073,6 +1078,11 @@ aggregate double precision[] **_prom_ext.prom_rate**(lowest_time timestamp with 
 
 ```
 function internal **_prom_ext.prom_rate_transition**(state internal, lowest_time timestamp with time zone, greatest_time timestamp with time zone, step_size bigint, range bigint, sample_time timestamp with time zone, sample_value double precision)
+```
+### _prom_ext.push_rec
+
+```
+function boolean **_prom_ext.push_rec**(_r _prom_ext.backend_telemetry_rec)
 ```
 ### _prom_ext.re2_match
 
