@@ -35,7 +35,7 @@ mod _prom_ext {
         type Item = BufferItem;
 
         fn next(&mut self) -> Option<Self::Item> {
-            // We are not deallocaing anything here. Drop does it wholesale.
+            // We are not deallocaing anything here because Drop does it wholesale.
             let item = self.buffer.list.get_ptr(self.pos);
             self.pos += 1;
             // SAFETY: push_rec is expected to be the only funciton appending to buffer.list
@@ -48,6 +48,11 @@ mod _prom_ext {
                 )
                 .unwrap()
             })
+        }
+
+        fn size_hint(&self) -> (usize, Option<usize>) {
+            let remaining = self.buffer.list.len() - self.pos;
+            (remaining, Some(remaining))
         }
     }
 
