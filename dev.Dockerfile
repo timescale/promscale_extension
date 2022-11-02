@@ -36,9 +36,9 @@ RUN install-cargo-pgx.sh
 
 RUN cargo pgx init --pg14 /usr/lib/postgresql/14/bin/pg_config --pg13 /usr/lib/postgresql/13/bin/pg_config --pg12 /usr/lib/postgresql/12/bin/pg_config
 
-RUN timescaledb-tune --quiet --yes -conf-path ~/.pgx/data-12/postgresql.conf
-RUN timescaledb-tune --quiet --yes -conf-path ~/.pgx/data-13/postgresql.conf
-RUN timescaledb-tune --quiet --yes -conf-path ~/.pgx/data-14/postgresql.conf
+RUN timescaledb-tune --profile=promscale --quiet --yes -conf-path ~/.pgx/data-12/postgresql.conf
+RUN timescaledb-tune --profile=promscale --quiet --yes -conf-path ~/.pgx/data-13/postgresql.conf
+RUN timescaledb-tune --profile=promscale --quiet --yes -conf-path ~/.pgx/data-14/postgresql.conf
 
 # Make Postgres accessible from host
 RUN sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" ~/.pgx/data-{12,13,14}/postgresql.conf
@@ -61,5 +61,3 @@ WORKDIR /code/
 RUN sudo apt-get install -y entr
 COPY devenv.sh /usr/local/bin/
 CMD ["devenv.sh"]
-
-
