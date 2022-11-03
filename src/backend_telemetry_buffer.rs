@@ -24,7 +24,7 @@ mod _prom_ext {
     type BufferItem = composite_type!(COMPOSITE_TYPE_NAME);
     struct Buffer {
         mem_ctx: PgMemoryContexts,
-        buffer: PgBox<[Datum; BUFFER_SIZE], AllocatedByRust>,
+        inner_buffer: PgBox<[Datum; BUFFER_SIZE], AllocatedByRust>,
         next_idx: usize,
     }
 
@@ -32,12 +32,12 @@ mod _prom_ext {
         fn new() -> Self {
             let mem_ctx = PgMemoryContexts::CacheMemoryContext
                 .switch_to(|_| PgMemoryContexts::new("backend_telemetry_buffer_context"));
-            let buffer = PgBox::<[Datum; BUFFER_SIZE], AllocatedByRust>::alloc0_in_context(
+            let inner_buffer = PgBox::<[Datum; BUFFER_SIZE], AllocatedByRust>::alloc0_in_context(
                 PgMemoryContexts::CacheMemoryContext,
             );
             Self {
                 mem_ctx,
-                buffer,
+                inner_buffer,
                 next_idx: 0,
             }
         }
@@ -46,7 +46,7 @@ mod _prom_ext {
             let copied_opt = self.mem_ctx.switch_to(|_| item.into_composite_datum());
             let fully_initialized = self.next_idx >= BUFFER_SIZE;
 
-            self.buffer
+            self.inner_buffer
                 .get_mut(self.next_idx % BUFFER_SIZE)
                 .and_then(|place| {
                     copied_opt.map(|copied| {
@@ -89,14 +89,18 @@ mod _prom_ext {
 
         fn next(&mut self) -> Option<Self::Item> {
             // We are not deallocaing anything here because Drop does it wholesale.
-            if self.pos < self.buffer.next_idx {
-                let datum_opt = self.buffer.buffer.get(self.pos);
-                self.pos += 1;
+            let cur_pos = self.pos;
+            self.pos += 1;
+            self.buffer
+                .inner_buffer
+                .get(cur_pos)
+                // guard against accessing uninitialized parts of the buffer
+                .filter(|_| cur_pos < self.buffer.next_idx)
                 // SAFETY:
                 // - append is expected to be the only funciton writing into the buffer,
                 //   therefore all elements are BufferItem
                 // - the if above ensures we don't access unintialized parts of the buffer
-                datum_opt.and_then(|datum| unsafe {
+                .and_then(|datum| unsafe {
                     // mem_ctx will be reset when the iterator drops,
                     // therefore we have to copy the data into another context
                     BufferItem::from_datum_in_memory_context(
@@ -106,9 +110,6 @@ mod _prom_ext {
                         BufferItem::type_oid(),
                     )
                 })
-            } else {
-                None
-            }
         }
 
         fn size_hint(&self) -> (usize, Option<usize>) {
