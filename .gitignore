@@ -7,3 +7,4 @@ target
 /promscale.control
 /bootstrap.sql
 /sql
+venv
