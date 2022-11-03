@@ -2563,7 +2563,7 @@ LANGUAGE PLPGSQL;
 REVOKE ALL ON FUNCTION _prom_catalog.create_metric_view(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION _prom_catalog.create_metric_view(text) TO prom_writer;
 
-CREATE OR REPLACE FUNCTION prom_api.register_metric_view(schema_name text, view_name text, if_not_exists BOOLEAN = false)
+CREATE OR REPLACE FUNCTION prom_api.register_metric_view(schema_name text, view_name text, refresh_interval INTERVAL = NULL, for_rollups BOOLEAN = false, if_not_exists BOOLEAN = false)
     RETURNS BOOLEAN
     SECURITY DEFINER
     VOLATILE
@@ -2581,7 +2581,7 @@ BEGIN
     AND    table_name   = register_metric_view.view_name;
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'cannot register non-existent metric view in specified schema';
+        RAISE EXCEPTION 'cannot register non-existent metric view with name % in specified schema %', view_name, schema_name;
     END IF;
 
     -- cannot register view in data schema
@@ -2589,14 +2589,20 @@ BEGIN
         RAISE EXCEPTION 'cannot register metric view in prom_data schema';
     END IF;
 
-    -- check if view is based on a metric from prom_data
-    -- we check for two levels so we can support 2-step continuous aggregates
-    SELECT v.view_schema, v.view_name, v.metric_table_name
-    INTO agg_schema, agg_name, metric_table_name
-    FROM _prom_catalog.get_first_level_view_on_metric(schema_name, view_name) v;
+    IF for_rollups THEN
+        metric_table_name := view_name;
+        agg_name := view_name;
+        agg_schema := schema_name;
+    ELSE
+        -- check if view is based on a metric from prom_data
+        -- we check for two levels so we can support 2-step continuous aggregates
+        SELECT v.view_schema, v.view_name, v.metric_table_name
+        INTO agg_schema, agg_name, metric_table_name
+        FROM _prom_catalog.get_first_level_view_on_metric(schema_name, view_name) v;
 
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'view not based on a metric table from prom_data schema';
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'view with name % not based on a metric table from prom_data schema', view_name;
+        END IF;
     END IF;
 
     -- check if the view contains necessary columns with the correct types
@@ -2608,13 +2614,22 @@ BEGIN
     OR (column_name = 'series_id' AND data_type = 'bigint')
     OR data_type = 'double precision');
 
+    -- We only handle automatic refresh if refresh_interval is applied. Otherwise
+    -- we ask the user to care about refreshing this Cagg.
+    IF refresh_interval IS NULL THEN
+        RAISE NOTICE 'Automatic refresh is disabled since refresh_interval is NULL. Please create refresh policy for this Cagg';
+    ELSE
+        CALL _prom_catalog.create_cagg_refresh_job(refresh_interval);
+    END IF;
+
     IF column_count < 3 THEN
         RAISE EXCEPTION 'view must contain time (data type: timestamp with time zone), series_id (data type: bigint), and at least one column with double precision data type';
     END IF;
 
     -- insert into metric table
-    INSERT INTO _prom_catalog.metric (metric_name, table_name, table_schema, series_table, is_view, creation_completed)
-    VALUES (register_metric_view.view_name, register_metric_view.view_name, register_metric_view.schema_name, metric_table_name, true, true)
+--     raise warning 'view_name -> %, view_name -> %, schema_name -> %, metric_table_name -> %, refresh_interval -> %', register_metric_view.view_name, register_metric_view.view_name, register_metric_view.schema_name, metric_table_name, refresh_interval;
+    INSERT INTO _prom_catalog.metric (metric_name, table_name, table_schema, series_table, is_view, creation_completed, view_refresh_interval)
+    VALUES (register_metric_view.view_name, register_metric_view.view_name, register_metric_view.schema_name, metric_table_name, true, true, refresh_interval)
     ON CONFLICT DO NOTHING;
 
     IF NOT FOUND THEN
@@ -2639,8 +2654,8 @@ END
 $func$
 LANGUAGE PLPGSQL;
 --redundant given schema settings but extra caution for security definers
-REVOKE ALL ON FUNCTION prom_api.register_metric_view(text, text, boolean) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION prom_api.register_metric_view(text, text, boolean) TO prom_admin;
+REVOKE ALL ON FUNCTION prom_api.register_metric_view(text, text, interval, boolean, boolean) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION prom_api.register_metric_view(text, text, interval, boolean, boolean) TO prom_admin;
 
 CREATE OR REPLACE FUNCTION prom_api.unregister_metric_view(schema_name text, view_name text, if_exists BOOLEAN = false)
     RETURNS BOOLEAN
