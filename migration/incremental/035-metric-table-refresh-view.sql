@@ -1,0 +1,1 @@
+ALTER TABLE _prom_catalog.metric ADD COLUMN view_refresh_interval INTERVAL DEFAULT NULL;
