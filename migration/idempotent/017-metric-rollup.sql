@@ -122,6 +122,12 @@ BEGIN
         RETURN;
     END IF;
 
+    CREATE TEMPORARY TABLE pending_registration (
+        schema_name TEXT,
+        table_name TEXT,
+        resolution INTERVAL
+    );
+
     FOR r IN
         SELECT * FROM _prom_catalog.rollup
     LOOP
@@ -135,6 +141,7 @@ BEGIN
             SELECT INTO rollup_view_created _prom_catalog.create_metric_rollup_view(r.schema_name, m.metric_name, m.table_name, r.resolution);
             IF rollup_view_created THEN
                 INSERT INTO _prom_catalog.metric_rollup(rollup_id, metric_id, refresh_pending) VALUES (r.id, m.id, TRUE);
+                INSERT INTO pending_registration values (r.schema_name, m.table_name, r.resolution);
                 new_rollups_created := new_rollups_created + 1;
             END IF;
         END LOOP;
@@ -143,6 +150,14 @@ BEGIN
 
     COMMIT;
     SET LOCAL search_path = pg_catalog, pg_temp;
+
+    FOR r IN
+        SELECT * FROM pending_registration
+    LOOP
+        PERFORM prom_api.register_metric_view(r.schema_name, r.table_name, r.resolution, true, false);
+    END LOOP;
+
+    DROP TABLE pending_registration;
 
     -- Refresh the newly added rollups for entire duration of data.
     FOR r IN
