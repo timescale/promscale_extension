@@ -1019,6 +1019,11 @@ procedure void **_prom_catalog.update_execute_everywhere_entry**(IN command_key 
 ```
 function _prom_catalog.ha_leases **_prom_catalog.update_lease**(cluster text, writer text, min_time timestamp with time zone, max_time timestamp with time zone)
 ```
+### _prom_ext.backend_telemetry_buffer_size
+
+```
+function integer **_prom_ext.backend_telemetry_buffer_size**()
+```
 ### _prom_ext.gapfilldeltatransition_in
 
 ```
@@ -1082,7 +1087,7 @@ function internal **_prom_ext.prom_rate_transition**(state internal, lowest_time
 ### _prom_ext.push_rec
 
 ```
-function boolean **_prom_ext.push_rec**(_r _prom_ext.backend_telemetry_rec)
+function boolean **_prom_ext.push_rec**(r _prom_ext.backend_telemetry_rec)
 ```
 ### _prom_ext.re2_match
 

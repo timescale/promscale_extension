@@ -19,11 +19,64 @@ mod _prom_ext {
     );
 
     const COMPOSITE_TYPE_NAME: &str = "_prom_ext.backend_telemetry_rec";
+    const BUFFER_SIZE: usize = 10000;
 
     type BufferItem = composite_type!(COMPOSITE_TYPE_NAME);
     struct Buffer {
         mem_ctx: PgMemoryContexts,
-        list: PgList<BufferItem>,
+        buffer: PgBox<[Datum; BUFFER_SIZE], AllocatedByRust>,
+        next_idx: usize,
+    }
+
+    impl Buffer {
+        fn new() -> Self {
+            let mem_ctx = PgMemoryContexts::CacheMemoryContext
+                .switch_to(|_| PgMemoryContexts::new("backend_telemetry_buffer_context"));
+            let buffer = PgBox::<[Datum; BUFFER_SIZE], AllocatedByRust>::alloc0_in_context(
+                PgMemoryContexts::CacheMemoryContext,
+            );
+            Self {
+                mem_ctx,
+                buffer,
+                next_idx: 0,
+            }
+        }
+
+        fn append(&mut self, item: BufferItem) -> bool {
+            let copied_opt = self.mem_ctx.switch_to(|_| item.into_composite_datum());
+            let fully_initialized = self.next_idx >= BUFFER_SIZE;
+
+            self.buffer
+                .get_mut(self.next_idx % BUFFER_SIZE)
+                .and_then(|place| {
+                    copied_opt.map(|copied| {
+                        if fully_initialized {
+                            unsafe { pg_sys::pfree(place.cast_mut_ptr()) }
+                        }
+                        *place = copied;
+                    })
+                })
+                .map(|_| self.next_idx += 1)
+                .is_some()
+        }
+
+        fn reset(&mut self) {
+            self.next_idx = 0;
+            self.mem_ctx.reset();
+        }
+
+        fn consume_as_iter(&mut self) -> BufferIter {
+            BufferIter {
+                buffer: self,
+                pos: 0,
+            }
+        }
+    }
+
+    impl Default for Buffer {
+        fn default() -> Self {
+            Self::new()
+        }
     }
 
     struct BufferIter<'b> {
@@ -36,33 +89,37 @@ mod _prom_ext {
 
         fn next(&mut self) -> Option<Self::Item> {
             // We are not deallocaing anything here because Drop does it wholesale.
-            let item = self.buffer.list.get_ptr(self.pos);
-            self.pos += 1;
-            // SAFETY: push_rec is expected to be the only funciton appending to buffer.list
-            item.map(|i| unsafe {
-                PgHeapTuple::from_datum_in_memory_context(
-                    PgMemoryContexts::CurrentMemoryContext,
-                    i.into(),
-                    false,
-                    BufferItem::type_oid(),
-                )
-                .unwrap()
-            })
+            if self.pos < self.buffer.next_idx {
+                let datum_opt = self.buffer.buffer.get(self.pos);
+                self.pos += 1;
+                // SAFETY:
+                // - append is expected to be the only funciton writing into the buffer,
+                //   therefore all elements are BufferItem
+                // - the if above ensures we don't access unintialized parts of the buffer
+                datum_opt.and_then(|datum| unsafe {
+                    // mem_ctx will be reset when the iterator drops,
+                    // therefore we have to copy the data into another context
+                    BufferItem::from_datum_in_memory_context(
+                        PgMemoryContexts::CurrentMemoryContext,
+                        *datum,
+                        false,
+                        BufferItem::type_oid(),
+                    )
+                })
+            } else {
+                None
+            }
         }
 
         fn size_hint(&self) -> (usize, Option<usize>) {
-            let remaining = self.buffer.list.len() - self.pos;
-            (remaining, Some(remaining))
+            let remaining = Ord::min(BUFFER_SIZE, self.buffer.next_idx) - self.pos;
+            (remaining, Some(BUFFER_SIZE))
         }
     }
 
     impl<'a> Drop for BufferIter<'a> {
         fn drop(&mut self) {
-            // Drop on the list calls list_free(). For it to work without segfaults we first
-            // need to replace the list (triggering the Drop) and only then call mem_ctx.reset()
-            self.buffer.list = PgMemoryContexts::CacheMemoryContext.switch_to(|_| PgList::new());
-            self.buffer.mem_ctx.reset();
-            self.buffer.list = self.buffer.mem_ctx.switch_to(|_| PgList::new());
+            self.buffer.reset();
         }
     }
 
@@ -72,10 +129,7 @@ mod _prom_ext {
 
         unsafe {
             ONCE.call_once(|| {
-                let mut mem_ctx = PgMemoryContexts::CacheMemoryContext
-                    .switch_to(|_| PgMemoryContexts::new("backend_telemetry_buffer_context"));
-                let list = mem_ctx.switch_to(|_| PgList::new());
-                let singleton = Mutex::new(Buffer { mem_ctx, list });
+                let singleton = Mutex::new(Buffer::new());
                 SINGLETON.write(singleton);
             });
 
@@ -83,36 +137,24 @@ mod _prom_ext {
         }
     }
 
+    #[pg_extern(strict, create_or_replace)]
+    pub fn backend_telemetry_buffer_size() -> i32 {
+        use std::convert::TryInto;
+        BUFFER_SIZE.try_into().unwrap()
+    }
+
     #[pg_extern(volatile, strict, create_or_replace, requires = ["backend_telemetry_rec_decl"])]
-    pub fn push_rec(
-        _r: pgx::composite_type!(COMPOSITE_TYPE_NAME),
-        fcinfo: pg_sys::FunctionCallInfo,
-    ) -> bool {
+    pub fn push_rec(r: pgx::composite_type!(COMPOSITE_TYPE_NAME)) -> bool {
         let buffer_mutex = init_buffer();
-        let r_datum = pg_getarg_datum_raw(fcinfo, 0);
-        {
-            let mut q_guard = buffer_mutex.lock().unwrap();
-            let prev_ctx = q_guard.mem_ctx.set_as_current();
-            let detoasted = unsafe {
-                pg_sys::pg_detoast_datum_copy(r_datum.cast_mut_ptr() as *mut pg_sys::varlena)
-            };
-            q_guard.list.push(detoasted.cast());
-            prev_ctx.set_as_current();
-        }
-        true
+        let mut buffer_guard = buffer_mutex.lock().unwrap();
+        buffer_guard.append(r)
     }
 
     #[pg_extern(volatile, strict, create_or_replace, requires = ["backend_telemetry_rec_decl"])]
     pub fn pop_recs() -> SetOfIterator<'static, pgx::composite_type!(COMPOSITE_TYPE_NAME)> {
         let buffer_mutex = init_buffer();
-        let mut q_guard = buffer_mutex.lock().unwrap();
-        SetOfIterator::new(
-            BufferIter {
-                buffer: &mut q_guard,
-                pos: 0,
-            }
-            .collect::<Vec<_>>(),
-        )
+        let mut buffer_guard = buffer_mutex.lock().unwrap();
+        SetOfIterator::new(buffer_guard.consume_as_iter().collect::<Vec<_>>())
     }
 }
 
@@ -143,18 +185,41 @@ mod tests {
 
     #[pg_test]
     fn test_backend_telemetry_buffer_big_roundtrip() {
-        let n = 1000;
+        let n = Spi::get_one::<i32>("SELECT backend_telemetry_buffer_size();")
+            .expect("SQL query failed")
+            - 1;
         for _ in 0..n {
             Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 1));").expect("SQL query failed");
         }
         let pop_res = Spi::get_one::<i32>(
             r#"
-            SELECT SUM(CASE WHEN (x).time > now() THEN 0 ELSE (x).value END)::INT 
+            SELECT SUM(CASE WHEN (x).time > now() THEN 0 ELSE (x).value END)::INT
             FROM pop_recs() x;
             "#,
         )
         .expect("SQL query failed");
         assert_eq!(pop_res, n);
+    }
+
+    #[pg_test]
+    fn test_backend_telemetry_buffer_overflow() {
+        let n = Spi::get_one::<i32>("SELECT backend_telemetry_buffer_size();")
+            .expect("SQL query failed");
+        let overflow = 10;
+        for _ in 0..n {
+            Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 1));").expect("SQL query failed");
+        }
+        for _ in 0..overflow {
+            Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 2));").expect("SQL query failed");
+        }
+        let pop_res = Spi::get_one::<i32>(
+            r#"
+            SELECT SUM((x).value)::INT
+            FROM pop_recs() x;
+            "#,
+        )
+        .expect("SQL query failed");
+        assert_eq!(pop_res, n - overflow + 2 * overflow);
     }
 
     #[pg_test]
