@@ -2563,7 +2563,7 @@ LANGUAGE PLPGSQL;
 REVOKE ALL ON FUNCTION _prom_catalog.create_metric_view(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION _prom_catalog.create_metric_view(text) TO prom_writer;
 
-CREATE OR REPLACE FUNCTION prom_api.register_metric_view(schema_name text, view_name text, refresh_interval INTERVAL = NULL, for_rollups BOOLEAN = false, if_not_exists BOOLEAN = false)
+CREATE OR REPLACE FUNCTION prom_api.register_metric_view(schema_name text, view_name text, refresh_interval INTERVAL, for_rollups BOOLEAN = false, if_not_exists BOOLEAN = false)
     RETURNS BOOLEAN
     SECURITY DEFINER
     VOLATILE
@@ -2590,6 +2590,11 @@ BEGIN
     END IF;
 
     IF for_rollups THEN
+        -- We do not do the checks offered by get_first_level_view_on_metric() for metric-rollups
+        -- because those checks are not meant for Caggs with timescaledb.materialized_only = true.
+        --
+        -- Since metric-rollups are an internal creation of Caggs, we should be fine with not doing
+        -- safety checks.
         metric_table_name := view_name;
         agg_name := view_name;
         agg_schema := schema_name;
