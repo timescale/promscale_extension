@@ -106,7 +106,7 @@ mod _prom_ext {
         type Item = BufferItem;
 
         fn next(&mut self) -> Option<Self::Item> {
-            // We are not deallocaing anything here because Drop does it wholesale.
+            // We are not deallocating anything here because Drop does it wholesale.
             let cur_pos = self.pos;
             self.pos += 1;
             self.buffer
@@ -115,9 +115,9 @@ mod _prom_ext {
                 // guard against accessing uninitialized parts of the buffer
                 .filter(|_| cur_pos < self.buffer.next_idx)
                 // SAFETY:
-                // - append is expected to be the only funciton writing into the buffer,
+                // - append is expected to be the only function writing into the buffer,
                 //   therefore all elements are BufferItem
-                // - the if above ensures we don't access unintialized parts of the buffer
+                // - the if above ensures we don't access uninitialized parts of the buffer
                 .and_then(|datum| unsafe {
                     // mem_ctx will be reset when the iterator drops,
                     // therefore we have to copy the data into another context
