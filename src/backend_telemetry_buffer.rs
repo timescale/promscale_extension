@@ -12,23 +12,12 @@ mod _prom_ext {
         sync::{Mutex, Once},
     };
 
-    // Using an SQL-defined composite type allows future modifications
-    // to be carried out in an incremental migration via ALTER TYPE,
-    // without touching Rust code.
-    extension_sql!(
-        r#"
-        CREATE TYPE _prom_ext.backend_telemetry_rec AS (
-            time timestamp with time zone,
-            value BIGINT,
-            tags text[]
-        );
-        "#,
-        name = "backend_telemetry_rec_decl"
-    );
-
     const COMPOSITE_TYPE_NAME: &str = "_prom_ext.backend_telemetry_rec";
     const BUFFER_SIZE: usize = 10000;
 
+    // Using an SQL-defined composite type allows future modifications
+    // to be carried out in an incremental migration via ALTER TYPE,
+    // without touching Rust code.
     type BufferItem = composite_type!(COMPOSITE_TYPE_NAME);
 
     /// Holds a PG memory context and a ring buffer of pointer- [`Datum`]
@@ -72,7 +61,8 @@ mod _prom_ext {
             let copied_opt = self.mem_ctx.switch_to(|_| item.into_composite_datum());
             let fully_initialized = self.next_idx >= BUFFER_SIZE;
 
-            self.inner_buffer
+            let ok = self
+                .inner_buffer
                 .get_mut(self.next_idx % BUFFER_SIZE)
                 .and_then(|place| {
                     copied_opt.map(|copied| {
@@ -83,7 +73,17 @@ mod _prom_ext {
                     })
                 })
                 .map(|_| self.next_idx += 1)
-                .is_some()
+                .is_some();
+
+            if self.next_idx == 0 {
+                // The only reason we may end up here
+                // is an integer overflow. Resetting to
+                // start from a safe state.
+                self.reset();
+                false
+            } else {
+                ok
+            }
         }
 
         /// Empties the buffer and frees memory occupied by contained items.
@@ -91,10 +91,16 @@ mod _prom_ext {
             self.next_idx = 0;
             self.mem_ctx.reset();
         }
+    }
+
+    impl<'a> IntoIterator for &'a mut Buffer {
+        type Item = BufferItem;
+        type IntoIter = BufferIter<'a>;
 
         /// Creates an iterator, traversing all initialized items
-        /// in the buffer. Calls `reset()` when dropped.
-        fn consume_as_iter(&mut self) -> BufferIter {
+        /// in the buffer. Calls `buffer.reset()` when dropped.
+        #[inline]
+        fn into_iter(self) -> BufferIter<'a> {
             BufferIter {
                 buffer: self,
                 pos: 0,
@@ -167,7 +173,7 @@ mod _prom_ext {
     }
 
     /// Adds a `backend_telemetry_rec` record to a backend-local ring buffer.
-    #[pg_extern(volatile, strict, create_or_replace, requires = ["backend_telemetry_rec_decl"])]
+    #[pg_extern(volatile, strict, create_or_replace, sql = false)]
     // Can't use [`BufferItem`] type directly due to DDL generator quirk.
     pub fn push_rec(r: pgx::composite_type!(COMPOSITE_TYPE_NAME)) -> bool {
         let buffer_mutex = backend_local_buffer();
@@ -177,12 +183,12 @@ mod _prom_ext {
 
     /// Returns all `backend_telemetry_rec` records currently present inside a backend-local
     /// ring buffer. Clears the buffer.
-    #[pg_extern(volatile, strict, create_or_replace, requires = ["backend_telemetry_rec_decl"])]
+    #[pg_extern(volatile, strict, create_or_replace, sql = false)]
     // Can't use [`BufferItem`] type directly due to DDL generator quirk.
     pub fn pop_recs() -> SetOfIterator<'static, pgx::composite_type!(COMPOSITE_TYPE_NAME)> {
         let buffer_mutex = backend_local_buffer();
         let mut buffer_guard = buffer_mutex.lock().unwrap();
-        SetOfIterator::new(buffer_guard.consume_as_iter().collect::<Vec<_>>())
+        SetOfIterator::new(buffer_guard.into_iter().collect::<Vec<_>>())
     }
 }
 
