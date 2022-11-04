@@ -1,6 +1,6 @@
 //! Provides a backend-local "escape hatch" buffer for backend metrics
 //! (and, in the future, logs) data. Even when an exception happens,
-//! the buffer retains its contents and they may be used inside 
+//! the buffer retains its contents so it may be used inside
 //! an exception handler.
 use pgx::*;
 
@@ -19,7 +19,8 @@ mod _prom_ext {
         r#"
         CREATE TYPE _prom_ext.backend_telemetry_rec AS (
             time timestamp with time zone,
-            value BIGINT
+            value BIGINT,
+            tags text[]
         );
         "#,
         name = "backend_telemetry_rec_decl"
@@ -29,13 +30,13 @@ mod _prom_ext {
     const BUFFER_SIZE: usize = 10000;
 
     type BufferItem = composite_type!(COMPOSITE_TYPE_NAME);
-    
+
     /// Holds a PG memory context and a ring buffer of pointer- [`Datum`]
     /// representing [`BufferItem`] inside the memory context.
-    /// 
+    ///
     /// The ring buffer can hold up to [`BUFFER_SIZE`] items.
-    /// 
-    /// The memory context is created as a child of 
+    ///
+    /// The memory context is created as a child of
     /// [`PgMemoryContexts::CacheMemoryContext`]
     struct Buffer {
         mem_ctx: PgMemoryContexts,
@@ -65,7 +66,7 @@ mod _prom_ext {
         }
 
         /// Copies [`BufferItem`] into the memory context associated
-        /// with the [`Buffer`]. Frees an older item if it needs 
+        /// with the [`Buffer`]. Frees an older item if it needs
         /// to be overwritten due to ring buffer overflow.
         fn append(&mut self, item: BufferItem) -> bool {
             let copied_opt = self.mem_ctx.switch_to(|_| item.into_composite_datum());
@@ -174,7 +175,7 @@ mod _prom_ext {
         buffer_guard.append(r)
     }
 
-    /// Returns all `backend_telemetry_rec` records currently present inside a backend-local 
+    /// Returns all `backend_telemetry_rec` records currently present inside a backend-local
     /// ring buffer. Clears the buffer.
     #[pg_extern(volatile, strict, create_or_replace, requires = ["backend_telemetry_rec_decl"])]
     // Can't use [`BufferItem`] type directly due to DDL generator quirk.
@@ -192,19 +193,21 @@ mod tests {
 
     #[pg_test]
     fn test_backend_telemetry_buffer_trivial_roundtrip() {
-        let push_res =
-            Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 1));").expect("SQL query failed");
+        let push_res = Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 1, ARRAY['foo']));")
+            .expect("SQL query failed");
         assert_eq!(push_res, true);
         let pop_res =
-            Spi::get_one::<bool>("SELECT (x).time <= now() AND (x).value = 1 FROM pop_recs() x;")
-                .expect("SQL query failed");
+            Spi::get_one::<bool>("SELECT (x).time <= now() AND (x).value = 1 AND (x).tags = ARRAY['foo'] FROM pop_recs() x;")
+            .expect("SQL query failed");
         assert_eq!(pop_res, true);
     }
 
     #[pg_test]
     fn test_backend_telemetry_buffer_multiple_roundtrip() {
-        Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 1));").expect("SQL query failed");
-        Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 2));").expect("SQL query failed");
+        Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 1, ARRAY['1']));")
+            .expect("SQL query failed");
+        Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 2, ARRAY['2']));")
+            .expect("SQL query failed");
         let pop_res = Spi::get_one::<i32>("SELECT SUM((x).value)::INT FROM pop_recs() x;")
             .expect("SQL query failed");
         assert_eq!(pop_res, 3);
@@ -216,7 +219,8 @@ mod tests {
             .expect("SQL query failed")
             - 1;
         for _ in 0..n {
-            Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 1));").expect("SQL query failed");
+            Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 1, ARRAY[]::text[]));")
+                .expect("SQL query failed");
         }
         let pop_res = Spi::get_one::<i32>(
             r#"
@@ -234,10 +238,12 @@ mod tests {
             .expect("SQL query failed");
         let overflow = 10;
         for _ in 0..n {
-            Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 1));").expect("SQL query failed");
+            Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 1, ARRAY['']));")
+                .expect("SQL query failed");
         }
         for _ in 0..overflow {
-            Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 2));").expect("SQL query failed");
+            Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 2, ARRAY['']));")
+                .expect("SQL query failed");
         }
         let pop_res = Spi::get_one::<i32>(
             r#"
@@ -251,7 +257,8 @@ mod tests {
 
     #[pg_test]
     fn test_backend_telemetry_buffer_clean_after_pop() {
-        Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 1));").expect("SQL query failed");
+        Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 1, ARRAY['']));")
+            .expect("SQL query failed");
         Spi::get_one::<bool>("SELECT 1 FROM pop_recs() x;").expect("SQL query failed");
         assert!(
             Spi::get_one::<bool>("SELECT 1 FROM pop_recs() x;").is_none(),
