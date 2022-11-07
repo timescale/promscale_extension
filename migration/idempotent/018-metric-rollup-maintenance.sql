@@ -1,94 +1,108 @@
-CREATE OR REPLACE PROCEDURE _prom_catalog.caggs_refresher(job_id int, config jsonb) AS
+CREATE OR REPLACE PROCEDURE _prom_catalog.execute_caggs_refresh_policy(job_id int, config jsonb)
+AS
 $$
 DECLARE
-    _refresh_interval INTERVAL := config ->> 'refresh_interval';
+    _refresh_interval INTERVAL;
+    _refresh_rollups BOOLEAN := (SELECT prom_api.get_automatic_downsample()::BOOLEAN);
+    _ignore_rollups_clause TEXT := '';
     r RECORD;
 
 BEGIN
+    SET LOCAL search_path = pg_catalog, pg_temp;
+
+    _refresh_interval := (config ->> 'refresh_interval')::INTERVAL;
+    IF _refresh_interval IS NULL THEN
+        RAISE EXCEPTION 'refresh_interval cannot be null';
+    END IF;
+
+    IF NOT _refresh_rollups THEN
+        _ignore_rollups_clause := 'AND m.rollup_id IS NULL';
+    END IF;
+
     FOR r IN
-        SELECT table_schema, table_name FROM _prom_catalog.metric
-           WHERE is_view IS TRUE AND view_refresh_interval = _refresh_interval
+        -- We need to refresh the custom caggs at the minimum.
+        -- The choice of not refreshing is applicable only on metric-rollups, depending on the value of _refresh_rollups.
+        EXECUTE FORMAT('
+            SELECT
+                m.table_schema,
+                m.table_name
+            FROM _prom_catalog.metric m
+            WHERE m.is_view %s AND m.view_refresh_interval = $1::INTERVAL
+       ', _ignore_rollups_clause) USING _refresh_interval
     LOOP
-        CALL public.refresh_continuous_aggregate(r.table_schema || '.' || r.table_name, current_timestamp - 3 * _refresh_interval, current_timestamp);
+        CALL public.refresh_continuous_aggregate(format('%I.%I', r.table_schema, r.table_name), current_timestamp - 3 * _refresh_interval, current_timestamp);
         COMMIT; -- Commit after every refresh to avoid high I/O & mem-buffering.
+        SET LOCAL search_path = pg_catalog, pg_temp;
     END LOOP;
 END;
 $$
 LANGUAGE PLPGSQL;
-COMMENT ON PROCEDURE _prom_catalog.caggs_refresher IS 'caggs_refresher runs every refresh_interval passed in config. Its
+COMMENT ON PROCEDURE _prom_catalog.execute_caggs_refresh_policy IS 'execute_caggs_refresh_policy runs every refresh_interval passed in config. Its
 main aim is to refresh those Caggs that have been registered under _prom_catalog.metric and whose view_refresh_interval
 matches the given refresh_interval. It refreshes 2 kinds of Caggs:
 1. Caggs created by metric rollups
 2. Custom Caggs created by the user';
 
-CREATE OR REPLACE PROCEDURE _prom_catalog.create_cagg_refresh_job(_refresh_interval INTERVAL) AS
+CREATE OR REPLACE FUNCTION _prom_catalog.create_cagg_refresh_job_if_not_exists(_refresh_interval INTERVAL) RETURNS VOID
+    SET search_path = pg_catalog, pg_temp
+AS
 $$
 BEGIN
     IF (
         SELECT EXISTS (
             SELECT 1 FROM timescaledb_information.jobs WHERE
-               proc_name = 'caggs_refresher' AND schedule_interval = _refresh_interval
+               proc_name = 'execute_caggs_refresh_policy' AND schedule_interval = _refresh_interval
         )
     ) THEN
         -- Refresh job exists for the given _refresh_interval. Hence, nothing to do.
         RETURN;
     END IF;
-    PERFORM public.add_job('_prom_catalog.caggs_refresher', _refresh_interval, FORMAT('{"refresh_interval": "%s"}', _refresh_interval)::jsonb);
+    PERFORM public.add_job('_prom_catalog.execute_caggs_refresh_policy', _refresh_interval, json_build_object('refresh_interval', _refresh_interval)::jsonb);
 END;
 $$
 LANGUAGE PLPGSQL;
-COMMENT ON PROCEDURE _prom_catalog.create_cagg_refresh_job(INTERVAL) IS
+COMMENT ON FUNCTION _prom_catalog.create_cagg_refresh_job_if_not_exists(INTERVAL) IS
 'Creates a Cagg refresh job that refreshes all Caggs registered by register_metric_view().
-This function creates a refresh job only if no caggs_refresher() exists currently with the given refresh_interval.';
+This function creates a refresh job only if no execute_caggs_refresh_policy() exists currently with the given refresh_interval.';
 
--- TODO for discussion on upgrade path:
--- We cannot compress existing Caggs that the user has created since they do not have timescaledb.compress = true.
--- Hence, the todos are:
--- 1. We need an upgrade script for existing Caggs in the system that applies timescaledb.compress = true
--- 2. In the docs [https://docs.timescale.com/promscale/latest/downsample-data/caggs/] write the command to add timescaledb.compress = true
-CREATE OR REPLACE PROCEDURE _prom_catalog.caggs_compressor(job_id int, config jsonb) AS
+CREATE OR REPLACE PROCEDURE _prom_catalog.execute_caggs_compression_policy(job_id int, config jsonb)
+    SET search_path = pg_catalog, pg_temp
+AS
 $$
 DECLARE
     r RECORD;
-    _rollup RECORD;
-    _temp INTEGER;
-    _chunks_compressed INTEGER := 0;
 
 BEGIN
-    FOR _rollup IN
-        SELECT resolution FROM _prom_catalog.rollup
+    FOR r IN
+        SELECT
+            format('%I.%I', m.table_schema, m.table_name) AS compressible_cagg,
+            m.view_refresh_interval AS refresh_interval
+        FROM
+            _prom_catalog.metric m
+        INNER JOIN
+            timescaledb_information.continuous_aggregates cagg
+        ON (m.table_name = cagg.view_name AND m.table_schema = cagg.view_schema)
+        WHERE
+            cagg.compression_enabled AND m.is_view
     LOOP
-        FOR r IN
-            SELECT m.table_schema || '.' || m.table_name AS compressible_cagg FROM
-                _prom_catalog.metric m
-            INNER JOIN
-                timescaledb_information.continuous_aggregates cagg
-            ON (m.table_name = cagg.view_name AND m.table_schema = cagg.view_schema)
-            WHERE
-                m.is_view IS true AND m.view_refresh_interval = _rollup.resolution AND cagg.compression_enabled IS TRUE
-        LOOP
-            SELECT count(*) INTO _temp FROM (SELECT public.compress_chunk(public.show_chunks(r.compressible_cagg, older_than => 1000 * _rollup.resolution))) a;
-            _chunks_compressed := _chunks_compressed + _temp;
-        END LOOP;
+        PERFORM public.compress_chunk(public.show_chunks(r.compressible_cagg, older_than => 100 * r.refresh_interval));
     END LOOP;
-    RAISE WARNING 'Caggs compressor: Compressed % chunks', _chunks_compressed;
 END;
 $$
 LANGUAGE PLPGSQL;
-COMMENT ON PROCEDURE _prom_catalog.caggs_compressor IS 'caggs_compressor is responsible to compress continuous aggregates registered via
-register_metric_view(). These include metric-rollups and custom Caggs based downsampling.
-Note: caggs_compressor runs every X interval and compresses inactive chunks of only those Caggs which have timescaledb.compress = true.
+COMMENT ON PROCEDURE _prom_catalog.execute_caggs_compression_policy IS 'execute_caggs_compression_policy is responsible to compress Caggs registered via
+register_metric_view() in _prom_catalog.metric. It goes through all the entries in the _prom_catalog.metric and tries to compress any Cagg that supports compression.
+These include metric-rollups and custom Caggs based downsampling.
+Note: execute_caggs_compression_policy runs every X interval and compresses only the inactive chunks of those Caggs which have timescaledb.compress = true.
 By default, these include metric-rollups.';
 
-CREATE OR REPLACE PROCEDURE _prom_catalog.caggs_retainer(job_id int, config jsonb) AS
+CREATE OR REPLACE PROCEDURE _prom_catalog.execute_caggs_retention_policy(job_id int, config jsonb)
+    SET search_path = pg_catalog, pg_temp
+AS
 $$
 DECLARE
     r RECORD;
-    _rollup RECORD;
-    _temp INTEGER;
     _retention INTERVAL;
-    _dropped_compressed INTEGER := 0;
-    _rollup_schemas TEXT[];
 
 BEGIN
     -- For retention, we have 2 cases:
@@ -97,62 +111,61 @@ BEGIN
     --
     -- Case 2: Retention for custom Caggs
     -- These Caggs do not have a well definied policy for retention. Hence, we will assume the
-    -- retention to be the retention of their parent hypertable.
+    -- retention to be the metric_retention_period(cagg_name), which itself is either the global
+    -- retention or retention specific to that cagg view stored in 'retention_period' column of
+    -- _prom_catalog.metric
 
-    _rollup_schemas := (SELECT array_agg(schema_name) FROM _prom_catalog.rollup);
-
-    FOR _rollup IN
-        SELECT retention, resolution FROM _prom_catalog.rollup
+    -- Case 1.
+    FOR r IN
+        SELECT
+            format('%I.%I', rp.schema_name, m.table_name) AS cagg,
+            rp.retention as rollup_retention
+        FROM _prom_catalog.metric m
+        INNER JOIN _prom_catalog.metric_rollup mr ON (m.id = mr.metric_id)
+        INNER JOIN _prom_catalog.rollup rp ON (mr.rollup_id = rp.id)
     LOOP
-        FOR r IN
-            SELECT
-                m.table_schema || '.' || m.table_name AS cagg,
-                m.table_schema::TEXT AS _schema_name,
-                m.metric_name AS _metric_name
-            FROM _prom_catalog.metric m
-                WHERE m.is_view IS TRUE AND m.view_refresh_interval = _rollup.resolution
-        LOOP
-            IF (SELECT r._schema_name = ANY(_rollup_schemas)) THEN
-                -- Case 1.
-                _retention := _rollup.retention;
-            ELSE
-                -- Case 2.
-                -- Use the retention of the Cagg’s parent hypertable.
-                _retention := (SELECT _prom_catalog.get_metric_retention_period(r._metric_name));
-            END IF;
-
-            SELECT count(*) INTO _temp FROM (SELECT public.drop_chunks(public.show_chunks(r.cagg, older_than => _retention))) a;
-            _dropped_compressed := _dropped_compressed + _temp;
-        END LOOP;
+        PERFORM public.drop_chunks(r.cagg, older_than => r.rollup_retention);
     END LOOP;
-    RAISE WARNING 'Caggs retention: Dropped % chunks', _dropped_compressed;
+
+    -- Case 2.
+    FOR r IN
+        SELECT
+            format('%I.%I', table_schema, metric_name) AS cagg,
+            metric_name AS cagg_name -- Note: This is the name of cagg view.
+        FROM _prom_catalog.metric WHERE is_view AND rollup_id IS NULL
+    LOOP
+        _retention := (SELECT _prom_catalog.get_metric_retention_period(r.cagg_name));
+        PERFORM public.drop_chunks(r.cagg, older_than => _retention);
+    END LOOP;
 END;
 $$
 LANGUAGE PLPGSQL;
-COMMENT ON PROCEDURE _prom_catalog.caggs_retainer IS 'caggs_retainer is responsible to perform retention behaviour on compress continuous aggregates registered via
-register_metric_view(). These include metric-rollups and custom Caggs based downsampling.';
+COMMENT ON PROCEDURE _prom_catalog.execute_caggs_retention_policy IS 'execute_caggs_retention_policy is responsible to perform retention behaviour on compress continuous aggregates registered via
+register_metric_view(). It loops through all entries in the _prom_catalog.metric that are Caggs and tries to delete the stale chunks of those Caggs.
+The staleness is determined by rollup_retention (for metric rollups) and default_retention_period of parent hypertable (for custom Caggs).
+These include metric-rollups and custom Caggs based downsampling.';
 
 DO $$
 DECLARE
     _is_restore_in_progress boolean = false;
-    _caggs_compressor_job_already_exists boolean := false;
-    _caggs_retainer_job_already_exists boolean := false;
+    _job_already_exists boolean := false;
+
 BEGIN
     _is_restore_in_progress = coalesce((SELECT setting::boolean from pg_catalog.pg_settings where name = 'timescaledb.restoring'), false);
     IF  NOT _prom_catalog.is_timescaledb_oss()
         AND _prom_catalog.get_timescale_major_version() >= 2
         AND NOT _is_restore_in_progress
     THEN
-        -- Add a caggs_compressor job if not exist.
-        _caggs_compressor_job_already_exists = (SELECT EXISTS(SELECT * FROM timescaledb_information.jobs WHERE proc_name = 'caggs_compressor')::boolean);
-        IF NOT _caggs_compressor_job_already_exists THEN
-            PERFORM public.add_job('_prom_catalog.caggs_compressor', INTERVAL '30 minutes');
+        -- Add a execute_caggs_compression_policy job if not exist.
+        _job_already_exists := (SELECT EXISTS(SELECT * FROM timescaledb_information.jobs WHERE proc_name = 'execute_caggs_compression_policy')::boolean);
+        IF NOT _job_already_exists THEN
+            PERFORM public.add_job('_prom_catalog.execute_caggs_compression_policy', INTERVAL '30 minutes');
         END IF;
 
-        -- Add a caggs_retainer job if not exist.
-        _caggs_retainer_job_already_exists = (SELECT EXISTS(SELECT * FROM timescaledb_information.jobs WHERE proc_name = 'caggs_retainer')::boolean);
-        IF NOT _caggs_retainer_job_already_exists THEN
-            PERFORM public.add_job('_prom_catalog.caggs_retainer', INTERVAL '30 minutes');
+        -- Add a execute_caggs_retention_policy job if not exist.
+        _job_already_exists := (SELECT EXISTS(SELECT * FROM timescaledb_information.jobs WHERE proc_name = 'execute_caggs_retention_policy')::boolean);
+        IF NOT _job_already_exists THEN
+            PERFORM public.add_job('_prom_catalog.execute_caggs_retention_policy', INTERVAL '30 minutes');
         END IF;
     END IF;
 END;
