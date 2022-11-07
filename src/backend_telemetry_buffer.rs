@@ -199,23 +199,35 @@ mod tests {
 
     #[pg_test]
     fn test_backend_telemetry_buffer_trivial_roundtrip() {
-        let push_res = Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 1, ARRAY['foo']));")
-            .expect("SQL query failed");
+        let push_res = Spi::get_one::<bool>(
+            "SELECT push_rec(ROW(now(), 1, 'metrics', 'compression', ARRAY['foo']));",
+        )
+        .expect("SQL query failed");
         assert_eq!(push_res, true);
-        let pop_res =
-            Spi::get_one::<bool>("SELECT (x).time <= now() AND (x).value = 1 AND (x).tags = ARRAY['foo'] FROM pop_recs() x;")
-            .expect("SQL query failed");
+        let pop_res = Spi::get_one::<bool>(
+            r#"
+            SELECT 
+              (x).time <= now() 
+              AND (x).correlation_value = 1
+              AND (x).tags = ARRAY['foo']
+              AND (x).signal_type = 'metrics'
+              AND (x).job_type = 'compression'
+            FROM pop_recs() x;
+            "#,
+        )
+        .expect("SQL query failed");
         assert_eq!(pop_res, true);
     }
 
     #[pg_test]
     fn test_backend_telemetry_buffer_multiple_roundtrip() {
-        Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 1, ARRAY['1']));")
+        Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 1, NULL, NULL, ARRAY['']));")
             .expect("SQL query failed");
-        Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 2, ARRAY['2']));")
+        Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 2, NULL, NULL, ARRAY['']));")
             .expect("SQL query failed");
-        let pop_res = Spi::get_one::<i32>("SELECT SUM((x).value)::INT FROM pop_recs() x;")
-            .expect("SQL query failed");
+        let pop_res =
+            Spi::get_one::<i32>("SELECT SUM((x).correlation_value)::INT FROM pop_recs() x;")
+                .expect("SQL query failed");
         assert_eq!(pop_res, 3);
     }
 
@@ -225,12 +237,12 @@ mod tests {
             .expect("SQL query failed")
             - 1;
         for _ in 0..n {
-            Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 1, ARRAY[]::text[]));")
+            Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 1, NULL, NULL, ARRAY[]::text[]));")
                 .expect("SQL query failed");
         }
         let pop_res = Spi::get_one::<i32>(
             r#"
-            SELECT SUM(CASE WHEN (x).time > now() THEN 0 ELSE (x).value END)::INT
+            SELECT SUM(CASE WHEN (x).time > now() THEN 0 ELSE (x).correlation_value END)::INT
             FROM pop_recs() x;
             "#,
         )
@@ -244,16 +256,16 @@ mod tests {
             .expect("SQL query failed");
         let overflow = 10;
         for _ in 0..n {
-            Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 1, ARRAY['']));")
+            Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 1, NULL, NULL, ARRAY['']));")
                 .expect("SQL query failed");
         }
         for _ in 0..overflow {
-            Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 2, ARRAY['']));")
+            Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 2, NULL, NULL, ARRAY['']));")
                 .expect("SQL query failed");
         }
         let pop_res = Spi::get_one::<i32>(
             r#"
-            SELECT SUM((x).value)::INT
+            SELECT SUM((x).correlation_value)::INT
             FROM pop_recs() x;
             "#,
         )
@@ -263,7 +275,7 @@ mod tests {
 
     #[pg_test]
     fn test_backend_telemetry_buffer_clean_after_pop() {
-        Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 1, ARRAY['']));")
+        Spi::get_one::<bool>("SELECT push_rec(ROW(now(), 1, 'metrics', 'retention', ARRAY['']));")
             .expect("SQL query failed");
         Spi::get_one::<bool>("SELECT 1 FROM pop_recs() x;").expect("SQL query failed");
         assert!(
