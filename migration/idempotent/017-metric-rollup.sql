@@ -122,7 +122,12 @@ BEGIN
         RETURN;
     END IF;
 
-    CREATE TEMPORARY TABLE pending_registration (
+    DROP TABLE IF EXISTS _pending_registration;
+
+    -- Store metadata for newly created rollups which can be later used for registration in
+    -- prom_api.register_metric_view()
+    CREATE TEMPORARY TABLE _pending_registration (
+        rollup_id BIGINT,
         schema_name TEXT,
         table_name TEXT,
         resolution INTERVAL
@@ -134,14 +139,17 @@ BEGIN
         rollup_view_created := FALSE;
         new_rollups_created := 0;
         FOR m IN
-            select id, metric_name, table_name FROM _prom_catalog.metric where id NOT IN (
-                SELECT metric_id FROM _prom_catalog.metric_rollup WHERE rollup_id = r.id
+            SELECT id, metric_name, table_name FROM _prom_catalog.metric m WHERE NOT is_view AND NOT EXISTS (
+                SELECT 1 FROM _prom_catalog.metric_rollup mr WHERE mr.rollup_id = r.id AND mr.metric_id = id
             ) -- Get metric names that have a pending rollup creation.
         LOOP
             SELECT INTO rollup_view_created _prom_catalog.create_metric_rollup_view(r.schema_name, m.metric_name, m.table_name, r.resolution);
             IF rollup_view_created THEN
                 INSERT INTO _prom_catalog.metric_rollup(rollup_id, metric_id, refresh_pending) VALUES (r.id, m.id, TRUE);
-                INSERT INTO pending_registration values (r.schema_name, m.table_name, r.resolution);
+
+                -- We store in a temp table instead of directly doing PERFORM prom_api.register_metric_view
+                -- otherwise we get an error that the caggs already exists.
+                INSERT INTO _pending_registration(rollup_id, schema_name, table_name, resolution) VALUES (r.id, r.schema_name, m.table_name, r.resolution);
                 new_rollups_created := new_rollups_created + 1;
             END IF;
         END LOOP;
@@ -152,12 +160,12 @@ BEGIN
     SET LOCAL search_path = pg_catalog, pg_temp;
 
     FOR r IN
-        SELECT * FROM pending_registration
+        SELECT * FROM _pending_registration
     LOOP
-        PERFORM prom_api.register_metric_view(r.schema_name, r.table_name, r.resolution, true, false);
+        PERFORM prom_api.register_metric_view(r.schema_name, r.table_name, r.resolution, false, r.rollup_id);
     END LOOP;
 
-    DROP TABLE pending_registration;
+    DROP TABLE _pending_registration;
 
     -- Refresh the newly added rollups for entire duration of data.
     FOR r IN
@@ -167,7 +175,7 @@ BEGIN
                  INNER JOIN _prom_catalog.metric mt ON (mr.metric_id = mt.id)
         WHERE mr.refresh_pending = TRUE
     LOOP
-        CALL public.refresh_continuous_aggregate(r.schema_name || '.' || r.table_name, NULL, NULL);
+        CALL public.refresh_continuous_aggregate(format('%I.%I', r.schema_name, r.table_name), NULL, NULL);
         UPDATE _prom_catalog.metric_rollup SET refresh_pending = FALSE WHERE id = r.id;
         COMMIT;
         SET LOCAL search_path = pg_catalog, pg_temp;
@@ -188,7 +196,7 @@ $$
     BEGIN
         SELECT EXISTS( SELECT 1 FROM _prom_catalog.rollup WHERE name = _name) INTO _exists;
         IF _exists THEN
-            RAISE EXCEPTION 'ERROR: cannot create metric rollup for %. REASON: already exists.', name;
+            RAISE EXCEPTION 'ERROR: cannot create metric rollup for %. REASON: already exists.', _name;
         END IF;
         -- We do not use IF NOT EXISTS (below) since we want to stop creation process if the schema already exists.
         -- This forces the user to delete the conflicting schema before proceeding ahead.
@@ -216,6 +224,7 @@ $$
         IF _rollup_id IS NULL THEN
             RAISE EXCEPTION '% rollup not found', _rollup_name;
         END IF;
+        DELETE FROM _prom_catalog.metric WHERE rollup_id = _rollup_id; -- Delete all entries that were created due to this _rollup_name.
         DELETE FROM _prom_catalog.metric_rollup WHERE rollup_id = _rollup_id;
         DELETE FROM _prom_catalog.rollup WHERE id = _rollup_id;
         EXECUTE FORMAT('DROP SCHEMA %I CASCADE', _rollup_schema_name);
@@ -268,7 +277,7 @@ END;
 $$;
 
 -- TODO: Temporary utilities for creation of metric rollups. These MUST be removed once we have SQL aggregate in Rust,
--- since their behaviour is unreliable
+-- since their behaviour is unreliable.
 CREATE FUNCTION _prom_catalog.counter_reset_sum(v DOUBLE PRECISION[]) RETURNS DOUBLE PRECISION
     SET search_path = pg_catalog, pg_temp
 AS

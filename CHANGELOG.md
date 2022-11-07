@@ -23,6 +23,7 @@ We use the following categories for changes:
 ### Added
 
 - Support to create and delete metric rollups based on metric types [#538] 
+- Support for maintenance of Metric-rollups and Caggs for downsampling [#554]
 
 ## [0.7.0 - 2022-10-03]
 
