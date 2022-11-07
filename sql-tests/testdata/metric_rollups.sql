@@ -21,8 +21,12 @@ SELECT EXISTS(SELECT schema_name FROM information_schema.schemata WHERE schema_n
 -- Ensure the state before scanning for new rollups.
 SELECT * from _prom_catalog.metric_rollup;
 
+SELECT * FROM _prom_catalog.metric;
+
 -- Scan and create the Caggs.
 CALL _prom_catalog.scan_for_new_rollups(1, '{}'::jsonb);
+
+SELECT * FROM _prom_catalog.metric;
 
 -- Ensure the state after scanning for new rollups.
 SELECT * from _prom_catalog.metric_rollup;
@@ -33,4 +37,5 @@ CALL _prom_catalog.delete_rollup('test');
 -- Nothing should exist.
 SELECT * from _prom_catalog.rollup;
 SELECT * from _prom_catalog.metric_rollup;
+SELECT * FROM _prom_catalog.metric;
 SELECT EXISTS(SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'ps_test');

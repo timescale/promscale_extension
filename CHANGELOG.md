@@ -34,6 +34,7 @@ We use the following categories for changes:
 ### Fixed
 - Column conflict when creating a metric view with a label called `series` [#559]
 - Support to create and delete metric rollups based on metric types [#538]
+- Support for maintenance of Metric-rollups and Caggs for downsampling [#554]
 
 ## [0.7.0 - 2022-10-03]
 

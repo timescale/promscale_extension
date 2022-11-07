@@ -135,7 +135,7 @@ function void **prom_api.promscale_post_restore**()
 ### prom_api.register_metric_view
 
 ```
-function boolean **prom_api.register_metric_view**(schema_name text, view_name text, if_not_exists boolean DEFAULT false)
+function boolean **prom_api.register_metric_view**(schema_name text, view_name text, refresh_interval interval, if_not_exists boolean DEFAULT false, rollup_id bigint DEFAULT NULL::bigint)
 ```
 ### prom_api.reset_metric_chunk_interval
 resets the chunk interval for a specific metric to using the default
@@ -527,6 +527,12 @@ function integer **_prom_catalog.count_jsonb_keys**(j jsonb)
 ```
 function double precision **_prom_catalog.counter_reset_sum**(v double precision[])
 ```
+### _prom_catalog.create_cagg_refresh_job_if_not_exists
+Creates a Cagg refresh job that refreshes all Caggs registered by register_metric_view().
+This function creates a refresh job only if no execute_caggs_refresh_policy() exists currently with the given refresh_interval.
+```
+function void **_prom_catalog.create_cagg_refresh_job_if_not_exists**(_refresh_interval interval)
+```
 ### _prom_catalog.create_exemplar_table_if_not_exists
 
 ```
@@ -646,6 +652,32 @@ procedure void **_prom_catalog.drop_metric_chunks**(IN schema_name text, IN metr
 ABORT an INSERT transaction due to the ID epoch being out of date
 ```
 function void **_prom_catalog.epoch_abort**(user_epoch bigint)
+```
+### _prom_catalog.execute_caggs_compression_policy
+execute_caggs_compression_policy is responsible to compress Caggs registered via
+register_metric_view() in _prom_catalog.metric. It goes through all the entries in the _prom_catalog.metric and tries to compress any Cagg that supports compression.
+These include metric-rollups and custom Caggs based downsampling.
+Note: execute_caggs_compression_policy runs every X interval and compresses only the inactive chunks of those Caggs which have timescaledb.compress = true.
+By default, these include metric-rollups.
+```
+procedure void **_prom_catalog.execute_caggs_compression_policy**(IN job_id integer, IN config jsonb)
+```
+### _prom_catalog.execute_caggs_refresh_policy
+execute_caggs_refresh_policy runs every refresh_interval passed in config. Its
+main aim is to refresh those Caggs that have been registered under _prom_catalog.metric and whose view_refresh_interval
+matches the given refresh_interval. It refreshes 2 kinds of Caggs:
+1. Caggs created by metric rollups
+2. Custom Caggs created by the user
+```
+procedure void **_prom_catalog.execute_caggs_refresh_policy**(IN job_id integer, IN config jsonb)
+```
+### _prom_catalog.execute_caggs_retention_policy
+execute_caggs_retention_policy is responsible to perform retention behaviour on compress continuous aggregates registered via
+register_metric_view(). It loops through all entries in the _prom_catalog.metric that are Caggs and tries to delete the stale chunks of those Caggs.
+The staleness is determined by rollup_retention (for metric rollups) and default_retention_period of parent hypertable (for custom Caggs).
+These include metric-rollups and custom Caggs based downsampling.
+```
+procedure void **_prom_catalog.execute_caggs_retention_policy**(IN job_id integer, IN config jsonb)
 ```
 ### _prom_catalog.execute_compression_policy
 compress data according to the policy. This procedure should be run regularly in a cron job

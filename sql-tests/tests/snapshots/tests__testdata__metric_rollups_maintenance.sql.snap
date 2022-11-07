@@ -1,0 +1,50 @@
+---
+source: sql-tests/tests/tests.rs
+expression: query_result
+---
+ plan 
+------
+ 1..8
+(1 row)
+
+ set_default_chunk_interval 
+----------------------------
+ t
+(1 row)
+
+psql:testdata/metric_rollups_maintenance.sql:15: NOTICE:  table "_pending_registration" does not exist, skipping
+                 ok                 
+------------------------------------
+ ok 1 - samples in 5m metric-rollup
+(1 row)
+
+                 ok                 
+------------------------------------
+ ok 2 - samples in 1h metric-rollup
+(1 row)
+
+  ok  
+------
+ ok 3
+(1 row)
+
+  ok  
+------
+ ok 4
+(1 row)
+
+  ok  
+------
+ ok 5
+(1 row)
+
+  ok  
+------
+ ok 6
+(1 row)
+
+ finish 
+--------
+(0 rows)
+
+

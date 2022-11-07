@@ -27,14 +27,26 @@ CALL
 ----+-----------+-----------+-----------------
 (0 rows)
 
-psql:testdata/metric_rollups.sql:25: NOTICE:  continuous aggregate "test" is already up-to-date
+ id | metric_name | table_name | creation_completed | default_chunk_interval | retention_period | default_compression | delay_compression_until | table_schema | series_table | is_view | view_refresh_interval | rollup_id 
+----+-------------+------------+--------------------+------------------------+------------------+---------------------+-------------------------+--------------+--------------+---------+-----------------------+-----------
+  1 | test        | test       | f                  | t                      |                  | t                   |                         | prom_data    | test         | f       |                       |          
+(1 row)
+
+psql:testdata/metric_rollups.sql:27: NOTICE:  table "_pending_registration" does not exist, skipping
+psql:testdata/metric_rollups.sql:27: NOTICE:  continuous aggregate "test" is already up-to-date
 CALL
+ id | metric_name | table_name | creation_completed | default_chunk_interval | retention_period | default_compression | delay_compression_until | table_schema | series_table | is_view | view_refresh_interval | rollup_id 
+----+-------------+------------+--------------------+------------------------+------------------+---------------------+-------------------------+--------------+--------------+---------+-----------------------+-----------
+  1 | test        | test       | f                  | t                      |                  | t                   |                         | prom_data    | test         | f       |                       |          
+  2 | test        | test       | t                  | t                      |                  | t                   |                         | ps_test      | test         | t       | 00:05:00              |         1
+(2 rows)
+
  id | rollup_id | metric_id | refresh_pending 
 ----+-----------+-----------+-----------------
   1 |         1 |         1 | f
 (1 row)
 
-psql:testdata/metric_rollups.sql:31: NOTICE:  drop cascades to view ps_test.test
+psql:testdata/metric_rollups.sql:35: NOTICE:  drop cascades to view ps_test.test
 CALL
  id | name | schema_name | resolution | retention 
 ----+------+-------------+------------+-----------
@@ -43,6 +55,11 @@ CALL
  id | rollup_id | metric_id | refresh_pending 
 ----+-----------+-----------+-----------------
 (0 rows)
+
+ id | metric_name | table_name | creation_completed | default_chunk_interval | retention_period | default_compression | delay_compression_until | table_schema | series_table | is_view | view_refresh_interval | rollup_id 
+----+-------------+------------+--------------------+------------------------+------------------+---------------------+-------------------------+--------------+--------------+---------+-----------------------+-----------
+  1 | test        | test       | f                  | t                      |                  | t                   |                         | prom_data    | test         | f       |                       |          
+(1 row)
 
  exists 
 --------
