@@ -1,0 +1,61 @@
+---
+source: sql-tests/tests/tests.rs
+expression: query_result
+---
+ plan  
+-------
+ 1..10
+(1 row)
+
+  ok  
+------
+ ok 1
+(1 row)
+
+  ok  
+------
+ ok 2
+(1 row)
+
+psql:testdata/metric_rollups_refresh.sql:17: NOTICE:  table "_pending_registration" does not exist, skipping
+  ok  
+------
+ ok 3
+(1 row)
+
+  ok  
+------
+ ok 4
+(1 row)
+
+                 ok                 
+------------------------------------
+ ok 5 - samples in 5m metric-rollup
+(1 row)
+
+                 ok                 
+------------------------------------
+ ok 6 - samples in 1h metric-rollup
+(1 row)
+
+                 ok                 
+------------------------------------
+ ok 7 - samples in 5m metric-rollup
+(1 row)
+
+                 ok                 
+------------------------------------
+ ok 8 - samples in 1h metric-rollup
+(1 row)
+
+                 ok                 
+------------------------------------
+ ok 9 - samples in 5m metric-rollup
+(1 row)
+
+                 ok                  
+-------------------------------------
+ ok 10 - samples in 1h metric-rollup
+(1 row)
+
+

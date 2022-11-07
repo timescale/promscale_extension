@@ -2563,7 +2563,7 @@ LANGUAGE PLPGSQL;
 REVOKE ALL ON FUNCTION _prom_catalog.create_metric_view(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION _prom_catalog.create_metric_view(text) TO prom_writer;
 
-CREATE OR REPLACE FUNCTION prom_api.register_metric_view(schema_name text, view_name text, refresh_interval INTERVAL, for_rollups BOOLEAN = false, if_not_exists BOOLEAN = false)
+CREATE OR REPLACE FUNCTION prom_api.register_metric_view(schema_name text, view_name text, refresh_interval INTERVAL, if_not_exists BOOLEAN = false, rollup_id BIGINT = NULL)
     RETURNS BOOLEAN
     SECURITY DEFINER
     VOLATILE
@@ -2589,12 +2589,22 @@ BEGIN
         RAISE EXCEPTION 'cannot register metric view in prom_data schema';
     END IF;
 
-    IF for_rollups THEN
+    IF rollup_id IS NOT NULL THEN
+        -- Check if the materialized view is at least created.
+        PERFORM 1 FROM pg_views WHERE viewname = view_name AND schemaname = schema_name;
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'No materialized view like %.% found', schema_name, view_name;
+        END IF;
+
+        IF refresh_interval IS NULL THEN
+            RAISE EXCEPTION 'refresh_interval must not be null for rollup views';
+        END IF;
+
         -- We do not do the checks offered by get_first_level_view_on_metric() for metric-rollups
         -- because those checks are not meant for Caggs with timescaledb.materialized_only = true.
         --
         -- Since metric-rollups are an internal creation of Caggs, we should be fine with not doing
-        -- safety checks.
+        -- "strict" safety checks.
         metric_table_name := view_name;
         agg_name := view_name;
         agg_schema := schema_name;
@@ -2611,30 +2621,27 @@ BEGIN
     END IF;
 
     -- check if the view contains necessary columns with the correct types
-    SELECT count(*) FROM information_schema.columns
-    INTO column_count
+    SELECT count(*) INTO column_count FROM information_schema.columns
     WHERE table_schema = register_metric_view.schema_name
-    AND table_name   = register_metric_view.view_name
+    AND table_name = register_metric_view.view_name
     AND ((column_name = 'time' AND data_type = 'timestamp with time zone')
     OR (column_name = 'series_id' AND data_type = 'bigint')
     OR data_type = 'double precision');
-
-    -- We only handle automatic refresh if refresh_interval is applied. Otherwise
-    -- we ask the user to care about refreshing this Cagg.
-    IF refresh_interval IS NULL THEN
-        RAISE NOTICE 'Automatic refresh is disabled since refresh_interval is NULL. Please create refresh policy for this Cagg';
-    ELSE
-        CALL _prom_catalog.create_cagg_refresh_job(refresh_interval);
-    END IF;
 
     IF column_count < 3 THEN
         RAISE EXCEPTION 'view must contain time (data type: timestamp with time zone), series_id (data type: bigint), and at least one column with double precision data type';
     END IF;
 
+    IF refresh_interval IS NULL THEN
+        -- When a non-metric-rollup Cagg is created, we should inform the user that he needs to create a refresh policy himself.
+        RAISE NOTICE 'Automatic refresh is disabled since refresh_interval is NULL. Please create refresh policy for this Cagg';
+    ELSE
+        PERFORM _prom_catalog.create_cagg_refresh_job_if_not_exists(refresh_interval);
+    END IF;
+
     -- insert into metric table
---     raise warning 'view_name -> %, view_name -> %, schema_name -> %, metric_table_name -> %, refresh_interval -> %', register_metric_view.view_name, register_metric_view.view_name, register_metric_view.schema_name, metric_table_name, refresh_interval;
-    INSERT INTO _prom_catalog.metric (metric_name, table_name, table_schema, series_table, is_view, creation_completed, view_refresh_interval)
-    VALUES (register_metric_view.view_name, register_metric_view.view_name, register_metric_view.schema_name, metric_table_name, true, true, refresh_interval)
+    INSERT INTO _prom_catalog.metric (metric_name, table_name, table_schema, series_table, is_view, creation_completed, view_refresh_interval, rollup_id)
+    VALUES (register_metric_view.view_name, register_metric_view.view_name, register_metric_view.schema_name, metric_table_name, true, true, refresh_interval, register_metric_view.rollup_id)
     ON CONFLICT DO NOTHING;
 
     IF NOT FOUND THEN
@@ -2659,8 +2666,8 @@ END
 $func$
 LANGUAGE PLPGSQL;
 --redundant given schema settings but extra caution for security definers
-REVOKE ALL ON FUNCTION prom_api.register_metric_view(text, text, interval, boolean, boolean) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION prom_api.register_metric_view(text, text, interval, boolean, boolean) TO prom_admin;
+REVOKE ALL ON FUNCTION prom_api.register_metric_view(text, text, interval, boolean, bigint) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION prom_api.register_metric_view(text, text, interval, boolean, bigint) TO prom_admin;
 
 CREATE OR REPLACE FUNCTION prom_api.unregister_metric_view(schema_name text, view_name text, if_exists BOOLEAN = false)
     RETURNS BOOLEAN
