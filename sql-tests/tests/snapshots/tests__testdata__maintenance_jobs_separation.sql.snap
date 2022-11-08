@@ -1,0 +1,64 @@
+---
+source: sql-tests/tests/tests.rs
+expression: query_result
+---
+ plan 
+------
+ 1..5
+(1 row)
+
+  ok  
+------
+ ok 1
+(1 row)
+
+ add_job 
+---------
+    1009
+(1 row)
+
+ add_job 
+---------
+    1010
+(1 row)
+
+ config_maintenance_jobs 
+-------------------------
+ t
+(1 row)
+
+  ok  
+------
+ ok 2
+(1 row)
+
+  ok  
+------
+ ok 3
+(1 row)
+
+ config_maintenance_jobs 
+-------------------------
+ t
+(1 row)
+
+  ok  
+------
+ ok 4
+(1 row)
+
+ config_maintenance_jobs 
+-------------------------
+ t
+(1 row)
+
+  ok  
+------
+ ok 5
+(1 row)
+
+ finish 
+--------
+(0 rows)
+
+

@@ -16,6 +16,11 @@ We use the following categories for changes:
 
 ### Changed
 
+- Maintenance jobs were separated from one another. The bejaviour of the old 
+  `prom_api.config_maintenance_jobs` call changed and it sets identical parameters
+  for each job type (e.g. parallism 2 means each job type has 2 jobs, not 2 jobs in total).
+  There is also the new `prom_api.config_maintenance_jobs` that allows configuring
+  them individually.
 - Removed disk size related columns from `prom_info.metric`. 
   Added `prom_info.metric_detail` which includes the disk size related columns. 
   Improved the performance of these. [#547]
