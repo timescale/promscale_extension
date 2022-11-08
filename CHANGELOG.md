@@ -20,7 +20,8 @@ We use the following categories for changes:
   `prom_api.config_maintenance_jobs` call changed and it sets identical parameters
   for each job type (e.g. parallism 2 means each job type has 2 jobs, not 2 jobs in total).
   There is also the new `prom_api.config_maintenance_jobs` that allows configuring
-  them individually.
+  them individually. Finally, the new default worker allocation is 2 metrics retention
+  jobs, 1 job for metrics compression and 1 job for traces retention. [#555]
 - Removed disk size related columns from `prom_info.metric`. 
   Added `prom_info.metric_detail` which includes the disk size related columns. 
   Improved the performance of these. [#547]
