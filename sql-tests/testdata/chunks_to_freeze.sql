@@ -8,7 +8,7 @@ select * from plan(5);
 create table metric1(id int, t timestamptz not null, val double precision) with (autovacuum_enabled = 'off');
 select create_hypertable('metric1'::regclass, 't', chunk_time_interval=>'5 minutes'::interval);
 alter table metric1 set (timescaledb.compress, timescaledb.compress_segmentby = 'id');
-select add_compression_policy('metric1', INTERVAL '7 days');
+select 1 as add_compression_policy from add_compression_policy('metric1', INTERVAL '7 days');
 
 -- load it with data
 select format($$insert into metric1 (id, t, val) values (%L, %L, %L)$$
@@ -24,7 +24,7 @@ cross join generate_series(1, 50) t
 create table metric2(id int, t timestamptz not null, val double precision) with (autovacuum_enabled = 'off');
 select create_hypertable('metric2'::regclass, 't', chunk_time_interval=>'5 minutes'::interval);
 alter table metric2 set (timescaledb.compress, timescaledb.compress_segmentby = 'id');
-select add_compression_policy('metric2', INTERVAL '7 days');
+select 1 as add_compression_policy from add_compression_policy('metric2', INTERVAL '7 days');
 
 -- load it with data
 select format($$insert into metric2 (id, t, val) values (%L, %L, %L)$$
