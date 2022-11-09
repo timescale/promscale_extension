@@ -7,9 +7,14 @@
 procedure void **prom_api.add_prom_node**(IN node_name text, IN attach_to_existing_metrics boolean DEFAULT true)
 ```
 ### prom_api.config_maintenance_jobs
-Configure the number of maintenance jobs run by the job scheduler, as well as their scheduled interval
+Configure the number of maintenance jobs run by the job scheduler, as well as their scheduled interval. Sets identical settings for all job types.
 ```
 function boolean **prom_api.config_maintenance_jobs**(number_jobs integer, new_schedule_interval interval, new_config jsonb DEFAULT NULL::jsonb)
+```
+### prom_api.config_maintenance_jobs
+Configure the number of maintenance jobs run by the job scheduler, as well as their scheduled interval
+```
+function boolean **prom_api.config_maintenance_jobs**(signal _ps_catalog.signal_type, job_type _ps_catalog.job_type, number_jobs integer, new_schedule_interval interval, new_config jsonb DEFAULT NULL::jsonb)
 ```
 ### prom_api.drop_metric
 
@@ -32,9 +37,15 @@ returns true if the label array and matchers are equal, there should not be a ma
 function boolean **prom_api.eq**(labels1 label_array, matchers matcher_positive)
 ```
 ### prom_api.execute_maintenance
-Execute maintenance tasks like dropping data according to retention policy. This procedure should be run regularly in a cron job
+Execute maintenance tasks like dropping data according to retention policy.
+ This function exists for backwards compatiblity and executes all types of jobs except trace compression at once
 ```
 procedure void **prom_api.execute_maintenance**(IN log_verbose boolean DEFAULT false)
+```
+### prom_api.execute_maintenance
+Executes a specified maintenance job type like dropping data according to retention policy. This procedure should be run regularly in a cron job
+```
+procedure void **prom_api.execute_maintenance**(IN signal _ps_catalog.signal_type, IN job_type _ps_catalog.job_type, IN log_verbose boolean DEFAULT false)
 ```
 ### prom_api.get_default_chunk_interval
 Get the default chunk interval for all metrics

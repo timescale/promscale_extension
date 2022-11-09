@@ -444,12 +444,25 @@ COMMENT ON PROCEDURE _prom_catalog.execute_data_retention_policy(boolean)
 IS 'drops old data according to the data retention policy. This procedure should be run regularly in a cron job';
 GRANT EXECUTE ON PROCEDURE _prom_catalog.execute_data_retention_policy(boolean) TO prom_maintenance;
 
+CREATE OR REPLACE PROCEDURE prom_api.execute_maintenance(log_verbose boolean = false)
+AS $$
+BEGIN
+    CALL prom_api.execute_maintenance('metrics', 'retention', log_verbose);
+    CALL prom_api.execute_maintenance('traces', 'retention', log_verbose);
+    CALL prom_api.execute_maintenance('metrics', 'compression', log_verbose);
+END;
+$$ LANGUAGE PLPGSQL;
+COMMENT ON PROCEDURE prom_api.execute_maintenance(boolean)
+IS 'Execute maintenance tasks like dropping data according to retention policy.
+ This function exists for backwards compatiblity and executes all types of jobs except trace compression at once';
+GRANT EXECUTE ON PROCEDURE prom_api.execute_maintenance(boolean) TO prom_maintenance;
+
 --public procedure to be called by cron
---right now just does data retention but name is generic so that
---we can add stuff later without needing people to change their cron scripts
 --should be the last thing run in a session so that all session locks
 --are guaranteed released on error.
-CREATE OR REPLACE PROCEDURE prom_api.execute_maintenance(log_verbose boolean = false)
+CREATE OR REPLACE PROCEDURE prom_api.execute_maintenance(signal _ps_catalog.signal_type,
+                                                         job_type _ps_catalog.job_type,
+                                                         log_verbose boolean = false)
 AS $$
 DECLARE
    startT TIMESTAMPTZ;
@@ -460,40 +473,44 @@ BEGIN
 
     startT := clock_timestamp();
     IF log_verbose THEN
-        RAISE LOG 'promscale maintenance: data retention: starting';
+        RAISE LOG 'promscale maintenance: % %: starting', signal, job_type;
     END IF;
 
-    PERFORM _prom_catalog.set_app_name( format('promscale maintenance: data retention'));
-    CALL _prom_catalog.execute_data_retention_policy(log_verbose=>log_verbose);
-    CALL _ps_trace.execute_data_retention_policy(log_verbose=>log_verbose);
-
-    IF NOT _prom_catalog.is_timescaledb_oss() THEN
-        IF log_verbose THEN
-            RAISE LOG 'promscale maintenance: compression: starting';
+    IF job_type = 'retention' THEN
+        PERFORM _prom_catalog.set_app_name('promscale maintenance: data retention');
+        IF signal = 'metrics' THEN
+            CALL _prom_catalog.execute_data_retention_policy(log_verbose=>log_verbose);
         END IF;
+        IF signal = 'traces' THEN
+            CALL _ps_trace.execute_data_retention_policy(log_verbose=>log_verbose);
+        END IF;
+    END IF;
 
-        PERFORM _prom_catalog.set_app_name( format('promscale maintenance: compression'));
+    IF NOT _prom_catalog.is_timescaledb_oss() AND job_type = 'compression' THEN
+        PERFORM _prom_catalog.set_app_name('promscale maintenance: compression');
         CALL _prom_catalog.execute_compression_policy(log_verbose=>log_verbose);
     END IF;
 
     IF log_verbose THEN
-        RAISE LOG 'promscale maintenance: finished in %', clock_timestamp()-startT;
+        RAISE LOG 'promscale maintenance: % % finished in %', signal, job_type, clock_timestamp()-startT;
     END IF;
 
     IF clock_timestamp()-startT > INTERVAL '12 hours' THEN
-        RAISE WARNING 'promscale maintenance jobs are taking too long (one run took %)', clock_timestamp()-startT
+        RAISE WARNING 'promscale maintenance % % job took too long (%)', signal, job_type, clock_timestamp()-startT
               USING HINT = 'Please consider increasing the number of maintenance jobs using config_maintenance_jobs()';
     END IF;
 END;
 $$ LANGUAGE PLPGSQL;
-COMMENT ON PROCEDURE prom_api.execute_maintenance(boolean)
-IS 'Execute maintenance tasks like dropping data according to retention policy. This procedure should be run regularly in a cron job';
-GRANT EXECUTE ON PROCEDURE prom_api.execute_maintenance(boolean) TO prom_maintenance;
+COMMENT ON PROCEDURE prom_api.execute_maintenance(_ps_catalog.signal_type, _ps_catalog.job_type, boolean)
+IS 'Executes a specified maintenance job type like dropping data according to retention policy. This procedure should be run regularly in a cron job';
+GRANT EXECUTE ON PROCEDURE prom_api.execute_maintenance(_ps_catalog.signal_type, _ps_catalog.job_type, boolean) TO prom_maintenance;
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.execute_maintenance_job(job_id int, config jsonb)
 AS $$
 DECLARE
    log_verbose boolean;
+   signal _ps_catalog.signal_type;
+   job_type _ps_catalog.job_type;
    ae_key text;
    ae_value text;
    ae_load boolean := FALSE;
@@ -502,6 +519,8 @@ BEGIN
     -- and we can _only_ use SET LOCAL in a procedure which _does_ transaction control
     SET LOCAL search_path = pg_catalog, pg_temp;
     log_verbose := coalesce(config->>'log_verbose', 'false')::boolean;
+    signal := coalesce(config->>'signal', 'metrics')::_ps_catalog.signal_type;
+    job_type := coalesce(config->>'type', 'retention')::_ps_catalog.job_type;
 
     --if auto_explain enabled in config, turn it on in a best-effort way
     --i.e. if it fails (most likely due to lack of superuser priviliges) move on anyway.
@@ -521,7 +540,7 @@ BEGIN
     END;
 
 
-    CALL prom_api.execute_maintenance(log_verbose=>log_verbose);
+    CALL prom_api.execute_maintenance(signal, job_type, log_verbose=>log_verbose);
 END
 $$ LANGUAGE PLPGSQL;
 GRANT EXECUTE ON PROCEDURE _prom_catalog.execute_maintenance_job(int, jsonb) TO prom_maintenance;
@@ -533,34 +552,10 @@ CREATE OR REPLACE FUNCTION prom_api.config_maintenance_jobs(number_jobs int, new
     VOLATILE
     SET search_path = pg_catalog, pg_temp
 AS $func$
-DECLARE
-  cnt int;
-  log_verbose boolean;
 BEGIN
-    --check format of config
-    log_verbose := coalesce(new_config->>'log_verbose', 'false')::boolean;
-
-    PERFORM public.delete_job(job_id)
-    FROM timescaledb_information.jobs
-    WHERE proc_schema = '_prom_catalog' AND proc_name = 'execute_maintenance_job' AND (schedule_interval != new_schedule_interval OR new_config IS DISTINCT FROM config) ;
-
-
-    SELECT count(*) INTO cnt
-    FROM timescaledb_information.jobs
-    WHERE proc_schema = '_prom_catalog' AND proc_name = 'execute_maintenance_job';
-
-    IF cnt < number_jobs THEN
-        PERFORM public.add_job('_prom_catalog.execute_maintenance_job', new_schedule_interval, config=>new_config)
-        FROM generate_series(1, number_jobs-cnt);
-    END IF;
-
-    IF cnt > number_jobs THEN
-        PERFORM public.delete_job(job_id)
-        FROM timescaledb_information.jobs
-        WHERE proc_schema = '_prom_catalog' AND proc_name = 'execute_maintenance_job'
-        LIMIT (cnt-number_jobs);
-    END IF;
-
+    PERFORM prom_api.config_maintenance_jobs('metrics', 'retention', number_jobs, new_schedule_interval, new_config);
+    PERFORM prom_api.config_maintenance_jobs('traces', 'retention', number_jobs, new_schedule_interval, new_config);
+    PERFORM prom_api.config_maintenance_jobs('metrics', 'compression', number_jobs, new_schedule_interval, new_config);
     RETURN TRUE;
 END
 $func$
@@ -569,6 +564,73 @@ LANGUAGE PLPGSQL;
 REVOKE ALL ON FUNCTION prom_api.config_maintenance_jobs(int, interval, jsonb) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION prom_api.config_maintenance_jobs(int, interval, jsonb) TO prom_admin;
 COMMENT ON FUNCTION prom_api.config_maintenance_jobs(int, interval, jsonb)
+IS 'Configure the number of maintenance jobs run by the job scheduler, as well as their scheduled interval. Sets identical settings for all job types.';
+
+CREATE OR REPLACE FUNCTION prom_api.config_maintenance_jobs(signal _ps_catalog.signal_type,
+                                                            job_type _ps_catalog.job_type, 
+                                                            number_jobs int,
+                                                            new_schedule_interval interval, 
+                                                            new_config jsonb = NULL)
+    RETURNS BOOLEAN
+    --security definer to add jobs as the logged-in user
+    SECURITY DEFINER
+    VOLATILE
+    SET search_path = pg_catalog, pg_temp
+AS $func$
+DECLARE
+  cnt int;
+  log_verbose boolean;
+  final_config jsonb;
+BEGIN
+    --check format of config
+    log_verbose := coalesce(new_config->>'log_verbose', 'false')::boolean;
+    final_config := coalesce(new_config, '{}'::jsonb) || jsonb_build_object('signal', signal::text) || jsonb_build_object('type', job_type::text);
+
+    -- delete jobs with the old config style
+    PERFORM public.delete_job(job_id)
+    FROM timescaledb_information.jobs
+    WHERE proc_schema = '_prom_catalog' 
+      AND proc_name = 'execute_maintenance_job' 
+      AND NOT coalesce(config, '{}'::jsonb) ?& ARRAY['signal', 'type'];
+
+    PERFORM public.delete_job(job_id)
+    FROM timescaledb_information.jobs
+    WHERE proc_schema = '_prom_catalog' 
+      AND proc_name = 'execute_maintenance_job' 
+      AND coalesce(config->>'signal', '') = signal::text
+      AND coalesce(config->>'type', '') = job_type::text
+      AND (schedule_interval != new_schedule_interval OR final_config IS DISTINCT FROM config);
+
+    SELECT count(*) INTO cnt
+    FROM timescaledb_information.jobs
+    WHERE proc_schema = '_prom_catalog'
+      AND proc_name = 'execute_maintenance_job'
+      AND coalesce(config->>'signal', '') = signal::text
+      AND coalesce(config->>'type', '') = job_type::text;
+
+    IF cnt < number_jobs THEN
+        PERFORM public.add_job('_prom_catalog.execute_maintenance_job', new_schedule_interval, config=>final_config)
+        FROM generate_series(1, number_jobs-cnt);
+    END IF;
+
+    IF cnt > number_jobs THEN
+        PERFORM public.delete_job(job_id)
+        FROM timescaledb_information.jobs
+        WHERE proc_schema = '_prom_catalog'
+          AND proc_name = 'execute_maintenance_job'
+          AND coalesce(config->>'signal', '') = signal::text
+          AND coalesce(config->>'type', '') = job_type::text
+        LIMIT (cnt-number_jobs);
+    END IF;
+
+    RETURN TRUE;
+END
+$func$
+LANGUAGE PLPGSQL;
+--redundant given schema settings but extra caution for security definers
+REVOKE ALL ON FUNCTION prom_api.config_maintenance_jobs(_ps_catalog.signal_type, _ps_catalog.job_type, int, interval, jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION prom_api.config_maintenance_jobs(_ps_catalog.signal_type, _ps_catalog.job_type, int, interval, jsonb) TO prom_admin;
+COMMENT ON FUNCTION prom_api.config_maintenance_jobs(_ps_catalog.signal_type, _ps_catalog.job_type, int, interval, jsonb)
 IS 'Configure the number of maintenance jobs run by the job scheduler, as well as their scheduled interval';
 
 CREATE OR REPLACE FUNCTION prom_api.promscale_post_restore()
