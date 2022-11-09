@@ -14,7 +14,7 @@ expression: query_result
 
  add_compression_policy 
 ------------------------
-                   1009
+                      1
 (1 row)
 
    create_hypertable   
@@ -24,7 +24,7 @@ expression: query_result
 
  add_compression_policy 
 ------------------------
-                   1010
+                      1
 (1 row)
 
          isnt_empty         

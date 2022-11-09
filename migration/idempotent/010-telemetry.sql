@@ -100,6 +100,20 @@ $$
         SELECT _prom_catalog.get_default_value('chunk_interval') INTO result;
         PERFORM _ps_catalog.apply_telemetry('metrics_default_chunk_interval', result);
 
+        IF ( SELECT count(*)>0 FROM _prom_catalog.metric WHERE metric_name = 'prometheus_tsdb_head_series' ) THEN
+            -- Calculate active series in Promscale. This is done by taking the help of the Prometheus metric 'prometheus_tsdb_head_series'.
+            -- An active series for Promscale is basically sum of active series of all Prometheus instances writing into Promscale
+            -- within the last 30 minutes at least.
+            SELECT sum(active_series)::TEXT INTO result FROM
+            (
+                SELECT
+                    series_id, public.last(value, time) AS active_series
+                FROM prom_data.prometheus_tsdb_head_series
+                    WHERE time > now() - INTERVAL '30 minutes' GROUP BY series_id
+            ) a;
+            PERFORM _ps_catalog.apply_telemetry('metrics_active_series', result);
+        END IF;
+
         -- Traces telemetry.
         SELECT (CASE
                     WHEN n_distinct >= 0 THEN
@@ -129,6 +143,9 @@ $$
 
         SELECT count(*)::TEXT INTO result FROM timescaledb_information.data_nodes;
         PERFORM _ps_catalog.apply_telemetry('db_node_count', result);
+
+        SELECT current_timestamp::TEXT INTO result; -- UTC timestamp.
+        PERFORM _ps_catalog.apply_telemetry('telemetry_last_updated', result);
     END;
 $$
 LANGUAGE PLPGSQL;
