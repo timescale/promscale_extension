@@ -447,9 +447,9 @@ GRANT EXECUTE ON PROCEDURE _prom_catalog.execute_data_retention_policy(boolean) 
 CREATE OR REPLACE PROCEDURE prom_api.execute_maintenance(log_verbose boolean = false)
 AS $$
 BEGIN
-    CALL prom_api.execute_maintenance('metrics', 'compression', log_verbose);
     CALL prom_api.execute_maintenance('metrics', 'retention', log_verbose);
     CALL prom_api.execute_maintenance('traces', 'retention', log_verbose);
+    CALL prom_api.execute_maintenance('metrics', 'compression', log_verbose);
 END;
 $$ LANGUAGE PLPGSQL;
 COMMENT ON PROCEDURE prom_api.execute_maintenance(boolean)

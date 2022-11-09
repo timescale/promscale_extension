@@ -1,8 +1,10 @@
 CREATE TYPE _ps_catalog.signal_type
      AS ENUM ('metrics', 'traces');
+GRANT USAGE ON TYPE _ps_catalog.signal_type TO prom_maintenance;
 
 CREATE TYPE _ps_catalog.job_type
      AS ENUM ('retention', 'compression');
+GRANT USAGE ON TYPE _ps_catalog.job_type TO prom_maintenance;
 
 --add jobs for each workload executing every 30 min by default 
 DO $$
