@@ -15,11 +15,10 @@ RUN <<EOF
 export OS_NAME="$(source /etc/os-release; echo "${ID}")"
 export OS_VERSION="$(source /etc/os-release; echo "${VERSION_ID}")"
 
-yum update -y
-
 # Version-specific dependencies
 case "${OS_VERSION}" in
     7)
+        yum update -y
         yum install -y epel-release scl-utils centos-release-scl centos-release-scl-rh
         yum install -y rh-ruby23 llvm-toolset-7
         # Activate rh-ruby23 and llvm-toolset-7 in the current shell session
@@ -35,7 +34,13 @@ case "${OS_VERSION}" in
         chmod a+x /etc/scl_enable
         ;;
     8|9)
+        pushd /etc/yum.repos.d/
+        sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
+        sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
+        popd
+        yum update -y
         yum install -y epel-release rubygems ruby-devel
+        yum -y install glibc-locale-source glibc-langpack-en
         ;;
     *)
         if [ "${OS_NAME}" = "fedora" ]; then

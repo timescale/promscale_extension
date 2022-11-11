@@ -39,6 +39,12 @@ jobs:
           pkg_cloud_tags:
             - el/7
           pkg_type: rpm
+        - name: linux
+          distro: centos
+          version: 8
+          pkg_cloud_tags:
+            - el/8
+          pkg_type: rpm          
         postgres:
         - version: "12"
         - version: "13"
