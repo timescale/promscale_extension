@@ -29,6 +29,10 @@ We use the following categories for changes:
 ### Added
 - Telemetry for active series and last updated [#534]
 
+### Fixed
+- Column conflict when creating a metric view with a label called `series`
+  [#559]
+
 ## [0.7.0 - 2022-10-03]
 
 ### Added
