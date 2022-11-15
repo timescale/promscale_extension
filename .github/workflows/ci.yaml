@@ -18,11 +18,8 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.PROMSCALE_EXTENSION_SCCACHE_AWS_SECRET_ACCESS_KEY }}
     steps:
       - uses: actions/checkout@v3
-      - name: Install latest nightly
-        uses: actions-rs/toolchain@v1
-        with:
-            toolchain: stable
-            override: true
+      - name: Install rust
+        uses: dtolnay/rust-toolchain@1.64.0
 
       - name: Setup sccache
         run: |
@@ -31,7 +28,7 @@ jobs:
           sudo mv sccache-*/sccache /usr/local/bin/sccache
           sccache --show-stats
 
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       - name: Install cargo-pgx
         run: |
@@ -46,16 +43,10 @@ jobs:
 
       - name: Initialize pgx
         if: ${{ steps.cache-pgx.outputs.cache-hit != 'true' }}
-        uses: actions-rs/cargo@v1
-        with:
-          command: pgx
-          args: init --pg${{ matrix.postgres.version }} download
+        run: cargo pgx init --pg${{ matrix.postgres.version }} download
       
       - name: Run cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: pgx
-          args: test pg${{ matrix.postgres.version }}
+        run: cargo pgx test pg${{ matrix.postgres.version }}
 
       - name: Show sccache stats
         run: sccache --show-stats

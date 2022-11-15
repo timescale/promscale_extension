@@ -48,11 +48,11 @@ jobs:
           branch_name=$(echo ${{github.head_ref || github.ref_name}})
           image_branch_name=$(echo ${branch_name} | sed 's#/#-#')
           build_type_suffix=$(echo "-${{matrix.base}}" | sed 's/-ha//')
-          echo "::set-output name=tsmajor::${tsmajor}"
-          echo "::set-output name=tsmajmin::${tsmajmin}"
-          echo "::set-output name=branch_name::${branch_name}"
-          echo "::set-output name=image_branch_name::${image_branch_name}"
-          echo "::set-output name=build_type_suffix::${build_type_suffix}"
+          echo "tsmajor=${tsmajor}" >> ${GITHUB_OUTPUT}
+          echo "tsmajmin=${tsmajmin}" >> ${GITHUB_OUTPUT}
+          echo "branch_name=${branch_name}" >> ${GITHUB_OUTPUT}
+          echo "image_branch_name=${image_branch_name}" >> ${GITHUB_OUTPUT}
+          echo "build_type_suffix=${build_type_suffix}" >> ${GITHUB_OUTPUT}
 
       - name: Build and push
         uses: docker/build-push-action@v3
@@ -84,19 +84,13 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{matrix.base}}-${{matrix.pgversion}}-${{matrix.tsversion}}
 
       - name: Run end-to-end tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: -p e2e
+        run: cargo test -p e2e
         env:
           TS_DOCKER_IMAGE: ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.image_branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
           RUST_LOG: info
 
       - name: Run SQL tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: -p sql-tests
+        run: cargo test -p sql-tests
         env:
           TS_DOCKER_IMAGE: ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.image_branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
           USE_DOCKER: true
@@ -146,9 +140,9 @@ jobs:
                   -H "Accept: application/vnd.github.v3+json" \
                   https://api.github.com/repos/timescale/promscale/branches/${branch_name} | tail -1)
           if [[ "$res" = "200" ]]; then
-            echo "::set-output name=branch::${branch_name}"
+            echo "branch=${branch_name}" >> ${GITHUB_OUTPUT}
           elif [[ "$res" == "404" ]]; then
-            echo "::set-output name=branch::master"
+            echo "branch=master" >> ${GITHUB_OUTPUT}
           else
             echo "Unexpected HTTP response: $res"
             exit 1
