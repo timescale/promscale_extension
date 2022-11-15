@@ -8,18 +8,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Install latest nightly
-        uses: actions-rs/toolchain@v1
+      - name: Install rust
+        uses: dtolnay/rust-toolchain@1.64.0
         with:
-            toolchain: 1.64.0
-            override: true
             components: rustfmt, clippy
-
-      - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+      - run: cargo fmt --all -- --check
 
   clippy:
     runs-on: ubuntu-latest
@@ -30,11 +23,9 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.PROMSCALE_EXTENSION_SCCACHE_AWS_SECRET_ACCESS_KEY }}
     steps:
       - uses: actions/checkout@v3
-      - name: Install latest nightly
-        uses: actions-rs/toolchain@v1
+      - name: Install rust
+        uses: dtolnay/rust-toolchain@1.64.0
         with:
-            toolchain: 1.64.0
-            override: true
             components: rustfmt, clippy
 
       - name: Setup sccache
@@ -44,23 +35,16 @@ jobs:
           sudo mv sccache-*/sccache /usr/local/bin/sccache
           sccache --show-stats
 
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       - name: Install cargo-pgx
         run: |
           ./install-cargo-pgx.sh
 
       - name: Initialize pgx
-        uses: actions-rs/cargo@v1
-        with:
-          command: pgx
-          args: init --pg14 download
+        run: cargo pgx init --pg14 download
       
-      - name: Run cargo clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --features pg14 -- -D warnings
+      - run: cargo clippy --features pg14 -- -D warnings
 
   pgspot:
     runs-on: ubuntu-latest
@@ -70,6 +54,11 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.PROMSCALE_EXTENSION_SCCACHE_AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.PROMSCALE_EXTENSION_SCCACHE_AWS_SECRET_ACCESS_KEY }}
     steps:
+      - name: Install rust
+        uses: dtolnay/rust-toolchain@1.64.0
+        with:
+          components: rustfmt, clippy
+
       - name: Checkout extension code
         uses: actions/checkout@v3
 
@@ -88,26 +77,20 @@ jobs:
           sudo mv sccache-*/sccache /usr/local/bin/sccache
           sccache --show-stats
 
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       - name: Install cargo-pgx
         run: |
           ./install-cargo-pgx.sh
 
       - name: Initialize pgx
-        uses: actions-rs/cargo@v1
-        with:
-          command: pgx
-          args: init --pg14 download
+        run: cargo pgx init --pg14 download
 
       - name: Prepare control file
         run: make promscale.control
 
       - name: Generate schema
-        uses: actions-rs/cargo@v1
-        with:
-          command: pgx
-          args: schema pg14 --out /tmp/schema.sql
+        run: cargo pgx schema pg14 --out /tmp/schema.sql
 
       - name: Run pgspot
         run: pgspot --sql-accepting=execute_everywhere --sql-accepting=distributed_exec --ignore PS005 /tmp/schema.sql ./sql/promscale--0.0.0.sql
