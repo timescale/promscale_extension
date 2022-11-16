@@ -2430,7 +2430,7 @@ AS $func$
 DECLARE
   is_reserved boolean;
 BEGIN
-  SELECT label_key = ANY(ARRAY['time', 'value', 'series_id', 'labels'])
+  SELECT label_key = ANY(ARRAY['time', 'value', 'series_id', 'labels', 'series'])
   INTO STRICT is_reserved;
 
   IF is_reserved THEN

@@ -1,0 +1,63 @@
+---
+source: sql-tests/tests/tests.rs
+assertion_line: 49
+expression: query_result
+---
+ plan  
+-------
+ 1..20
+(1 row)
+
+                                                          is                                                          
+----------------------------------------------------------------------------------------------------------------------
+ ok 1 - time is a restricted keyword and sanitized. When id=true the column name is returned suffixed with `_id`
+ ok 2 - value is a restricted keyword and sanitized. When id=true the column name is returned suffixed with `_id`
+ ok 3 - series_id is a restricted keyword and sanitized. When id=true the column name is returned suffixed with `_id`
+ ok 4 - labels is a restricted keyword and sanitized. When id=true the column name is returned suffixed with `_id`
+ ok 5 - series is a restricted keyword and sanitized. When id=true the column name is returned suffixed with `_id`
+(5 rows)
+
+                                 is                                  
+---------------------------------------------------------------------
+ ok 6 - when id=true the column name is returned suffixed with `_id`
+(1 row)
+
+                               is                                
+-----------------------------------------------------------------
+ ok 7 - _prom_catalog.label_key entry for label_time exists
+ ok 8 - _prom_catalog.label_key entry for label_value exists
+ ok 9 - _prom_catalog.label_key entry for label_series_id exists
+ ok 10 - _prom_catalog.label_key entry for label_labels exists
+ ok 11 - _prom_catalog.label_key entry for label_series exists
+ ok 12 - _prom_catalog.label_key entry for my-key exists
+(6 rows)
+
+                             is                             
+------------------------------------------------------------
+ ok 13 - 6 entries were created for _prom_catalog.label_key
+(1 row)
+
+                           is                            
+---------------------------------------------------------
+ ok 14 - time is a restricted keyword and sanitized
+ ok 15 - value is a restricted keyword and sanitized
+ ok 16 - series_id is a restricted keyword and sanitized
+ ok 17 - labels is a restricted keyword and sanitized
+ ok 18 - series is a restricted keyword and sanitized
+(5 rows)
+
+                   is                   
+----------------------------------------
+ ok 19 - column name is the same as key
+(1 row)
+
+                                               is                                                
+-------------------------------------------------------------------------------------------------
+ ok 20 - no additional _prom_catalog.label_key are created on subsequent calls for the same keys
+(1 row)
+
+ finish 
+--------
+(0 rows)
+
+
