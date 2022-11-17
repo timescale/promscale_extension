@@ -85,7 +85,7 @@ BEGIN
         WHERE
             cagg.compression_enabled AND m.is_view
     LOOP
-        PERFORM public.compress_chunk(public.show_chunks(r.compressible_cagg, older_than => 100 * r.refresh_interval));
+        PERFORM public.compress_chunk(public.show_chunks(r.compressible_cagg, older_than => 100 * r.refresh_interval), true);
     END LOOP;
 END;
 $$
