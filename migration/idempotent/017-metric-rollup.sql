@@ -139,8 +139,8 @@ BEGIN
         rollup_view_created := FALSE;
         new_rollups_created := 0;
         FOR m IN
-            SELECT id, metric_name, table_name FROM _prom_catalog.metric m WHERE NOT is_view AND NOT EXISTS (
-                SELECT 1 FROM _prom_catalog.metric_rollup mr WHERE mr.rollup_id = r.id AND mr.metric_id = id
+            SELECT id, metric_name, table_name FROM _prom_catalog.metric mt WHERE NOT is_view AND NOT EXISTS (
+                SELECT 1 FROM _prom_catalog.metric_rollup mr WHERE mr.rollup_id = r.id AND mr.metric_id = mt.id
             ) -- Get metric names that have a pending rollup creation.
         LOOP
             SELECT INTO rollup_view_created _prom_catalog.create_metric_rollup_view(r.schema_name, m.metric_name, m.table_name, r.resolution);
