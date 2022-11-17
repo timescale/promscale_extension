@@ -58,4 +58,8 @@ psql:testdata/metric_rollups_refresh.sql:17: NOTICE:  table "_pending_registrati
  ok 10 - samples in 1h metric-rollup
 (1 row)
 
+ finish 
+--------
+(0 rows)
+
 

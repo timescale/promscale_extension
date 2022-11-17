@@ -53,3 +53,6 @@ $$;
 
 -- Check samples after the refresh.
 SELECT ok(count(*) = 340, 'samples in custom downsample after refresh') FROM custom.test; -- 2 samples increased, i.e, from 333 -> 336 which is expected, since last 2 buckets are only updated.
+
+-- The end
+SELECT * FROM finish(true);

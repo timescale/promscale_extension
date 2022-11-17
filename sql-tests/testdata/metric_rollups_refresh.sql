@@ -52,3 +52,6 @@ $$;
 -- Check samples after the refresh.
 SELECT ok(count(*) = 2019, 'samples in 5m metric-rollup') FROM ps_short.test; -- Note: Only 2 samples increased, since refresh only accounts for last 2 buckets
 SELECT ok(count(*) = 171, 'samples in 1h metric-rollup') FROM ps_long.test;
+
+-- The end
+SELECT * FROM finish(true);

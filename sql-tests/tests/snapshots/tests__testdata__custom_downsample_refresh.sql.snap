@@ -39,4 +39,8 @@ HINT:  Use WITH NO DATA if you do not want to refresh the continuous aggregate o
  ok 5 - samples in custom downsample after refresh
 (1 row)
 
+ finish 
+--------
+(0 rows)
+
 
