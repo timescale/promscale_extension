@@ -1,3 +1,5 @@
 initial-upload-closes-no-bugs
 extended-description-is-empty
 unknown-field
+syntax-error-in-debian-changelog
+package-contains-timestamped-gzip
