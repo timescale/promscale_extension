@@ -3,8 +3,8 @@ on:
   pull_request:
     paths:
     - '.github/workflows/release.yaml'
-    - 'dist/*'
-    - 'tools/*'
+    - 'dist/**'
+    - 'tools/**'
   push:
     branches:
     - main
