@@ -32,6 +32,9 @@ CALL _prom_catalog.execute_caggs_compression_policy(3, '{}'::jsonb);
 SELECT ok(compressed_chunks_exist('ps_short.test') = true);
 SELECT ok(compressed_chunks_exist('ps_long.test') = true);
 
+-- Compress again to ensure we don't error when touching compressed chunks.
+SET client_min_messages to 'ERROR'; -- So that the snapshot does not get filled with debug logs.
+CALL _prom_catalog.execute_caggs_compression_policy(3, '{}'::jsonb);
 
 -- # Test retaining metric-rollups.
 
