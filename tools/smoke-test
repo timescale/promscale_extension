@@ -11,18 +11,18 @@ DOCKER_PLATFORM=$2 # e.g. linux/amd64
 
 TESTER_NAME=$(echo "${EXTENSION_DOCKER_IMAGE}" | sed 's/[:]/-/')
 
-docker run --rm --name "${TESTER_NAME}" --platform="${DOCKER_PLATFORM}" -e POSTGRES_PASSWORD=postgres -dt "${EXTENSION_DOCKER_IMAGE}";
+docker run --rm --name "${TESTER_NAME}" --platform="${DOCKER_PLATFORM}" -e POSTGRES_PASSWORD=postgres -d "${EXTENSION_DOCKER_IMAGE}";
 
 for i in $(seq 10) ; do
-  if docker exec -ti "${TESTER_NAME}" pg_isready -h 0.0.0.0 -p 5432 1>/dev/null 2>&1; then
+  if docker exec "${TESTER_NAME}" pg_isready -h 0.0.0.0 -p 5432 1>/dev/null 2>&1; then
     break
   fi
   sleep 1
 done
 
-docker exec -ti "${TESTER_NAME}" psql -c 'CREATE EXTENSION promscale;'
+docker exec "${TESTER_NAME}" psql -c 'CREATE EXTENSION promscale CASCADE;'
 
-if ! docker exec -ti "${TESTER_NAME}" psql -c '\dx promscale;' | grep 'promscale'; then
+if ! docker exec "${TESTER_NAME}" psql -c '\dx promscale;' | grep 'promscale'; then
     echo "Encountered error while testing image ${EXTENSION_DOCKER_IMAGE}";
     docker logs "${TESTER_NAME}"
     docker stop "${TESTER_NAME}"

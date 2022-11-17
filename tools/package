@@ -170,7 +170,7 @@ if [ -z "$pkg_type" ]; then
         debian|ubuntu)
             pkg_type="deb"
             ;;
-        rhel|centos|fedora)
+        centos|rocky)
             pkg_type="rpm"
             ;;
         *)
@@ -200,7 +200,7 @@ case "$os_name" in
         pg_package="postgresql-${pg_version}"
         ;;
 
-    rhel|centos|fedora)
+    centos|rocky)
         pg_package="postgresql${pg_version}-server"
         ;;
 
@@ -217,7 +217,7 @@ else
         debian|ubuntu)
             pg_config_dir="/usr/lib/postgresql/${pg_version}/bin"
             ;;
-        rhel|centos|fedora)
+        centos|rocky)
             pg_config_dir="/usr/pgsql-${pg_version}/bin"
             ;;
         *)
@@ -287,7 +287,7 @@ if [ "$lint" = "true" ]; then
                 echo "WARN: --lint was set, but lintian was not found, skipping"
                 exit 0
             fi
-            if ! lintian --fail-on warning --profile "${os_name}" --suppress-tags-from-file dist/debian/lintian-ignore "${pkg_path}"; then
+            if ! lintian --profile "${os_name}" --suppress-tags-from-file dist/debian/lintian-ignore "${pkg_path}"; then
                 echo "Package failed lint checks!"
                 exit 1
             fi

@@ -1,9 +1,10 @@
 # syntax=docker/dockerfile:1.3-labs
 
 ## Build base system
-ARG OS_NAME=centos
+ARG DOCKER_DISTRO_NAME=rockylinux
+ARG OS_NAME=rocky
 ARG OS_VERSION=8
-FROM ${OS_NAME}:${OS_VERSION} as base
+FROM ${DOCKER_DISTRO_NAME}:${OS_VERSION} as base
 
 # Used to provide SCL packages to all noninteractive, non-login shells when present
 ENV BASH_ENV=/etc/scl_enable
@@ -13,7 +14,7 @@ SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 # Setup base system
 RUN <<EOF
 export OS_NAME="$(source /etc/os-release; echo "${ID}")"
-export OS_VERSION="$(source /etc/os-release; echo "${VERSION_ID}")"
+export OS_VERSION="$(source /etc/os-release; echo "${VERSION_ID}" | cut -d. -f 1)"
 
 yum update -y
 
@@ -46,8 +47,10 @@ case "${OS_VERSION}" in
         ;;
 esac
 
-# Disable postgres
-if command -v dnf; then dnf -qy module disable postgresql; fi
+if [ "${OS_VERSION}" != "9" ]; then
+    # Disable postgres
+    if command -v dnf; then dnf -qy module disable postgresql; fi
+fi
 
 # System dependencies
 yum install -y \
@@ -66,7 +69,11 @@ yum install -y \
     diffutils \
     git
 
-# Use UTFF-8 as the locale
+if [ "${OS_VERSION}" != "7" ]; then
+  yum -y install glibc-locale-source glibc-langpack-en
+fi
+
+# Use UTF-8 as the locale
 localedef -f UTF-8 -i en_US en_US.UTF-8
 
 # Pin dotenv gem because 2.8.0 is not compatible with earlier ruby
@@ -96,7 +103,7 @@ ARG PG_VERSION
 
 RUN <<EOF
 export OS_NAME="$(source /etc/os-release; echo "${ID}")"
-export OS_VERSION="$(source /etc/os-release; echo "${VERSION_ID}")"
+export OS_VERSION="$(source /etc/os-release; echo "${VERSION_ID}" | cut -d. -f 1)"
 
 export PG_ARCH
 case "$(uname -m)" in
@@ -187,3 +194,6 @@ sccache --show-stats
 rm -rf target/
 rm -rf .cargo/
 EOF
+
+FROM alpine as bundler
+COPY --from=packager /dist /dist

@@ -1,10 +1,11 @@
 # syntax=docker/dockerfile:1.3-labs
 
 ## Build base system
+ARG DOCKER_DISTRO_NAME=debian
 ARG OS_NAME=debian
 ARG OS_VERSION=11
 ARG PG_VERSION
-FROM ${OS_NAME}:${OS_VERSION} as base
+FROM ${DOCKER_DISTRO_NAME}:${OS_VERSION} as base
 
 SHELL ["/bin/bash", "-eu", "-o", "pipefail", "-c"]
 
@@ -128,3 +129,6 @@ sccache --show-stats
 rm -rf target/
 rm -rf .cargo/
 EOF
+
+FROM alpine as bundler
+COPY --from=packager /dist /dist

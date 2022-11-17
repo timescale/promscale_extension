@@ -27,20 +27,46 @@ jobs:
         os:
         - name: linux
           distro: debian
-          version: 11
-          pkg_cloud_tags:
-            - debian/buster
-            - debian/bullseye
-            - ubuntu/bionic
-            - ubuntu/focal
-            - ubuntu/jammy
+          version: buster # LTS EOL 2024-06-30 (https://wiki.debian.org/LTS)
           pkg_type: deb
         - name: linux
+          distro: debian
+          version: bullseye # LTS EOL ~2026-06 (https://wiki.debian.org/LTS)
+          pkg_type: deb
+        - name: linux
+          distro: ubuntu
+          version: bionic # End of support 2023-04 (https://wiki.ubuntu.com/Releases)
+          pkg_type: deb
+        - name: linux
+          distro: ubuntu
+          version: focal # End of support 2025-04 (https://wiki.ubuntu.com/Releases)
+          pkg_type: deb
+        - name: linux
+          distro: ubuntu
+          version: jammy # End of support 2027-04 (https://wiki.ubuntu.com/Releases)
+          pkg_type: deb
+        # Kinetic is not currently supported by TimescaleDB
+        # - name: linux
+        #   distro: ubuntu
+        #   version: kinetic # End of support 2023-07 (https://wiki.ubuntu.com/Releases)
+        #   pkg_type: deb
+        - name: linux
           distro: centos
-          version: 7
-          pkg_cloud_tags:
-            - el/7
+          version: 7 # EOL 2024-06-30 (https://en.wikipedia.org/wiki/Red_Hat_Enterprise_Linux#Product_life_cycle)
           pkg_type: rpm
+          pkg_cloud_distro: el
+        - name: linux
+          distro: rocky
+          docker_distro: rockylinux
+          version: 8 # EOL 2029 (https://en.wikipedia.org/wiki/Red_Hat_Enterprise_Linux#Product_life_cycle)
+          pkg_type: rpm
+          pkg_cloud_distro: el
+        - name: linux
+          distro: rocky
+          docker_distro: rockylinux
+          version: 9 # EOL 2032 (https://en.wikipedia.org/wiki/Red_Hat_Enterprise_Linux#Product_life_cycle)
+          pkg_type: rpm
+          pkg_cloud_distro: el
         postgres:
         - version: "12"
         - version: "13"
@@ -96,6 +122,7 @@ jobs:
         target: packager
         build-args: |
           OS_NAME=${{ matrix.os.distro }}
+          DOCKER_DISTRO_NAME=${{ matrix.os.docker_distro || matrix.os.distro }}
           OS_VERSION=${{ matrix.os.version }}
           PG_VERSION=${{ matrix.postgres.version }}
           RUST_VERSION=${{ env.RUST_VERSION }}
@@ -115,29 +142,28 @@ jobs:
         docker rm -f "${container}"
         ls -la artifacts/*
 
-    - name: Test package against all variants
-      if: ${{ false }} # temporarily disabling this test to allow the release to build for 0.6.0
+    - name: Test package
       env:
+        DISTRO: ${{ matrix.os.distro }}
+        DISTRO_VERSION: ${{ matrix.os.version }}
+        DOCKER_DISTRO_NAME: ${{ matrix.os.docker_distro || matrix.os.distro }}
         PG_VERSION: ${{ matrix.postgres.version }}
         DOCKER_PLATFORM: ${{ matrix.os.name }}/${{ matrix.arch.platform }}
         PACKAGE_TO_TEST: artifacts/${{ steps.metadata.outputs.outfile }}
         IMAGE_BASE: ${{ steps.metadata.outputs.image }}-test
         DOCKER_FILE: dist/${{ matrix.os.pkg_type }}.test.dockerfile
       run: |
-        for pkg_cloud_tag in ${{ join(matrix.os.pkg_cloud_tags, ' ') }}; do \
-          DISTRO=$(echo ${pkg_cloud_tag} | cut -d'/' -f 1 | sed 's/el/centos/'); \
-          DISTRO_VERSION=$(echo ${pkg_cloud_tag} | cut -d'/' -f 2); \
-          EXTENSION_DOCKER_IMAGE="${IMAGE_BASE}-${DISTRO}-${DISTRO_VERSION}"; \
-          docker buildx build --load --platform=${DOCKER_PLATFORM} \
-            --build-arg=DISTRO=${DISTRO} \
-            --build-arg=DISTRO_VERSION=${DISTRO_VERSION} \
-            --build-arg=PG_VERSION=${PG_VERSION} \
-            --build-arg=RELEASE_FILE_NAME=${PACKAGE_TO_TEST} \
-            -t ${EXTENSION_DOCKER_IMAGE} \
-            -f ${DOCKER_FILE} \
-            . ; \
-          ./tools/smoke-test "${EXTENSION_DOCKER_IMAGE}" "${DOCKER_PLATFORM}"; \
-        done
+        EXTENSION_DOCKER_IMAGE="${IMAGE_BASE}-${DISTRO}-${DISTRO_VERSION}"; \
+        docker buildx build --load --platform=${DOCKER_PLATFORM} \
+          --build-arg=DISTRO=${DISTRO} \
+          --build-arg=DOCKER_DISTRO_NAME=${DOCKER_DISTRO_NAME} \
+          --build-arg=DISTRO_VERSION=${DISTRO_VERSION} \
+          --build-arg=PG_VERSION=${PG_VERSION} \
+          --build-arg=RELEASE_FILE_NAME=${PACKAGE_TO_TEST} \
+          -t ${EXTENSION_DOCKER_IMAGE} \
+          -f ${DOCKER_FILE} \
+          . ; \
+        ./tools/smoke-test "${EXTENSION_DOCKER_IMAGE}" "${DOCKER_PLATFORM}";
 
     - name: Upload Artifact for Job
       uses: actions/upload-artifact@v3
@@ -151,9 +177,7 @@ jobs:
       env:
         PACKAGECLOUD_TOKEN: ${{ secrets.IO_PACKAGECLOUD_TOKEN }}
       run: |
-        for pkg_cloud_tag in ${{ join(matrix.os.pkg_cloud_tags, ' ') }}; do \
-          package_cloud push ${{ steps.metadata.outputs.repo }}/${pkg_cloud_tag} artifacts/${{ steps.metadata.outputs.outfile }}; \
-        done
+        package_cloud push ${{ steps.metadata.outputs.repo }}/${{ matrix.os.pkg_cloud_distro || matrix.os.distro }}/${{ matrix.os.version }} artifacts/${{ steps.metadata.outputs.outfile }}; \
 
     - name: Notify slack on build fail
       if: github.event.schedule && failure()
