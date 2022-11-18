@@ -7,9 +7,11 @@ on:
     - 'tools/**'
   push:
     branches:
-    - main
+    - master
     tags:
     - "*"
+  schedule:
+    - cron: '0 4 * * 1-5' # Monday-Friday @ 4AM
 
 jobs:
   package:
@@ -152,6 +154,16 @@ jobs:
         for pkg_cloud_tag in ${{ join(matrix.os.pkg_cloud_tags, ' ') }}; do \
           package_cloud push ${{ steps.metadata.outputs.repo }}/${pkg_cloud_tag} artifacts/${{ steps.metadata.outputs.outfile }}; \
         done
+
+    - name: Notify slack on build fail
+      if: github.event.schedule && failure()
+      env:
+        SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      uses: voxmedia/github-action-slack-notify-build@v1
+      with:
+        channel: C02V9U5TYE6 #team-o11y-data-platform
+        status: FAILED
+        color: danger
 
     outputs:
       tag: ${{ steps.metadata.outputs.tag }}
