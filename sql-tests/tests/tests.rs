@@ -1,4 +1,5 @@
 use insta::assert_snapshot;
+use pgtap_parse::parse_pgtap_result;
 use std::{
     env,
     mem::MaybeUninit,
@@ -46,5 +47,19 @@ fn sql_tests(full_resource: &str) {
         full_resource
     };
     let query_result = test_pg_instance.exec_sql_script(resource);
-    assert_snapshot!(resource, query_result);
+
+    match parse_pgtap_result(&query_result) {
+        Some(result) => {
+            // Result parsed as pgtap output
+            if result.executed_test_count != result.planned_test_count
+                || result.success_count != result.planned_test_count
+            {
+                assert!(false, "{}", query_result);
+            }
+        }
+        None => {
+            // Result is not pgtap output, fall back to snapshot compare
+            assert_snapshot!(resource, query_result)
+        }
+    }
 }
