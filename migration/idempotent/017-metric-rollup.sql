@@ -141,7 +141,7 @@ BEGIN
         FOR m IN
             SELECT id, metric_name, table_name FROM _prom_catalog.metric mt WHERE NOT is_view AND NOT EXISTS (
                 SELECT 1 FROM _prom_catalog.metric_rollup mr WHERE mr.rollup_id = r.id AND mr.metric_id = mt.id
-            ) -- Get metric names that have a pending rollup creation.
+            ) ORDER BY mt.id -- Get metric names that have a pending rollup creation.
         LOOP
             SELECT INTO rollup_view_created _prom_catalog.create_metric_rollup_view(r.schema_name, m.metric_name, m.table_name, r.resolution);
             IF rollup_view_created THEN
@@ -152,20 +152,14 @@ BEGIN
                 INSERT INTO _pending_registration(rollup_id, schema_name, table_name, resolution) VALUES (r.id, r.schema_name, m.table_name, r.resolution);
                 new_rollups_created := new_rollups_created + 1;
             END IF;
+            COMMIT;
+            SET LOCAL search_path = pg_catalog, pg_temp;
         END LOOP;
         RAISE LOG '[Rollup] Created % for rollup name %', new_rollups_created, r.name;
     END LOOP;
 
     COMMIT;
     SET LOCAL search_path = pg_catalog, pg_temp;
-
-    FOR r IN
-        SELECT * FROM _pending_registration
-    LOOP
-        PERFORM prom_api.register_metric_view(r.schema_name, r.table_name, r.resolution, false, r.rollup_id);
-    END LOOP;
-
-    DROP TABLE _pending_registration;
 
     -- Refresh the newly added rollups for entire duration of data.
     FOR r IN
@@ -174,12 +168,23 @@ BEGIN
                  INNER JOIN _prom_catalog.rollup rollup ON (mr.rollup_id = rollup.id)
                  INNER JOIN _prom_catalog.metric mt ON (mr.metric_id = mt.id)
         WHERE mr.refresh_pending = TRUE
+        ORDER BY mt.id
     LOOP
         CALL public.refresh_continuous_aggregate(format('%I.%I', r.schema_name, r.table_name), NULL, NULL);
         UPDATE _prom_catalog.metric_rollup SET refresh_pending = FALSE WHERE id = r.id;
         COMMIT;
         SET LOCAL search_path = pg_catalog, pg_temp;
     END LOOP;
+
+    -- Register the metric-rollups after refresh_continuous_aggregate() so that execute_caggs_refresh_policy() does not
+    -- collide with refresh_continuous_aggregate().
+    FOR r IN
+        SELECT * FROM _pending_registration ORDER BY rollup_id, table_name
+    LOOP
+        PERFORM prom_api.register_metric_view(r.schema_name, r.table_name, r.resolution, false, r.rollup_id);
+    END LOOP;
+
+    DROP TABLE _pending_registration;
 END;
 $$
 LANGUAGE PLPGSQL;
@@ -270,7 +275,7 @@ BEGIN
         _rollup_creation_job_already_exists = (SELECT EXISTS(SELECT * FROM timescaledb_information.jobs WHERE proc_name = 'scan_for_new_rollups')::boolean); -- prevents from registering 2 scan jobs.
         IF NOT _rollup_creation_job_already_exists THEN
             -- Scan and create metric rollups regularly for pending metrics.
-            PERFORM public.add_job('_prom_catalog.scan_for_new_rollups', INTERVAL '30 minutes');
+            PERFORM public.add_job('_prom_catalog.scan_for_new_rollups', INTERVAL '10 hours');
         END IF;
     END IF;
 END;
