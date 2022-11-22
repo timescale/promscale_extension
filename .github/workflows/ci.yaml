@@ -31,6 +31,16 @@ jobs:
           sudo mv sccache-*/sccache /usr/local/bin/sccache
           sccache --show-stats
 
+      - name: Install postgres
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lsb-release wget gnupg2
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+          sudo apt-get update
+          sudo apt-get -y install postgresql-${{matrix.postgres.version}} postgresql-server-dev-${{matrix.postgres.version}}
+          sudo chmod a+w -R /usr/lib/postgresql /usr/share/postgresql
+
       - uses: Swatinem/rust-cache@v1
 
       - name: Install cargo-pgx
@@ -49,7 +59,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: pgx
-          args: init --pg${{ matrix.postgres.version }} download
+          args: init --pg${{ matrix.postgres.version }} /usr/lib/postgresql/${{ matrix.postgres.version }}/bin/pg_config
       
       - name: Run cargo test
         uses: actions-rs/cargo@v1
