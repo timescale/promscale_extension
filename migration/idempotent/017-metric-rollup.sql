@@ -152,6 +152,8 @@ BEGIN
                 INSERT INTO _pending_registration(rollup_id, schema_name, table_name, resolution) VALUES (r.id, r.schema_name, m.table_name, r.resolution);
                 new_rollups_created := new_rollups_created + 1;
             END IF;
+            COMMIT;
+            SET LOCAL search_path = pg_catalog, pg_temp;
         END LOOP;
         RAISE LOG '[Rollup] Created % for rollup name %', new_rollups_created, r.name;
     END LOOP;
