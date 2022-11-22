@@ -7,21 +7,16 @@ expression: query_result
  1..3
 (1 row)
 
-psql:testdata/metric_rollups_scan_for_new_rollups.sql:8: NOTICE:  table "_pending_registration" does not exist, skipping
-psql:testdata/metric_rollups_scan_for_new_rollups.sql:13: NOTICE:  table "_pending_registration" does not exist, skipping
-psql:testdata/metric_rollups_scan_for_new_rollups.sql:18: NOTICE:  table "_pending_registration" does not exist, skipping
   ok  
 ------
  ok 1
 (1 row)
 
-psql:testdata/metric_rollups_scan_for_new_rollups.sql:23: NOTICE:  table "_pending_registration" does not exist, skipping
   ok  
 ------
  ok 2
 (1 row)
 
-psql:testdata/metric_rollups_scan_for_new_rollups.sql:48: NOTICE:  table "_pending_registration" does not exist, skipping
   ok  
 ------
  ok 3
