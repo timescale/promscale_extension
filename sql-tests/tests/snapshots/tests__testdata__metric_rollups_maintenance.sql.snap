@@ -12,7 +12,6 @@ expression: query_result
  t
 (1 row)
 
-psql:testdata/metric_rollups_maintenance.sql:15: NOTICE:  table "_pending_registration" does not exist, skipping
                  ok                 
 ------------------------------------
  ok 1 - samples in 5m metric-rollup

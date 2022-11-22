@@ -32,7 +32,6 @@ CALL
   1 | test        | test       | f                  | t                      |                  | t                   |                         | prom_data    | test         | f       |                       |          
 (1 row)
 
-psql:testdata/metric_rollups.sql:27: NOTICE:  table "_pending_registration" does not exist, skipping
 psql:testdata/metric_rollups.sql:27: NOTICE:  continuous aggregate "test" is already up-to-date
 CALL
  id | metric_name | table_name | creation_completed | default_chunk_interval | retention_period | default_compression | delay_compression_until | table_schema | series_table | is_view | view_refresh_interval | rollup_id 
