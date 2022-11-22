@@ -1,0 +1,9 @@
+[package]
+name = "pgtap-parse"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+log = "0.4.1"
+regex = "1.7.0"
+

@@ -7,6 +7,7 @@ edition = "2021"
 insta = "1.14.0"
 test-generator = "0.3.0"
 test-common = { path = "../test-common" }
+pgtap-parse = { path = "../pgtap-parse" }
 
 [build-dependencies]
 build-deps = "^0.1"

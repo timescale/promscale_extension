@@ -26,12 +26,29 @@ To run the tests against a docker image set the value of the `TS_DOCKER_IMAGE` t
 TS_DOCKER_IMAGE=ghcr.io/timescale/dev_promscale_extension:master-ts2-pg13 cargo test -p sql-tests
 ```
 
-## SQL Snapshot tests
+## Testing methods
 
 Each `.sql` file in the `testdata` directory is executed as its own test, against a fresh database.
+We provide two ways of testing: pgTAP tests, and snapshot tests. Snapshot tests are like golden tests:
+when they break, it's often unclear why they broke, because the assertion is run over the whole test output.
+Please write new tests as pgTAP tests, as these should be more robust.
+
+### pgTAP tests
+
+If pgTAP is used in a test, then the output of the test run is parsed with our
+pgTAP parser. If any tests failed, the whole test run will fail.  
+
+To add a new pgTAP test:
+
+1. create new `.sql` file in the `testdata` directory
+2. use pgTAP in your test file, see the existing pgTAP examples
+3. run the tests with `cargo test -p sql-tests` (see [Running tests][Running tests])
+
+### Snapshot tests
+
 The output of the script is recorded as a snapshot, and compared on the next test run.
 
-To add a new test:
+To add a new snapshot test:
 0. (prerequisite) run `cargo install cargo-insta`
 1. create a new `.sql` file in the `testdata` directory
 2. run the tests with `cargo test -p sql-tests`
