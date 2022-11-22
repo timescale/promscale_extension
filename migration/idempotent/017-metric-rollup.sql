@@ -122,17 +122,6 @@ BEGIN
         RETURN;
     END IF;
 
-    DROP TABLE IF EXISTS _pending_registration;
-
-    -- Store metadata for newly created rollups which can be later used for registration in
-    -- prom_api.register_metric_view()
-    CREATE TEMPORARY TABLE _pending_registration (
-        rollup_id BIGINT,
-        schema_name TEXT,
-        table_name TEXT,
-        resolution INTERVAL
-    );
-
     FOR r IN
         SELECT * FROM _prom_catalog.rollup
     LOOP
@@ -146,14 +135,13 @@ BEGIN
             SELECT INTO rollup_view_created _prom_catalog.create_metric_rollup_view(r.schema_name, m.metric_name, m.table_name, r.resolution);
             IF rollup_view_created THEN
                 INSERT INTO _prom_catalog.metric_rollup(rollup_id, metric_id, refresh_pending) VALUES (r.id, m.id, TRUE);
-
-                -- We store in a temp table instead of directly doing PERFORM prom_api.register_metric_view
-                -- otherwise we get an error that the caggs already exists.
-                INSERT INTO _pending_registration(rollup_id, schema_name, table_name, resolution) VALUES (r.id, r.schema_name, m.table_name, r.resolution);
                 new_rollups_created := new_rollups_created + 1;
+
+                -- Commit the materialized view created so that we release the parent hypertable and do not block
+                -- depending tasks, such as ingestion. Otherwise, it will deadlock.
+                COMMIT;
+                SET LOCAL search_path = pg_catalog, pg_temp;
             END IF;
-            COMMIT;
-            SET LOCAL search_path = pg_catalog, pg_temp;
         END LOOP;
         RAISE LOG '[Rollup] Created % for rollup name %', new_rollups_created, r.name;
     END LOOP;
@@ -163,28 +151,30 @@ BEGIN
 
     -- Refresh the newly added rollups for entire duration of data.
     FOR r IN
-        SELECT mr.id as id, rollup.schema_name as schema_name, mt.table_name as table_name
+        SELECT
+            mr.id as metric_id,
+            rollup.schema_name as schema_name,
+            mt.table_name as table_name,
+            rollup.resolution as resolution,
+            rollup.id as rollup_id
         FROM _prom_catalog.metric_rollup mr
                  INNER JOIN _prom_catalog.rollup rollup ON (mr.rollup_id = rollup.id)
                  INNER JOIN _prom_catalog.metric mt ON (mr.metric_id = mt.id)
-        WHERE mr.refresh_pending = TRUE
-        ORDER BY mt.id
+        WHERE mr.refresh_pending ORDER BY mt.id
     LOOP
         CALL public.refresh_continuous_aggregate(format('%I.%I', r.schema_name, r.table_name), NULL, NULL);
-        UPDATE _prom_catalog.metric_rollup SET refresh_pending = FALSE WHERE id = r.id;
+        UPDATE _prom_catalog.metric_rollup SET refresh_pending = FALSE WHERE id = r.metric_id;
+
+        -- Perform the rollup registration only after we have initial data. This helps in 2 ways:
+        -- 1. Prevent execute_caggs_refresh_policy() from refreshing the materialized view even before it is
+        --      refreshed for the first time ,i.e., from start to end of the hypertable
+        -- 2. In case of non-graceful shutdown, we will successfully register the non-registered rollups the
+        --      next time this procedure is called. Earlier, this was done using temp table, which did not
+        --      provide this guarantee
+        PERFORM prom_api.register_metric_view(r.schema_name, r.table_name, r.resolution, false, r.rollup_id);
         COMMIT;
         SET LOCAL search_path = pg_catalog, pg_temp;
     END LOOP;
-
-    -- Register the metric-rollups after refresh_continuous_aggregate() so that execute_caggs_refresh_policy() does not
-    -- collide with refresh_continuous_aggregate().
-    FOR r IN
-        SELECT * FROM _pending_registration ORDER BY rollup_id, table_name
-    LOOP
-        PERFORM prom_api.register_metric_view(r.schema_name, r.table_name, r.resolution, false, r.rollup_id);
-    END LOOP;
-
-    DROP TABLE _pending_registration;
 END;
 $$
 LANGUAGE PLPGSQL;
