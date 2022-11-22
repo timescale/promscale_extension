@@ -265,7 +265,7 @@ BEGIN
         _rollup_creation_job_already_exists = (SELECT EXISTS(SELECT * FROM timescaledb_information.jobs WHERE proc_name = 'scan_for_new_rollups')::boolean); -- prevents from registering 2 scan jobs.
         IF NOT _rollup_creation_job_already_exists THEN
             -- Scan and create metric rollups regularly for pending metrics.
-            PERFORM public.add_job('_prom_catalog.scan_for_new_rollups', INTERVAL '10 hours');
+            PERFORM public.add_job('_prom_catalog.scan_for_new_rollups', INTERVAL '30 minutes');
         END IF;
     END IF;
 END;
