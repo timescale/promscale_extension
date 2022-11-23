@@ -2199,10 +2199,8 @@ BEGIN
     SET LOCAL search_path = pg_catalog, pg_temp;
 
     -- Now we recheck the delete conditions, and delete series.
-    -- This corresponds to the ActuallyDeleteTx in our model.
+    -- This corresponds to the ActuallyDeleteTx and Resurrect in our model.
     CALL _prom_catalog._actually_delete_series_and_labels(metric_schema, metric_table, metric_series_table, deletion_epoch);
-    -- Now we check if there are any labels which we can remove.
-    -- This is not reflected in the model.
     COMMIT;
 END
 $func$
@@ -2269,6 +2267,8 @@ BEGIN
         FROM deleted_series)
     $query$, metric_schema, metric_table, metric_series_table, deletion_epoch) INTO label_array;
 
+    -- Now we check if there are any labels which we can remove.
+    -- This is not reflected in our series cache model.
     IF array_length(label_array, 1) > 0 THEN
         --jit interacts poorly why the multi-partition query below
         SET LOCAL jit = 'off';
