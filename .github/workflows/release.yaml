@@ -190,12 +190,12 @@ jobs:
     if: always()
     steps:
       - name: Notify slack on build fail
-        if: github.event.schedule && needs.docker.result != 'success'
+        if: github.event_name == 'schedule' && needs.package.result != 'success'
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
         uses: voxmedia/github-action-slack-notify-build@v1
         with:
-          channel: C02V9U5TYE6 #team-o11y-data-platform
+          channel_id: C02V9U5TYE6 #team-o11y-data-platform
           status: FAILED
           color: danger
 
