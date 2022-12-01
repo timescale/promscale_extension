@@ -1,8 +1,10 @@
 use crate::utils::sql_entity_graph::metadata::{ArgumentError, Returns, ReturnsError, SqlMapping};
 use pg_sys::*;
+use pgx::numeric::Error;
 use pgx::utils::sql_entity_graph::metadata::SqlTranslatable;
 use pgx::FromDatum;
 use pgx::*;
+use std::str::FromStr;
 
 // Trick DDL generator into recognizing our implementation of a built-in type.
 extension_sql!(
@@ -158,8 +160,7 @@ impl<'a> Iterator for TokenIterator<'a> {
                 match TokenIterator::extract_value_token(&mut jsonb_val) {
                     Token::String(str) => Some(Token::Key(str)),
                     _ => {
-                        elog(PgLogLevel::ERROR, "Unexpected token while expecting a key");
-                        None
+                        error!("Unexpected token while expecting a key");
                     }
                 }
             }
@@ -167,11 +168,7 @@ impl<'a> Iterator for TokenIterator<'a> {
                 Some(TokenIterator::extract_value_token(&mut jsonb_val))
             }
             _ => {
-                elog(
-                    PgLogLevel::ERROR,
-                    format!("invalid JsonbIteratorNext rc: {}", r).as_str(),
-                );
-                None
+                error!("invalid JsonbIteratorNext rc: {}", r);
             }
         }
     }
@@ -244,8 +241,8 @@ impl JsonbNormalizedNumeric {
     }
 
     #[allow(dead_code)]
-    pub fn to_pgx_numeric(&self) -> pgx::Numeric {
-        pgx::Numeric(self.to_str().to_string())
+    pub fn to_pgx_numeric(&self) -> std::result::Result<AnyNumeric, Error> {
+        AnyNumeric::from_str(self.to_str())
     }
 }
 
