@@ -49,7 +49,7 @@ macro_rules! do_serialize {
                 let len = writer.position().try_into().expect("serialized size too large");
                 ::pgx::set_varsize(writer.get_mut().as_mut_ptr() as *mut _, len);
             }
-            bytea::from(pgx::Datum::from(writer.into_inner().as_mut_ptr()))
+            bytea::from(pgx::pg_sys::Datum::from(writer.into_inner().as_mut_ptr()))
         }
     };
 }

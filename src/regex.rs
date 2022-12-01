@@ -67,6 +67,7 @@ mod _prom_ext {
 #[cfg(any(test, feature = "pg_test"))]
 #[pg_schema]
 mod tests {
+    use pgx::pg_sys::panic::CaughtError;
     use pgx::*;
 
     #[pg_test]
@@ -95,9 +96,17 @@ mod tests {
 
     #[pg_test]
     fn test_regex_too_large_does_not_kill_session() {
-        let _ = pg_try(|| {
+        PgTryBuilder::new(|| {
             Spi::run(r#"SELECT re2_match('a', 'a'||repeat('.?', 10000));"#);
-        });
+        })
+            .catch_others(|e| {
+                if let CaughtError::PostgresError(report) = e {
+                    assert_eq!(report.message(), "unable to compile regular expression: Compiled regex exceeds size limit of 10485760 bytes.");
+                } else {
+                    assert!(false, "expected PostgresError, found: {:?}", e)
+                }
+            })
+            .execute();
         let result =
             Spi::get_one::<bool>(r#"SELECT re2_match('a', 'a');"#).expect("SQL query failed");
         assert_eq!(result, true);
