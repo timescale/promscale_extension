@@ -28,7 +28,7 @@ jobs:
           sudo mv sccache-*/sccache /usr/local/bin/sccache
           sccache --show-stats
 
-      - uses: Swatinem/rust-cache@v2
+#      - uses: Swatinem/rust-cache@v2
 
       - name: Install cargo-pgx
         run: |
@@ -44,7 +44,7 @@ jobs:
       - name: Initialize pgx
         if: ${{ steps.cache-pgx.outputs.cache-hit != 'true' }}
         run: cargo pgx init --pg${{ matrix.postgres.version }} download
-      
+
       - name: Run cargo test
         run: cargo pgx test pg${{ matrix.postgres.version }}
 

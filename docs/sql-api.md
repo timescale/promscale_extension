@@ -492,6 +492,18 @@ the specified span_id.
 ```
 function TABLE(trace_id trace_id, parent_span_id bigint, span_id bigint, dist integer, path bigint[]) **ps_trace.upstream_spans**(_trace_id trace_id, _span_id bigint, _max_dist integer DEFAULT NULL::integer)
 ```
+### _prom_catalog._actually_delete_series_and_labels
+Internal utility function which only exists due to restrictions on plpgsql
+transaction control and SECURITY DEFINER
+```
+procedure void **_prom_catalog._actually_delete_series_and_labels**(IN metric_schema text, IN metric_table text, IN metric_series_table text, IN deletion_epoch bigint)
+```
+### _prom_catalog._lock_and_set_epoch
+Internal utility function which only exists due to restrictions on plpgsql
+transaction control and SECURITY DEFINER
+```
+procedure void **_prom_catalog._lock_and_set_epoch**(IN new_current_epoch bigint, IN new_delete_epoch bigint)
+```
 ### _prom_catalog.attach_series_partition
 
 ```
@@ -575,7 +587,7 @@ function void **_prom_catalog.delay_compression_job**(ht_table text, new_start t
 ### _prom_catalog.delete_expired_series
 
 ```
-function void **_prom_catalog.delete_expired_series**(metric_schema text, metric_table text, metric_series_table text, ran_at timestamp with time zone, present_epoch bigint, last_updated_epoch timestamp with time zone)
+procedure void **_prom_catalog.delete_expired_series**(IN metric_schema text, IN metric_table text, IN metric_series_table text, IN run_at timestamp with time zone)
 ```
 ### _prom_catalog.delete_series_catalog_row
 
@@ -831,6 +843,14 @@ function TABLE(hypertable_name text, node_name text, node_up boolean) **_prom_ca
 
 ```
 function TABLE(hypertable_name text, table_bytes bigint, index_bytes bigint, toast_bytes bigint, total_bytes bigint) **_prom_catalog.hypertable_remote_size**(schema_name_in text)
+```
+### _prom_catalog.initialize_current_epoch
+This function can be used to initialize the current epoch to the epoch value
+of `ran_at`. The value will only be adjusted if `current_epoch` is 0, which is
+the default value set by schema migrations.
+This is necessary to prevent spurious epoch aborts during ingestion.
+```
+function bigint **_prom_catalog.initialize_current_epoch**(ran_at timestamp with time zone)
 ```
 ### _prom_catalog.insert_exemplar_row
 
