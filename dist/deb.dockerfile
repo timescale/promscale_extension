@@ -36,7 +36,9 @@ apt-get install -y \
     git \
     lintian \
     pkg-config \
-    rubygems
+    rubygems \
+    clang \
+    libclang-dev
 
 # Install FPM
 gem install fpm

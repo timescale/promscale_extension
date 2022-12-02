@@ -19,10 +19,12 @@ Create a new issue titled "Release `<version to be released here>`". Copy everyt
 ## Release
 - [ ] Create a tag on the master branch `git tag <new version>`
 - [ ] Push the tag `git push origin <new version>`
-- [ ] CI will trigger and create a draft release with assets attached.
+- [ ] CI will trigger the `release` job, which (when it completes) will create a draft release with assets attached.
+- [ ] Push the tag to the `promscale_extension_private` repository `git push private <new version>`.
+- [ ] Validate that the arm64 package build is triggered in the `promscale_extension_private` repo.
 - [ ] Prepare extension release notes, share with team asking for feedback.
+- [ ] Wait for CI to generate the packages, validate that _both_ `x86_64` and `aarch64` packages are present.
 - [ ] Attach release notes to draft release created above.
-- [ ] Wait for CI to generate the packages files
 - [ ] Create a PR to update the HA image in [timescaledb-docker-ha](https://github.com/timescale/timescaledb-docker-ha). [EXAMPLE](https://github.com/timescale/timescaledb-docker-ha/pull/285/files)
 - [ ] In the timescaledb-docker-ha repo, update `TIMESCALE_PROMSCALE_EXTENSIONS` in the `Makefile` to include the version just released
 - [ ] Update the CHANGELOG entry in the timescaledb-docker-ha repo and wait for the CI to complete and request review from the Cloud team and merge it when approved.
