@@ -717,11 +717,6 @@ function interval **_prom_catalog.get_metric_retention_period**(schema_name text
 ```
 function TABLE(id integer, table_name name, table_schema name, series_table name, is_view boolean) **_prom_catalog.get_metric_table_name_if_exists**(schema text, metric_name text)
 ```
-### _prom_catalog.get_metrics_that_need_compression
-
-```
-function SETOF _prom_catalog.metric **_prom_catalog.get_metrics_that_need_compression**()
-```
 ### _prom_catalog.get_metrics_that_need_drop_chunk
 
 ```
@@ -964,6 +959,11 @@ function boolean **_prom_catalog.match_regexp_matches**(labels label_array, _op 
 
 ```
 function boolean **_prom_catalog.match_regexp_not_matches**(labels label_array, _op tag_op_regexp_not_matches)
+```
+### _prom_catalog.metric_chunks_that_need_to_be_compressed
+
+```
+function TABLE(metric_id integer, metric_name text, hypertable_id integer, table_name text, chunks_to_compress jsonb) **_prom_catalog.metric_chunks_that_need_to_be_compressed**(_older_than interval)
 ```
 ### _prom_catalog.metric_detail
 Returns details describing each metric table including disk sizes

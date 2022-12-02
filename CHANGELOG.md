@@ -25,6 +25,8 @@ We use the following categories for changes:
 - Removed disk size related columns from `prom_info.metric`. 
   Added `prom_info.metric_detail` which includes the disk size related columns. 
   Improved the performance of these. [#547]
+- The metric compression job now only locks metrics which are known to have chunks
+  that need to be compressed [#576]
 
 ### Added
 - Telemetry for active series and last updated [#534]

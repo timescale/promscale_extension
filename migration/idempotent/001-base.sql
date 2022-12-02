@@ -3364,93 +3364,203 @@ END
 $$ LANGUAGE PLPGSQL;
 GRANT EXECUTE ON PROCEDURE _prom_catalog.compress_metric_chunks(text) TO prom_maintenance;
 
---Order by random with stable marking gives us same order in a statement and different
--- orderings in different statements
-CREATE OR REPLACE FUNCTION _prom_catalog.get_metrics_that_need_compression()
-    RETURNS SETOF _prom_catalog.metric
-    SET search_path = pg_catalog, pg_temp
-AS $$
-DECLARE
+CREATE OR REPLACE FUNCTION _prom_catalog.metric_chunks_that_need_to_be_compressed(_older_than interval)
+RETURNS TABLE
+( metric_id int
+, metric_name text
+, hypertable_id int
+, table_name text
+, chunks_to_compress jsonb -- array of objects
+)
+SET search_path = pg_catalog, pg_temp
+AS $func$
 BEGIN
     RETURN QUERY
-    SELECT m.*
-    FROM _prom_catalog.metric m
-    WHERE is_view = false
-    AND _prom_catalog.get_metric_compression_setting(m.metric_name)
-    AND (delay_compression_until IS NULL OR delay_compression_until < now())
-    ORDER BY random();
-END
-$$
+    SELECT
+        m.id AS metric_id,
+        m.metric_name::text,
+        m.hypertable_id,
+        m.table_name::text,
+        c.chunks_to_compress
+    FROM
+    (
+        SELECT
+            m.id,
+            m.metric_name,
+            m.table_name,
+            h.id AS hypertable_id
+        FROM _prom_catalog.metric m
+        INNER JOIN _timescaledb_catalog.hypertable h ON (h.schema_name OPERATOR(pg_catalog.=) 'prom_data' AND h.table_name OPERATOR(pg_catalog.=) m.table_name)
+        WHERE m.is_view IS FALSE
+        AND (m.delay_compression_until IS NULL OR m.delay_compression_until OPERATOR(pg_catalog.<) now())
+        AND h.compression_state OPERATOR(pg_catalog.=) 1 -- compression enabled
+        ORDER BY random() -- random metric order
+    ) m
+    INNER JOIN LATERAL -- lateral to force looking up chunks 1 metric at a time in nested loop
+    (
+        SELECT -- array of objects in order from oldest to newest
+            jsonb_agg
+            (
+                jsonb_build_object
+                (
+                    'chunk_id', x.chunk_id,
+                    'schema_name', x.schema_name,
+                    'table_name', x.table_name,
+                    'range_end', x.range_end,
+                    'chunk_num', x.chunk_num
+                )
+                ORDER BY x.chunk_num DESC -- oldest chunks first
+            )
+            FILTER
+            (
+                WHERE x.chunk_num OPERATOR(pg_catalog.>) 1 -- don't compress the most recent chunk
+                AND x.range_end OPERATOR(pg_catalog.<=) now() - _older_than -- don't compress chunks that aren't at least _older_than old
+            )
+            AS chunks_to_compress
+        FROM
+        (
+            SELECT
+                c.id AS chunk_id,
+                c.schema_name,
+                c.table_name,
+                _timescaledb_internal.to_timestamp(ds.range_end) AS range_end,
+                row_number() OVER (ORDER BY ds.range_end desc) AS chunk_num -- number them from most recent to oldest i.e. newest will be 1
+            FROM _timescaledb_catalog.chunk c
+            INNER JOIN _timescaledb_catalog.chunk_constraint k ON (k.chunk_id OPERATOR(pg_catalog.=) c.id)
+            INNER JOIN _timescaledb_catalog.dimension_slice ds ON (ds.id OPERATOR(pg_catalog.=) k.dimension_slice_id)
+            WHERE c.hypertable_id OPERATOR(pg_catalog.=) m.hypertable_id
+            AND c.dropped IS FALSE
+            AND (c.status OPERATOR(pg_catalog.&) 1) OPERATOR(pg_catalog.!=) 1 -- not yet compressed
+        ) x
+    ) c ON (c.chunks_to_compress OPERATOR(pg_catalog.!=) '[]'::jsonb) -- don't bother with metrics that have no chunks to compress
+    ;
+END;
+$func$
 LANGUAGE PLPGSQL STABLE;
-GRANT EXECUTE ON FUNCTION _prom_catalog.get_metrics_that_need_compression() TO prom_maintenance;
+GRANT EXECUTE ON FUNCTION _prom_catalog.metric_chunks_that_need_to_be_compressed(interval) TO prom_maintenance;
 
 --only for timescaledb 2.0 in 1.x we use compression policies
 CREATE OR REPLACE PROCEDURE _prom_catalog.execute_compression_policy(log_verbose boolean = false)
 AS $$
 DECLARE
-    r _prom_catalog.metric;
-    remaining_metrics _prom_catalog.metric[] DEFAULT '{}';
-    startT TIMESTAMPTZ;
-    lockStartT TIMESTAMPTZ;
+    _m record;
+    _c record;
+    _remaining jsonb = pg_catalog.jsonb_build_array();
+    _job_start timestamptz;
+    _job_duration_min double precision;
+    _start TIMESTAMPTZ;
+    _lock_start TIMESTAMPTZ;
+    _metrics_compressed int = 0;
+    _chunks_compressed int = 0;
 BEGIN
     -- Note: We cannot use SET in the procedure declaration because we do transaction control
     -- and we can _only_ use SET LOCAL in a procedure which _does_ transaction control
     SET LOCAL search_path = pg_catalog, pg_temp;
 
+    _job_start = pg_catalog.clock_timestamp();
+
     --Do one loop with metric that could be locked without waiting.
     --This allows you to do everything you can while avoiding lock contention.
     --Then come back for the metrics that would have needed to wait on the lock.
-    --Hopefully, that lock is now freed. The secoond loop waits for the lock
+    --Hopefully, that lock is now freed. The second loop waits for the lock
     --to prevent starvation.
-    FOR r IN
+    FOR _m IN
         SELECT *
-        FROM _prom_catalog.get_metrics_that_need_compression()
+        FROM _prom_catalog.metric_chunks_that_need_to_be_compressed(interval '1 hour')
     LOOP
-        IF NOT _prom_catalog.lock_metric_for_maintenance(r.id, wait=>false) THEN
-            remaining_metrics := remaining_metrics OPERATOR(pg_catalog.||) r;
+        IF NOT _prom_catalog.lock_metric_for_maintenance(_m.metric_id, wait=>false) THEN
+            _remaining = _remaining OPERATOR(pg_catalog.||) pg_catalog.jsonb_build_array
+            (
+                pg_catalog.jsonb_build_object
+                (
+                    'metric_id', _m.metric_id,
+                    'metric_name', _m.metric_name,
+                    'hypertable_id', _m.hypertable_id,
+                    'table_name', _m.table_name,
+                    'chunks_to_compress', _m.chunks_to_compress
+                )
+            );
             CONTINUE;
         END IF;
         IF log_verbose THEN
-            startT := pg_catalog.clock_timestamp();
-            RAISE LOG 'promscale maintenance: compression: metric %: starting, without lock wait', r.metric_name;
+            _start := pg_catalog.clock_timestamp();
+            RAISE LOG 'promscale maintenance: compression: metric %: starting, without lock wait', _m.metric_name;
         END IF;
-        PERFORM _prom_catalog.set_app_name( pg_catalog.format('promscale maintenance: compression: metric %s', r.metric_name));
-        CALL _prom_catalog.compress_metric_chunks(r.metric_name);
-        IF log_verbose THEN
-            RAISE LOG 'promscale maintenance: compression: metric %: finished in %', r.metric_name, pg_catalog.clock_timestamp() OPERATOR(pg_catalog.-) startT;
-        END IF;
-        PERFORM _prom_catalog.unlock_metric_for_maintenance(r.id);
+        PERFORM _prom_catalog.set_app_name( pg_catalog.format('promscale maintenance: compression: metric %s', _m.metric_name));
 
+        FOR _c IN
+            SELECT x.*
+            FROM pg_catalog.jsonb_to_recordset(_m.chunks_to_compress) x(chunk_id int, schema_name text, table_name text, range_end timestamptz, chunk_num int)
+            ORDER BY x.chunk_num DESC -- it ought to come out this way anyway, but just to be sure ;)
+        LOOP
+            PERFORM _prom_catalog.compress_chunk_for_hypertable('prom_data', _m.table_name, _c.schema_name, _c.table_name);
+            _chunks_compressed = _chunks_compressed OPERATOR(pg_catalog.+) 1;
+        END LOOP;
+
+        IF log_verbose THEN
+            RAISE LOG 'promscale maintenance: compression: metric %: finished in %', _m.metric_name, pg_catalog.clock_timestamp() OPERATOR(pg_catalog.-) _start;
+        END IF;
+        PERFORM _prom_catalog.unlock_metric_for_maintenance(_m.metric_id);
+
+        _metrics_compressed = _metrics_compressed OPERATOR(pg_catalog.+) 1;
         COMMIT;
         -- reset search path after transaction end
         SET LOCAL search_path = pg_catalog, pg_temp;
     END LOOP;
 
-    FOR r IN
-        SELECT *
-        FROM pg_catalog.unnest(remaining_metrics)
+    FOR _m IN
+        SELECT x.*
+        FROM pg_catalog.jsonb_to_recordset(_remaining) x
+        ( metric_id int
+        , metric_name text
+        , hypertable_id int
+        , table_name text
+        , chunks_to_compress jsonb -- array of objects
+        )
     LOOP
         IF log_verbose THEN
-            lockStartT := pg_catalog.clock_timestamp();
-            RAISE LOG 'promscale maintenance: compression: metric %: waiting for lock', r.metric_name;
+            _lock_start := pg_catalog.clock_timestamp();
+            RAISE LOG 'promscale maintenance: compression: metric %: waiting for lock', _m.metric_name;
         END IF;
-        PERFORM _prom_catalog.set_app_name( pg_catalog.format('promscale maintenance: compression: metric %s: waiting on lock', r.metric_name));
-        PERFORM _prom_catalog.lock_metric_for_maintenance(r.id);
+        PERFORM _prom_catalog.set_app_name( pg_catalog.format('promscale maintenance: compression: metric %s: waiting on lock', _m.metric_name));
+        PERFORM _prom_catalog.lock_metric_for_maintenance(_m.metric_id);
         IF log_verbose THEN
-            startT := pg_catalog.clock_timestamp();
-            RAISE LOG 'promscale maintenance: compression: metric %: starting', r.metric_name;
+            _start := pg_catalog.clock_timestamp();
+            RAISE LOG 'promscale maintenance: compression: metric %: starting', _m.metric_name;
         END IF;
-        PERFORM _prom_catalog.set_app_name( pg_catalog.format('promscale maintenance: compression: metric %s', r.metric_name));
-        CALL _prom_catalog.compress_metric_chunks(r.metric_name);
-        IF log_verbose THEN
-            RAISE LOG 'promscale maintenance: compression: metric %: finished in % (lock took %; compression took %)', r.metric_name, pg_catalog.clock_timestamp() OPERATOR(pg_catalog.-) lockStartT, startT OPERATOR(pg_catalog.-) lockStartT, pg_catalog.clock_timestamp() OPERATOR(pg_catalog.-) startT;
-        END IF;
-        PERFORM _prom_catalog.unlock_metric_for_maintenance(r.id);
+        PERFORM _prom_catalog.set_app_name( pg_catalog.format('promscale maintenance: compression: metric %s', _m.metric_name));
 
+        FOR _c IN
+            SELECT x.*
+            FROM pg_catalog.jsonb_to_recordset(_m.chunks_to_compress) x(chunk_id int, schema_name text, table_name text, range_end timestamptz, chunk_num int)
+            ORDER BY x.chunk_num DESC -- it ought to come out this way anyway, but just to be sure ;)
+        LOOP
+            PERFORM _prom_catalog.compress_chunk_for_hypertable('prom_data', _m.table_name, _c.schema_name, _c.table_name);
+            _chunks_compressed = _chunks_compressed OPERATOR(pg_catalog.+) 1;
+        END LOOP;
+
+        IF log_verbose THEN
+            RAISE LOG 'promscale maintenance: compression: metric %: finished in % (lock took %; compression took %)', _m.metric_name, pg_catalog.clock_timestamp() OPERATOR(pg_catalog.-) _lock_start, _start OPERATOR(pg_catalog.-) _lock_start, pg_catalog.clock_timestamp() OPERATOR(pg_catalog.-) _start;
+        END IF;
+        PERFORM _prom_catalog.unlock_metric_for_maintenance(_m.metric_id);
+
+        _metrics_compressed = _metrics_compressed OPERATOR(pg_catalog.+) 1;
         COMMIT;
         -- reset search path after transaction end
         SET LOCAL search_path = pg_catalog, pg_temp;
     END LOOP;
+
+    _job_duration_min = extract(epoch from pg_catalog.clock_timestamp() OPERATOR(pg_catalog.-) _job_start)::double precision / 60.0;
+    IF log_verbose AND _chunks_compressed != 0 AND _job_duration_min != 0.0 THEN
+        RAISE INFO 'promscale maintenance: compression: finished in % minutes. % metrics | % chunks | % metrics per minute | % chunks per minute',
+            _job_duration_min,
+            _metrics_compressed,
+            _chunks_compressed,
+            _metrics_compressed / _job_duration_min,
+            _chunks_compressed / _job_duration_min
+            ;
+    END IF;
+
 END;
 $$ LANGUAGE PLPGSQL;
 COMMENT ON PROCEDURE _prom_catalog.execute_compression_policy(boolean)

@@ -46,7 +46,7 @@ RUN sed -i "s#127.0.0.1/32#0.0.0.0/0#" ~/.pgx/data-{12,13,14}/pg_hba.conf
 # Disable telemetry
 RUN echo "timescaledb.telemetry_level=off" | tee -a ~/.pgx/data-{12,13,14}/postgresql.conf
 
-RUN sudo apt-get install -y vim lld
+RUN sudo apt-get install -y --fix-missing vim lld
 
 RUN mkdir -p ~/.cargo
 # Make cargo put compile artifacts in non-bind-mounted directory
