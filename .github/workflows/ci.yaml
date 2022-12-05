@@ -29,6 +29,8 @@ jobs:
           sccache --show-stats
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.postgres.version }}
 
       - name: Install cargo-pgx
         run: |
@@ -44,9 +46,17 @@ jobs:
       - name: Initialize pgx
         if: ${{ steps.cache-pgx.outputs.cache-hit != 'true' }}
         run: cargo pgx init --pg${{ matrix.postgres.version }} download
-      
+
       - name: Run cargo test
         run: cargo pgx test pg${{ matrix.postgres.version }}
+
+      # Note: pgx puts the postgres test configuration data in target/pgx-test-data-<pg_ver>
+      # Swatinem/rust-cache "cleans" and then caches this directory. This
+      # "cleaning" breaks pgx when the cache is restored. By removing the
+      # directory, we prevent it from being incorrectly cached.
+      - name: Remove pgx-test-data directory
+        run: |
+          rm -rf target/pgx-test-data*
 
       - name: Show sccache stats
         run: sccache --show-stats
