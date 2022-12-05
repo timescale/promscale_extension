@@ -1,5 +1,6 @@
 --NOTES
 --This code assumes that table names can only be 63 chars long
+-- Build me an image, would you kindly. BOO
 
 CREATE OR REPLACE VIEW _prom_catalog.initial_default AS
 SELECT *
