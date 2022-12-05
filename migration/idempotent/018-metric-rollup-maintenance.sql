@@ -30,7 +30,7 @@ BEGIN
             WHERE m.is_view %s AND m.view_refresh_interval = $1::INTERVAL
        ', _ignore_rollups_clause) USING _refresh_interval
     LOOP
-        CALL public.refresh_continuous_aggregate(format('%I.%I', r.table_schema, r.table_name), current_timestamp - 3 * _refresh_interval, current_timestamp);
+        CALL public.refresh_continuous_aggregate(format('%I.%I', r.table_schema, r.table_name), current_timestamp - 4 * _refresh_interval, current_timestamp - 2 * _refresh_interval);
         COMMIT; -- Commit after every refresh to avoid high I/O & mem-buffering.
         SET LOCAL search_path = pg_catalog, pg_temp;
     END LOOP;
