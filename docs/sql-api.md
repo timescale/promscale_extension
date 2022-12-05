@@ -47,6 +47,11 @@ Executes a specified maintenance job type like dropping data according to retent
 ```
 procedure void **prom_api.execute_maintenance**(IN signal _ps_catalog.signal_type, IN job_type _ps_catalog.job_type, IN log_verbose boolean DEFAULT false)
 ```
+### prom_api.get_automatic_downsample
+Get automatic downsample state for metrics (a.k.a. metric rollups)
+```
+function boolean **prom_api.get_automatic_downsample**()
+```
 ### prom_api.get_default_chunk_interval
 Get the default chunk interval for all metrics
 ```
@@ -496,6 +501,11 @@ towards the root. Optional third argument allows to limit the span tree traversa
 the specified span_id.
 ```
 function TABLE(trace_id trace_id, parent_span_id bigint, span_id bigint, dist integer, path bigint[]) **ps_trace.upstream_spans**(_trace_id trace_id, _span_id bigint, _max_dist integer DEFAULT NULL::integer)
+```
+### _prom_catalog.add_compression_clause_to_rollups
+
+```
+procedure void **_prom_catalog.add_compression_clause_to_rollups**(IN _rollup_schema text, IN _table_name text)
 ```
 ### _prom_catalog.attach_series_partition
 

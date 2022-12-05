@@ -4,6 +4,8 @@
 
 SELECT * FROM plan(5);
 
+SELECT prom_api.set_default_chunk_interval(INTERVAL '1 hour');
+
 \i 'testdata/scripts/generate-test-metric.sql'
 
 CREATE SCHEMA custom;
@@ -35,7 +37,7 @@ SELECT
     floor(random()*1000) AS value,
     _prom_catalog.get_or_create_series_id('{"__name__": "test", "job":"promscale", "instance": "localhost:9090"}')
 FROM generate_series(
-    current_timestamp - INTERVAL '2 hours',
+    current_timestamp - INTERVAL '3 hours',
     current_timestamp,
     interval '30 seconds'
 ) as time;
@@ -43,16 +45,12 @@ FROM generate_series(
 -- # TEST refreshing custom downsample.
 
 -- Check samples before calling the refresh func.
-SELECT ok(count(*) = 342, 'samples in custom downsample before refresh') FROM custom.test; -- Samples increased even before calling refresh func. My guess is that this is due to timescaledb.materalized behaviour.
+SELECT ok(count(*) = 344, 'samples in custom downsample before refresh') FROM custom.test; -- Samples increased even before calling refresh func. My guess is that this is due to timescaledb.materalized behaviour.
 
-DO $$
-BEGIN
-    CALL _prom_catalog.execute_caggs_refresh_policy(1, json_build_object('refresh_interval', interval '30 minutes')::jsonb);
-END;
-$$;
+CALL _prom_catalog.execute_caggs_refresh_policy(1, json_build_object('refresh_interval', interval '30 minutes')::jsonb);
 
 -- Check samples after the refresh.
-SELECT ok(count(*) = 340, 'samples in custom downsample after refresh') FROM custom.test; -- 2 samples increased, i.e, from 333 -> 336 which is expected, since last 2 buckets are only updated.
+SELECT ok(count(*) = 344, 'samples in custom downsample after refresh') FROM custom.test; -- Samples remain the same since refresh overwrote the samples done by materalized behaviour.
 
 -- The end
 SELECT * FROM finish(true);

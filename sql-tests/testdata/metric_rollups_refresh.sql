@@ -4,6 +4,8 @@
 
 SELECT * FROM plan(10);
 
+SELECT prom_api.set_default_chunk_interval(INTERVAL '1 hour');
+
 \i 'testdata/scripts/generate-test-metric.sql'
 
 -- Create metric rollups.
@@ -31,7 +33,7 @@ SELECT
     floor(random()*1000) AS value,
     _prom_catalog.get_or_create_series_id('{"__name__": "test", "job":"promscale", "instance": "localhost:9090"}')
 FROM generate_series(
-    current_timestamp - INTERVAL '2 hours', -- Refresh routine depends on now() as it refreshes the last 2 buckets only. Hence, we use current_timestamp.
+    current_timestamp - INTERVAL '5 hours', -- Start generating samples from 18 hours, since execute_caggs_refresh_policy skips the recent 2 chunks_interval data when refreshing so as to refresh only on inactive chunks.
     current_timestamp,
     interval '30 seconds'
 ) as time;
@@ -49,9 +51,8 @@ BEGIN
 END;
 $$;
 
--- Check samples after the refresh.
-SELECT ok(count(*) = 2019, 'samples in 5m metric-rollup') FROM ps_short.test; -- Note: Only 2 samples increased, since refresh only accounts for last 2 buckets
-SELECT ok(count(*) = 171, 'samples in 1h metric-rollup') FROM ps_long.test;
+SELECT ok(count(*) = 2018, 'samples in 5m metric-rollup') FROM ps_short.test; -- Note: Only 1 sample increased, since refresh only accounts for 1 bucket
+SELECT ok(count(*) = 170, 'samples in 1h metric-rollup') FROM ps_long.test; -- Same as above.
 
 -- The end
 SELECT * FROM finish(true);

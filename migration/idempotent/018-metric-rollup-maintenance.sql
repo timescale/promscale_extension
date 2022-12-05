@@ -4,6 +4,7 @@ $$
 DECLARE
     _refresh_interval INTERVAL;
     _refresh_rollups BOOLEAN := (SELECT prom_api.get_automatic_downsample()::BOOLEAN);
+    _active_chunk_interval INTERVAL := (SELECT _prom_catalog.get_default_chunk_interval()::INTERVAL * 2);
     _ignore_rollups_clause TEXT := '';
     r RECORD;
 
@@ -30,7 +31,8 @@ BEGIN
             WHERE m.is_view %s AND m.view_refresh_interval = $1::INTERVAL
        ', _ignore_rollups_clause) USING _refresh_interval
     LOOP
-        CALL public.refresh_continuous_aggregate(format('%I.%I', r.table_schema, r.table_name), current_timestamp - 3 * _refresh_interval, current_timestamp);
+        -- Refresh on inactive chunks so we do not disturb ingestion.
+        CALL public.refresh_continuous_aggregate(format('%I.%I', r.table_schema, r.table_name), current_timestamp - _active_chunk_interval - 4 * _refresh_interval, current_timestamp - _active_chunk_interval - 2 * _refresh_interval);
         COMMIT; -- Commit after every refresh to avoid high I/O & mem-buffering.
         SET LOCAL search_path = pg_catalog, pg_temp;
     END LOOP;
