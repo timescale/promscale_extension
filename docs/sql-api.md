@@ -47,6 +47,11 @@ Executes a specified maintenance job type like dropping data according to retent
 ```
 procedure void **prom_api.execute_maintenance**(IN signal _ps_catalog.signal_type, IN job_type _ps_catalog.job_type, IN log_verbose boolean DEFAULT false)
 ```
+### prom_api.get_automatic_downsample
+Get automatic downsample state for metrics (a.k.a. metric rollups)
+```
+function boolean **prom_api.get_automatic_downsample**()
+```
 ### prom_api.get_default_chunk_interval
 Get the default chunk interval for all metrics
 ```

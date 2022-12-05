@@ -2,7 +2,7 @@
 \set QUIET 1
 \i 'testdata/scripts/pgtap-1.2.0.sql'
 
-SELECT * FROM plan(8);
+SELECT * FROM plan(10);
 
 SELECT prom_api.set_default_chunk_interval(INTERVAL '1 hour');
 
@@ -33,33 +33,19 @@ SELECT ok(compressed_chunks_exist('ps_short.test') = true);
 SELECT ok(compressed_chunks_exist('ps_long.test') = true);
 
 -- Compress again to ensure we don't error when touching compressed chunks.
-SET client_min_messages to 'ERROR'; -- So that the snapshot does not get filled with debug logs.
+SET client_min_messages to 'WARNING'; -- So that the snapshot does not get filled with debug logs.
 CALL _prom_catalog.execute_caggs_compression_policy(3, '{}'::jsonb);
 
 -- # Test retaining metric-rollups.
 
-DO $$
-DECLARE
-    _chunks_before_retention_short INTEGER;
-    _chunks_before_retention_long INTEGER;
+SELECT ok(count(*) > 0) FROM (SELECT show_chunks('ps_short.test')) a;
+SELECT ok(count(*) > 0) FROM (SELECT show_chunks('ps_long.test')) a;
 
-    _chunks_after_retention_short INTEGER;
-    _chunks_after_retention_long INTEGER;
+-- Perform retention.
+CALL _prom_catalog.execute_caggs_retention_policy(4, '{}'::jsonb); -- Retention removes all the chunks since retention interval is 1 day and the data was ingested a month
 
-BEGIN
-    _chunks_before_retention_short := (SELECT count(*) FROM (SELECT show_chunks('ps_short.test')) a);
-    _chunks_before_retention_long := (SELECT count(*) FROM (SELECT show_chunks('ps_long.test')) a);
-
-    -- Perform retention.
-    CALL _prom_catalog.execute_caggs_retention_policy(4, '{}'::jsonb);
-
-    _chunks_after_retention_short := (SELECT count(*) FROM (SELECT show_chunks('ps_short.test')) a);
-    _chunks_after_retention_long := (SELECT count(*) FROM (SELECT show_chunks('ps_long.test')) a);
-
-    PERFORM ok(_chunks_before_retention_short > _chunks_after_retention_short, 'retention for short');
-    PERFORM ok(_chunks_before_retention_long > _chunks_after_retention_long, 'retention for long');
-END;
-$$;
+SELECT ok(count(*) = 0) FROM (SELECT show_chunks('ps_short.test')) a;
+SELECT ok(count(*) = 0) FROM (SELECT show_chunks('ps_long.test')) a;
 
 -- The end
 SELECT * FROM finish(true);
