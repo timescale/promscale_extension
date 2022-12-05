@@ -5,21 +5,20 @@ AS
 $$
 BEGIN
     EXECUTE FORMAT(
-            'CREATE MATERIALIZED VIEW %1$I.%2$I WITH (timescaledb.continuous, timescaledb.materialized_only=true) AS
-                SELECT
-                    timezone(
-                        %3$L,
-                        public.time_bucket(%4$L, time) AT TIME ZONE %3$L + %4$L
-                    ) as time,
-                    series_id,
-                    sum(value) as sum,
-                    count(value) as count,
-                    min(value) as min,
-                    max(value) as max
-                FROM prom_data.%2$I
-                GROUP BY public.time_bucket(%4$L, time), series_id WITH NO DATA
-            ', rollup_schema, table_name, 'UTC', resolution::text);
-    EXECUTE FORMAT('ALTER MATERIALIZED VIEW %1$I.%2$I SET (timescaledb.compress = true)', rollup_schema, table_name);
+        'CREATE MATERIALIZED VIEW %1$I.%2$I WITH (timescaledb.continuous, timescaledb.materialized_only=true) AS
+            SELECT
+                timezone(
+                    %3$L,
+                    public.time_bucket(%4$L, time) AT TIME ZONE %3$L + %4$L
+                ) as time,
+                series_id,
+                sum(value) as sum,
+                count(value) as count,
+                min(value) as min,
+                max(value) as max
+            FROM prom_data.%2$I
+            GROUP BY public.time_bucket(%4$L, time), series_id WITH NO DATA
+    ', rollup_schema, table_name, 'UTC', resolution::text);
 END;
 $$
 LANGUAGE plpgsql;
@@ -30,20 +29,19 @@ AS
 $$
 BEGIN
     EXECUTE FORMAT(
-            'CREATE MATERIALIZED VIEW %1$I.%2$I WITH (timescaledb.continuous, timescaledb.materialized_only=true) AS
-                SELECT
-                    timezone(
-                        %3$L,
-                        public.time_bucket(%4$L, time) AT TIME ZONE %3$L + %4$L
-                    ) as time,
-                    series_id,
-                    public.first(value, time),
-                    public.last(value, time) + _prom_catalog.counter_reset_sum(array_agg(value)) last,
-                    _prom_catalog.irate(array_agg(value)) irate
-                FROM prom_data.%2$I
-                GROUP BY public.time_bucket(%4$L, time), series_id WITH NO DATA
-            ', rollup_schema, table_name, 'UTC', resolution::text);
-    EXECUTE FORMAT('ALTER MATERIALIZED VIEW %1$I.%2$I SET (timescaledb.compress = true)', rollup_schema, table_name);
+        'CREATE MATERIALIZED VIEW %1$I.%2$I WITH (timescaledb.continuous, timescaledb.materialized_only=true) AS
+            SELECT
+                timezone(
+                    %3$L,
+                    public.time_bucket(%4$L, time) AT TIME ZONE %3$L + %4$L
+                ) as time,
+                series_id,
+                public.first(value, time),
+                public.last(value, time) + _prom_catalog.counter_reset_sum(array_agg(value)) last,
+                _prom_catalog.irate(array_agg(value)) irate
+            FROM prom_data.%2$I
+            GROUP BY public.time_bucket(%4$L, time), series_id WITH NO DATA
+    ', rollup_schema, table_name, 'UTC', resolution::text);
 END;
 $$
 LANGUAGE PLPGSQL;
@@ -54,19 +52,30 @@ AS
 $$
 BEGIN
     EXECUTE FORMAT(
-            'CREATE MATERIALIZED VIEW %1$I.%2$I WITH (timescaledb.continuous, timescaledb.materialized_only=true) AS
-                SELECT
-                    timezone(
-                        %3$L,
-                        public.time_bucket(%4$L, time) AT TIME ZONE %3$L + %4$L
-                    ) as time,
-                    series_id,
-                    sum(value) as sum,
-                    count(value) as count
-                FROM prom_data.%2$I
-                GROUP BY public.time_bucket(%4$L, time), series_id WITH NO DATA
-            ', rollup_schema, table_name, 'UTC', resolution::text);
-    EXECUTE FORMAT('ALTER MATERIALIZED VIEW %1$I.%2$I SET (timescaledb.compress = true)', rollup_schema, table_name);
+        'CREATE MATERIALIZED VIEW %1$I.%2$I WITH (timescaledb.continuous, timescaledb.materialized_only=true) AS
+            SELECT
+                timezone(
+                    %3$L,
+                    public.time_bucket(%4$L, time) AT TIME ZONE %3$L + %4$L
+                ) as time,
+                series_id,
+                sum(value) as sum,
+                count(value) as count
+            FROM prom_data.%2$I
+            GROUP BY public.time_bucket(%4$L, time), series_id WITH NO DATA
+    ', rollup_schema, table_name, 'UTC', resolution::text);
+END;
+$$
+LANGUAGE PLPGSQL;
+
+CREATE OR REPLACE PROCEDURE _prom_catalog.add_compression_clause_to_rollups(_rollup_schema TEXT, _table_name TEXT)
+    SET search_path = pg_catalog, pg_temp
+AS
+$$
+BEGIN
+    EXECUTE FORMAT($sql$
+        ALTER MATERIALIZED VIEW %1$I.%2$I SET (timescaledb.compress = true)
+    $sql$, _rollup_schema, _table_name);
 END;
 $$
 LANGUAGE PLPGSQL;
@@ -98,6 +107,7 @@ BEGIN
         ELSE
             RAISE WARNING '[Rollup] Skipping creation of metric rollup for %. REASON: invalid metric_type. Wanted {GAUGE, COUNTER, HISTOGRAM, SUMMARY}, received %', _metric_name, _metric_type;
     END CASE;
+    CALL _prom_catalog.add_compression_clause_to_rollups(_rollup_schema, _table_name);
     RETURN TRUE;
 END;
 $$
