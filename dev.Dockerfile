@@ -27,7 +27,7 @@ RUN chmod a+w /usr/share/postgresql/*/extension /usr/lib/postgresql/*/lib
 USER ubuntu
 
 # Install rust
-ENV RUST_VERSION=1.62.0
+ENV RUST_VERSION=1.64.0
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --profile minimal --component rustfmt --default-toolchain ${RUST_VERSION}
 ENV PATH=/home/ubuntu/.cargo/bin:$PATH
 
