@@ -39,6 +39,7 @@ impl PallocdString {
     }
 }
 
+use pgx::pg_sys::Datum;
 pub use pgx::Internal;
 
 #[allow(clippy::missing_safety_doc)]

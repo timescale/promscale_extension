@@ -3445,15 +3445,13 @@ CREATE OR REPLACE FUNCTION _prom_catalog.get_metrics_that_need_compression()
 AS $$
 DECLARE
 BEGIN
-        RETURN QUERY
-        SELECT m.*
-        FROM _prom_catalog.metric m
-        WHERE
-          is_view = false AND
-          _prom_catalog.get_metric_compression_setting(m.metric_name) AND
-          delay_compression_until IS NULL OR delay_compression_until < now() AND
-          is_view = FALSE
-        ORDER BY random();
+    RETURN QUERY
+    SELECT m.*
+    FROM _prom_catalog.metric m
+    WHERE is_view = false
+    AND _prom_catalog.get_metric_compression_setting(m.metric_name)
+    AND (delay_compression_until IS NULL OR delay_compression_until < now())
+    ORDER BY random();
 END
 $$
 LANGUAGE PLPGSQL STABLE;
