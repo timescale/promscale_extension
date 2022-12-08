@@ -19,6 +19,9 @@ and continually recompiles and reinstalls the promscale extension on source
 modifications. This means that you can edit the sources locally, and run SQL
 tests against the container.
 
+NOTE: If `make devenv` fails with a *signal 9*, it is likely that the container
+is running out of memory. Try increasing the RAM allocated to the docker engine.
+
 You can adjust the postgres version through the `DEVENV_PG_VERSION` env var,
 for example: `DEVENV_PG_VERSION=12 make devenv`
 

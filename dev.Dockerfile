@@ -51,7 +51,10 @@ RUN sudo apt-get install -y vim lld
 RUN mkdir -p ~/.cargo
 # Make cargo put compile artifacts in non-bind-mounted directory
 # To re-use compiled artifacts, mount a docker volume to /tmp/target
-RUN echo -e '[build]\ntarget-dir="/tmp/target"' > ~/.cargo/config.toml
+# We have seen issues with the docker container running out of memory
+# Limiting cargo to 2 jobs ought to reduce/limit memory usage
+# 1 job led to very slow build times. 2 is hopefully a good balance
+RUN echo -e '[build]\ntarget-dir="/tmp/target"\njobs=2' > ~/.cargo/config.toml
 # Tell rustc to use a fast linker
 RUN echo 'rustflags=["-C", "link-arg=-fuse-ld=lld"]' >> ~/.cargo/config.toml
 
