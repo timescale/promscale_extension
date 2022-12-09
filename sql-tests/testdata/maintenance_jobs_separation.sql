@@ -26,7 +26,7 @@ WHERE proc_schema = '_prom_catalog'
   AND config ->> 'signal' = 'metrics' 
   AND config ->> 'type' = 'retention';
 
-SELECT ok(COUNT(*) = 1, 'One metrics compression job by default.')
+SELECT ok(COUNT(*) = 4, 'Four metrics compression jobs by default.')
 FROM timescaledb_information.jobs 
 WHERE proc_schema = '_prom_catalog'
   AND config ->> 'signal' = 'metrics' 

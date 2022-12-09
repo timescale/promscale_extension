@@ -22,10 +22,16 @@ BEGIN
 	WHERE proc_schema = '_prom_catalog' 
 	  AND proc_name = 'execute_maintenance_job' 
 	  AND NOT coalesce(config, '{}'::jsonb) ?& ARRAY['signal', 'type'];
+       -- 2 metric retention jobs
        PERFORM public.add_job('_prom_catalog.execute_maintenance_job', '30 min', config=>'{"signal": "metrics", "type": "retention"}');
        PERFORM public.add_job('_prom_catalog.execute_maintenance_job', '30 min', config=>'{"signal": "metrics", "type": "retention"}');
-       PERFORM public.add_job('_prom_catalog.execute_maintenance_job', '30 min', config=>'{"signal": "traces", "type": "retention"}');
+       -- 4 metric compression jobs
        PERFORM public.add_job('_prom_catalog.execute_maintenance_job', '30 min', config=>'{"signal": "metrics", "type": "compression"}');
+       PERFORM public.add_job('_prom_catalog.execute_maintenance_job', '30 min', config=>'{"signal": "metrics", "type": "compression"}');
+       PERFORM public.add_job('_prom_catalog.execute_maintenance_job', '30 min', config=>'{"signal": "metrics", "type": "compression"}');
+       PERFORM public.add_job('_prom_catalog.execute_maintenance_job', '30 min', config=>'{"signal": "metrics", "type": "compression"}');
+       -- 1 traces retention job
+       PERFORM public.add_job('_prom_catalog.execute_maintenance_job', '30 min', config=>'{"signal": "traces", "type": "retention"}');
     END IF;
 END
 $$;
