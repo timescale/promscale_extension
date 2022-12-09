@@ -7,6 +7,7 @@ H := \#
 # not available for sudo, so we use `command -v` to only run them if they are available
 EXT_VERSION ?= $(shell command -v cargo >/dev/null && ./extract-extension-version.sh | tr -d '\n')
 RUST_VERSION ?= $(shell command -v rustc >/dev/null && rustc --version | cut -d' ' -f2)
+SQL_FILENAME ?= sql/promscale--${EXT_VERSION}.sql
 IMAGE_NAME ?= timescaledev/promscale-extension
 OS_NAME ?= debian
 OS_VERSION ?= 11
@@ -70,11 +71,15 @@ help:
 .PHONY: build
 build: promscale.control ## Build the extension
 	cargo build --release --features pg${PG_BUILD_VERSION} $(EXTRA_RUST_ARGS)
-	cargo pgx schema pg${PG_BUILD_VERSION} --out sql/promscale--${EXT_VERSION}.sql --release
 
 .PHONY: clean
-clean: ## Clean up latest build
+clean: clean-generated ## Clean up latest build
 	cargo clean
+
+.PHONY: clean-generated
+clean-generated:
+	-rm ${SQL_FILENAME}
+	-rm promscale.control
 
 .PHONY: run-12
 run-12: PG_BUILD_VERSION=12
@@ -95,14 +100,14 @@ run: promscale.control ## Custom wrapper around cargo pgx run
 .PHONY: dependencies
 dependencies: promscale.control ## Used in docker build to improve build caching
 	# both of these steps are also run in the `package` target, so we run them here to provide better caching
-	cargo pgx schema pg${PG_BUILD_VERSION} --out sql/promscale--${EXT_VERSION}.sql --release
+	cargo pgx schema pg${PG_BUILD_VERSION} --out ${SQL_FILENAME} --release
 	cargo pgx package --pg-config ${PG_CONFIG}
-	rm sql/promscale--${EXT_VERSION}.sql
+	rm ${SQL_FILENAME}
 
 .PHONY: package
 package: promscale.control ## Generate extension artifacts for packaging
 	cargo pgx schema pg${PG_BUILD_VERSION} --release >/dev/null
-	cargo pgx schema pg${PG_BUILD_VERSION} --out sql/promscale--${EXT_VERSION}.sql --release
+	cargo pgx schema pg${PG_BUILD_VERSION} --out ${SQL_FILENAME} --release
 	bash create-upgrade-symlinks.sh
 	cargo pgx package --pg-config ${PG_CONFIG}
 
@@ -184,7 +189,7 @@ release-test: dist/$(RELEASE_FILE_NAME)-docker-test ## Test the currently select
 
 .PHONY: post-release
 post-release: promscale.control
-	cargo pgx schema pg${PG_BUILD_VERSION} --out sql/promscale--${EXT_VERSION}.sql --release
+	cargo pgx schema pg${PG_BUILD_VERSION} --out ${SQL_FILENAME} --release
 	bash create-upgrade-symlinks.sh
 
 .PHONY: docker-image-build-12 docker-image-build-13 docker-image-build-14
@@ -259,15 +264,19 @@ promscale.control: ## A hack to boostrap the build, some pgx commands require th
 DEVENV_CONTAINER_NAME = promscale-extension-devcontainer
 
 .PHONY: devcontainer
-devcontainer:
+devcontainer: ## Builds an image for an interactive development container, that includes TimescaleDB with this extension
 	docker build -f dev.Dockerfile -t ${DEVENV_CONTAINER_NAME} .
 
 DEVENV_PG_VERSION ?= ${PG_BUILD_VERSION}
 DEVENV_PG_INTERNAL_PORT ?= 288${DEVENV_PG_VERSION}
 
+.PHONY: devenv-internal-build-install
+devenv-internal-build-install: clean-generated promscale.control
+	cargo pgx install --features="pg${DEVENV_PG_VERSION}"
+
 .PHONY: devenv
 devenv: VOLUME_NAME=promscale-extension-build-cache
-devenv: devcontainer promscale.control
+devenv: devcontainer promscale.control ## Starts an interactive container from an image built by devcontainer target. It monitors working directory and re-builds/re-installs the extension.
 	docker volume inspect ${VOLUME_NAME} 1>/dev/null 2>&1 || docker volume create ${VOLUME_NAME}
 	docker run --rm -v ${VOLUME_NAME}:/tmp/target ubuntu bash -c "chmod a+w /tmp/target"
 	docker run -ti -e DEVENV_PG_VERSION=${DEVENV_PG_VERSION} --rm -v ${VOLUME_NAME}:/tmp/target -p54321:${DEVENV_PG_INTERNAL_PORT} -v$(shell pwd):/code --name ${DEVENV_CONTAINER_NAME} ${DEVENV_CONTAINER_NAME}
@@ -279,7 +288,7 @@ devenv-export-url:
 	@echo "export POSTGRES_URL=${POSTGRES_URL}"
 
 .PHONY: devenv-url
-devenv-url:
+devenv-url: ## Outputs PSQL url that can be used to connect to the devenv
 	@echo "postgres://ubuntu@localhost:54321/"
 
 .PHONY: sql-tests
@@ -293,9 +302,9 @@ gendoc: ## Generate SQL API documentation
 DEVENV_EXEC ?= docker exec -it -e POSTGRES_URL=postgres://ubuntu@localhost:${DEVENV_PG_INTERNAL_PORT}/ ${DEVENV_CONTAINER_NAME}
 
 .PHONY: dev-sql-tests
-dev-sql-tests:
+dev-sql-tests: ## Run tests from sql-tests workspace within the devenv. The devenv must be started separately.
 	${DEVENV_EXEC} make sql-tests
 
 .PHONY: dev-gendoc
-dev-gendoc:
+dev-gendoc: ## Generate SQL API documentation within the devenv. The devenv must be started separately.
 	${DEVENV_EXEC} make gendoc
