@@ -30,6 +30,7 @@ We use the following categories for changes:
 
 ### Added
 - Telemetry for active series and last updated [#534]
+- Add support for merge chunks during compression [#583]
 
 ### Fixed
 - Column conflict when creating a metric view with a label called `series`
