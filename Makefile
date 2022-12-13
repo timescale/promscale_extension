@@ -274,12 +274,18 @@ DEVENV_PG_INTERNAL_PORT ?= 288${DEVENV_PG_VERSION}
 devenv-internal-build-install: clean-generated promscale.control
 	cargo pgx install --features="pg${DEVENV_PG_VERSION}"
 
+DEVENV_ENTR ?= 1
+
 .PHONY: devenv
 devenv: VOLUME_NAME=promscale-extension-build-cache
 devenv: devcontainer promscale.control ## Starts an interactive container from an image built by devcontainer target. It monitors working directory and re-builds/re-installs the extension.
 	docker volume inspect ${VOLUME_NAME} 1>/dev/null 2>&1 || docker volume create ${VOLUME_NAME}
 	docker run --rm -v ${VOLUME_NAME}:/tmp/target ubuntu bash -c "chmod a+w /tmp/target"
-	docker run -ti -e DEVENV_PG_VERSION=${DEVENV_PG_VERSION} --rm -v ${VOLUME_NAME}:/tmp/target -p54321:${DEVENV_PG_INTERNAL_PORT} -v$(shell pwd):/code --name ${DEVENV_CONTAINER_NAME} ${DEVENV_CONTAINER_NAME}
+	docker run -ti -e DEVENV_ENTR=${DEVENV_ENTR} -e DEVENV_PG_VERSION=${DEVENV_PG_VERSION} --rm -v ${VOLUME_NAME}:/tmp/target -p54321:${DEVENV_PG_INTERNAL_PORT} -v$(shell pwd):/code --name ${DEVENV_CONTAINER_NAME} ${DEVENV_CONTAINER_NAME}
+
+.PHONY: devenv-no-entr
+devenv-no-entr: DEVENV_ENTR=0
+devenv-no-entr: devenv
 
 POSTGRES_URL ?= $(shell $(MAKE) devenv-url)
 
@@ -308,3 +314,15 @@ dev-sql-tests: ## Run tests from sql-tests workspace within the devenv. The deve
 .PHONY: dev-gendoc
 dev-gendoc: ## Generate SQL API documentation within the devenv. The devenv must be started separately.
 	${DEVENV_EXEC} make gendoc
+
+.PHONY: dev-build
+dev-build: ## (Re)builds and installs the extension inside the devenv container. The devenv must be started separately.
+	${DEVENV_EXEC} make devenv-internal-build-install
+
+.PHONY: dev-bash
+dev-bash: ## Gets a bash shell inside the devenv container. The devenv must be started separately.
+	${DEVENV_EXEC} bash
+
+.PHONY: dev-psql
+dev-psql: ## Gets a psql shell connected to the devenv container. The devenv must be started separately.
+	psql "${POSTGRES_URL}"

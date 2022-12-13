@@ -19,6 +19,11 @@ and continually recompiles and reinstalls the promscale extension on source
 modifications. This means that you can edit the sources locally, and run SQL
 tests against the container.
 
+If you don't want the dev environment to continually recompile and reinstall the
+extension (i.e. you want to manually trigger these), run `make devenv-no-entr`.
+Then, use `make dev-build` to trigger a recompile and reinstall of the promscale 
+extension.
+
 NOTE: If `make devenv` fails with a *signal 9*, it is likely that the container
 is running out of memory. Try increasing the RAM allocated to the docker engine.
 
@@ -32,11 +37,13 @@ above, set `POSTGRES_URL=postgres://ubuntu@localhost:54321/`.
 The `devenv-url` and `devenv-export-url` make targets output the URL above in
 convenient formats, for example:
 
-- To connect to the devenv db with psql: `psql $(make devenv-url)`
+- To connect to the devenv db with psql: `psql $(make devenv-url)` or use `make dev-psql`
 - To set the `POSTGRES_URL` for all subshells: `eval $(make devenv-export-url)`
 
 To permanently configure `POSTGRES_URL` when you change into this directory,
 you may consider using a tool like [direnv](https://direnv.net/).
+
+To easily get a bash shell in the devenv container run `make dev-bash`.
 
 ## Modifying and testing SQL migrations
 
@@ -112,7 +119,7 @@ If you have already built a local docker image and your changes are limited to
 SQL migrations there is also `make docker-quick-NN` family of targets. It's faster
 but could be finicky.
 
-To run the e2e tests against the locally build image run: `cargo test -p e2e`.
+To run the e2e tests against the locally built image run: `cargo test -p e2e`.
 Further details could be found in the [corresponding document](./e2e/README.md).
 
 ## Known Issues
