@@ -37,13 +37,20 @@ for db in template1 postgres; do
 done
 createdb -h localhost -p "${PGPORT}" "$(whoami)"
 
-# This allows entr to work correctly on docker for mac
-export ENTR_INOTIFY_WORKAROUND=true
+if [ "$DEVENV_ENTR" -eq 1 ]; then
+  echo "entr enabled. rebuilds will be triggered on source file changes"
+  # This allows entr to work correctly on docker for mac
+  export ENTR_INOTIFY_WORKAROUND=true
 
-# Note: this is not a comprehensive list of source files, if you think one is missing, add it
-SOURCE_FILES="src migration"
-find ${SOURCE_FILES} | entr make devenv-internal-build-install > "${HOME}/compile.log" &
+  # Note: this is not a comprehensive list of source files, if you think one is missing, add it
+  SOURCE_FILES="src migration"
+  find ${SOURCE_FILES} | entr make devenv-internal-build-install > "${HOME}/compile.log" &
 
-tail -f "${HOME}/.pgx/${DEVENV_PG_VERSION}.log" "${HOME}/compile.log" &
+  tail -f "${HOME}/.pgx/${DEVENV_PG_VERSION}.log" "${HOME}/compile.log" &
+else
+  echo "entr disabled. you must trigger rebuilds manually with 'make dev-build'"
+  make devenv-internal-build-install
+  tail -f "${HOME}/.pgx/${DEVENV_PG_VERSION}.log"
+fi
 
 wait
