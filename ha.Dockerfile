@@ -82,7 +82,7 @@ RUN --mount=type=secret,uid=1000,id=AWS_ACCESS_KEY_ID --mount=type=secret,uid=10
 # Yes, fixed pg14 image is intentional. The image ships with PG 12, 13 and 14 binaries
 # PATH environment variable below is used to specify runtime version.
 # FROM timescale/timescaledb-ha:pg14-ts${TIMESCALEDB_VERSION_MAJMIN}-latest
-FROM timescale/timescaledb-ha:nightly-pg15
+FROM timescaledev/timescaledb-ha:nightly-pg15
 ARG PG_VERSION
 COPY --from=builder --chown=root:postgres /build/promscale/target/release/promscale-pg${PG_VERSION}/usr/lib/postgresql /usr/lib/postgresql
 COPY --from=builder --chown=root:postgres /build/promscale/target/release/promscale-pg${PG_VERSION}/usr/share/postgresql /usr/share/postgresql

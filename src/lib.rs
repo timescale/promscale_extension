@@ -22,7 +22,7 @@ pg_module_magic!();
 /// For safety reasons it p-allocates and copies its arguemnts
 /// every time. Which is OK for our current once-per-query usage,
 /// but don't attempt it on per-row basis.
-pub fn build_pg_list_of_cstrings<'a, I>(parts: I) -> PgList<pg_sys::Value>
+pub fn build_pg_list_of_cstrings<'a, I>(parts: I) -> PgList<pg_imports::PgString>
 where
     I: IntoIterator<Item = &'a str>,
 {
