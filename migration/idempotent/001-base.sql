@@ -3452,6 +3452,7 @@ DECLARE
     _lock_start TIMESTAMPTZ;
     _metrics_compressed int = 0;
     _chunks_compressed int = 0;
+    _sql text;
 BEGIN
     -- Note: We cannot use SET in the procedure declaration because we do transaction control
     -- and we can _only_ use SET LOCAL in a procedure which _does_ transaction control
@@ -3494,6 +3495,13 @@ BEGIN
             ORDER BY x.chunk_num DESC -- it ought to come out this way anyway, but just to be sure ;)
         LOOP
             PERFORM _prom_catalog.compress_chunk_for_hypertable('prom_data', _m.table_name, _c.schema_name, _c.table_name);
+            -- if we don't analyze the compressed chunk, n_live_tup = 0 and the autovacuum engine will ignore it
+            SELECT format('ANALYZE %I.%I', cc.schema_name, cc.table_name) INTO _sql
+            FROM _timescaledb_catalog.chunk c
+            INNER JOIN _timescaledb_catalog.chunk cc
+            ON (c.id = _c.chunk_id and c.compressed_chunk_id = cc.id)
+            ;
+            EXECUTE _sql;
             _chunks_compressed = _chunks_compressed OPERATOR(pg_catalog.+) 1;
         END LOOP;
 
@@ -3536,6 +3544,13 @@ BEGIN
             ORDER BY x.chunk_num DESC -- it ought to come out this way anyway, but just to be sure ;)
         LOOP
             PERFORM _prom_catalog.compress_chunk_for_hypertable('prom_data', _m.table_name, _c.schema_name, _c.table_name);
+            -- if we don't analyze the compressed chunk, n_live_tup = 0 and the autovacuum engine will ignore it
+            SELECT format('ANALYZE %I.%I', cc.schema_name, cc.table_name) INTO _sql
+            FROM _timescaledb_catalog.chunk c
+            INNER JOIN _timescaledb_catalog.chunk cc
+            ON (c.id = _c.chunk_id and c.compressed_chunk_id = cc.id)
+            ;
+            EXECUTE _sql;
             _chunks_compressed = _chunks_compressed OPERATOR(pg_catalog.+) 1;
         END LOOP;
 
