@@ -19,6 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         pgversion:
+        - 15
         - 14
         - 13
         - 12
@@ -26,7 +27,7 @@ jobs:
         - 2.9.1
         base:
         - ha
-        - alpine
+        # - alpine
     steps:
       - uses: actions/checkout@v3
 
