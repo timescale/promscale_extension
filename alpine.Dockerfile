@@ -115,19 +115,19 @@ RUN \
         llvm
 
 RUN \
-    git clone --branch v1.12 --depth 1 https://github.com/dimitri/pgextwlist.git /pgextwlist && \
+    git clone --branch v1.15 --depth 1 https://github.com/dimitri/pgextwlist.git /pgextwlist && \
     cd /pgextwlist && \
     make
 
-FROM ${PREVIOUS_IMAGE} as prev_img
+# FROM ${PREVIOUS_IMAGE} as prev_img
 
 # COPY over the new files to the image. Done as a seperate stage so we don't
 # ship the build tools.
 FROM timescaledev/timescaledb:nightly-pg${PG_VERSION}
 ARG PG_VERSION
 
-COPY --from=prev_img /usr/local/lib/postgresql/promscale*   /usr/local/lib/postgresql
-COPY --from=prev_img /usr/local/share/postgresql/extension/promscale* /usr/local/share/postgresql/extension
+# COPY --from=prev_img /usr/local/lib/postgresql/promscale*   /usr/local/lib/postgresql
+# COPY --from=prev_img /usr/local/share/postgresql/extension/promscale* /usr/local/share/postgresql/extension
 
 COPY --from=builder /build/promscale/target/release/promscale-pg${PG_VERSION}/usr/local/lib/postgresql /usr/local/lib/postgresql
 COPY --from=builder /build/promscale/target/release/promscale-pg${PG_VERSION}/usr/local/share/postgresql /usr/local/share/postgresql
