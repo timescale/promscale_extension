@@ -16,9 +16,11 @@ BEGIN
             k.relfrozenxid
         FROM _timescaledb_catalog.chunk c
         INNER JOIN _timescaledb_catalog.chunk cc
-        ON (c.dropped OPERATOR(pg_catalog.=) false and c.compressed_chunk_id OPERATOR(pg_catalog.=) cc.id)
+        ON (c.dropped OPERATOR(pg_catalog.=) false AND c.compressed_chunk_id OPERATOR(pg_catalog.=) cc.id)
         INNER JOIN pg_catalog.pg_class k
-        ON (k.oid OPERATOR(pg_catalog.=) format('%I.%I', cc.schema_name, cc.table_name)::regclass::oid)
+        ON (k.relname OPERATOR(pg_catalog.=) cc.table_name)
+        INNER JOIN pg_catalog.pg_namespace n
+        ON (k.relnamespace OPERATOR(pg_catalog.=) n.oid AND n.nspname OPERATOR(pg_catalog.=) cc.schema_name)
         WHERE k.relallvisible OPERATOR(pg_catalog.<) k.relpages
         ORDER BY pg_catalog.age(k.relfrozenxid) DESC
         ;
