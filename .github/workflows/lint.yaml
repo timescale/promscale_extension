@@ -42,9 +42,9 @@ jobs:
           ./install-cargo-pgx.sh
 
       - name: Initialize pgx
-        run: cargo pgx init --pg14 download
+        run: cargo pgx init --pg15 download
 
-      - run: cargo clippy --features pg14 -- -D warnings
+      - run: cargo clippy --no-default-features --features pg15 -- -D warnings
 
   pgspot:
     runs-on: ubuntu-latest
@@ -84,13 +84,13 @@ jobs:
           ./install-cargo-pgx.sh
 
       - name: Initialize pgx
-        run: cargo pgx init --pg14 download
+        run: cargo pgx init --pg15 download
 
       - name: Prepare control file
         run: make promscale.control
 
       - name: Generate schema
-        run: cargo pgx schema pg14 --out /tmp/schema.sql
+        run: cargo pgx schema pg15 --out /tmp/schema.sql
 
       - name: Run pgspot
         run: pgspot --sql-accepting=execute_everywhere --sql-accepting=distributed_exec --ignore PS005 /tmp/schema.sql ./sql/promscale--0.0.0.sql

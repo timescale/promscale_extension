@@ -22,8 +22,9 @@ pub enum ImageOrigin {
 }
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum PgVersion {
+    V15,
     V14,
     V13,
     V12,
@@ -34,6 +35,7 @@ impl TryFrom<&str> for PgVersion {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
+            "15" => Ok(PgVersion::V15),
             "14" => Ok(PgVersion::V14),
             "13" => Ok(PgVersion::V13),
             "12" => Ok(PgVersion::V12),
@@ -45,6 +47,7 @@ impl TryFrom<&str> for PgVersion {
 impl Display for PgVersion {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
+            PgVersion::V15 => write!(f, "15"),
             PgVersion::V14 => write!(f, "14"),
             PgVersion::V13 => write!(f, "13"),
             PgVersion::V12 => write!(f, "12"),
@@ -62,6 +65,7 @@ pub fn postgres_image_uri(origin: ImageOrigin, version: PgVersion) -> String {
         PgVersion::V12 => "pg12",
         PgVersion::V13 => "pg13",
         PgVersion::V14 => "pg14",
+        PgVersion::V15 => "pg15",
     };
     format!("{}{}", prefix, version)
 }

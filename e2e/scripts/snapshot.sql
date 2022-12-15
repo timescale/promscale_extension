@@ -100,6 +100,9 @@ select
         when n.nspname = '_timescaledb_config' and k.relname like 'bgw_job'
             then format('select to_jsonb(comp_tab) - ''initial_start''::text from (select id, * from %I.%I) comp_tab order by id', n.nspname, k.relname)
         when n.nspname = '_timescaledb_internal' and (k.relname like '_compressed_hypertable_%' or k.relname like 'compress_hyper_%_chunk')
+        -- ignore telemetry job errors
+        when n.nspname = '_timescaledb_internal' and k.relname like 'job_errors'
+            then 'select * from _timescaledb_internal.job_errors where job_id != 1'
             -- 1. Cannot order by tbl on compressed hypertables
             -- 2. Not every column should be in a snapshot. 
             --    E.g. _ts_meta_sequence_num changes its value when upgrading past TS 2.8.0

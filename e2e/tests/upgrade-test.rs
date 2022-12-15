@@ -170,7 +170,15 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
 
     // figure out which image we should start with in the upgrade process
     // based on alpine vs ha and postgres version
-    let from_image_uri = from_image(&flavor, &pg_version, &from_version);
+    let from_image_uri = if let Some(img) = from_image(&flavor, &pg_version, &from_version) {
+        img
+    } else {
+        info!(
+            "from image is not defined for the selected flavor {} and PG version {}",
+            flavor, pg_version
+        );
+        return;
+    };
     info!("from image {}", from_image_uri);
     info!("to image {}", to_image_uri);
 
@@ -342,33 +350,41 @@ fn test_upgrade(from_version: FromVersion, with_data: bool) {
     assert!(are_equal);
 }
 
-fn from_image(flavor: &Flavor, pg_version: &PgVersion, from_version: &FromVersion) -> String {
+fn from_image(
+    flavor: &Flavor,
+    pg_version: &PgVersion,
+    from_version: &FromVersion,
+) -> Option<String> {
     match flavor {
         Flavor::Alpine => match from_version {
             // Our timescaledev images are deprecated, but they are the only option for an alpine
             // image at the moment. They also are nicely tagged with the exact extension version.
-            FromVersion::First => format!(
+            FromVersion::First => Some(format!(
                 "timescaledev/promscale-extension:0.5.0-ts2.6.1-pg{}",
                 pg_version
-            ),
-            FromVersion::Prior => format!(
+            ))
+            .filter(|_| *pg_version != PgVersion::V15),
+            FromVersion::Prior => Some(format!(
                 "{}{}",
                 ALPINE_WITH_EXTENSION_LAST_RELEASED_PREFIX, pg_version
-            ),
+            ))
+            .filter(|_| *pg_version != PgVersion::V15),
         },
         Flavor::HA => match from_version {
             // The timescaledb-ha docker images aren't tagged with the version of the promscale
             // extension that they contain, so we need to keep a map of exact image tags (with
             // patch version) for the first release (with extension 0.5.0) and the prior release.
             FromVersion::First => match pg_version {
-                PgVersion::V14 => String::from("timescale/timescaledb-ha:pg14.2-ts2.6.1-p5"),
-                PgVersion::V13 => String::from("timescale/timescaledb-ha:pg13.6-ts2.6.1-p5"),
-                PgVersion::V12 => String::from("timescale/timescaledb-ha:pg12.10-ts2.6.1-p2"),
+                PgVersion::V15 => None,
+                PgVersion::V14 => Some(String::from("timescale/timescaledb-ha:pg14.2-ts2.6.1-p5")),
+                PgVersion::V13 => Some(String::from("timescale/timescaledb-ha:pg13.6-ts2.6.1-p5")),
+                PgVersion::V12 => Some(String::from("timescale/timescaledb-ha:pg12.10-ts2.6.1-p2")),
             },
             FromVersion::Prior => match pg_version {
-                PgVersion::V14 => String::from(HA_WITH_LAST_RELEASED_EXTENSION_PG14),
-                PgVersion::V13 => String::from(HA_WITH_LAST_RELEASED_EXTENSION_PG13),
-                PgVersion::V12 => String::from(HA_WITH_LAST_RELEASED_EXTENSION_PG12),
+                PgVersion::V15 => None,
+                PgVersion::V14 => Some(String::from(HA_WITH_LAST_RELEASED_EXTENSION_PG14)),
+                PgVersion::V13 => Some(String::from(HA_WITH_LAST_RELEASED_EXTENSION_PG13)),
+                PgVersion::V12 => Some(String::from(HA_WITH_LAST_RELEASED_EXTENSION_PG12)),
             },
         },
     }
