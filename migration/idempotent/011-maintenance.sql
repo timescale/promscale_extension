@@ -609,7 +609,15 @@ BEGIN
       AND coalesce(config->>'type', '') = job_type::text;
 
     IF cnt < number_jobs THEN
-        PERFORM public.add_job('_prom_catalog.execute_maintenance_job', new_schedule_interval, config=>final_config)
+        PERFORM 
+            public.add_job(
+                '_prom_catalog.execute_maintenance_job', 
+                -- shift schedules a little to avoid multiple jobs starting in a lockstep
+                new_schedule_interval + (random() / 2.0 + 0.5) * interval '1 min', 
+                config=>final_config,
+                -- shift the inital start time to avoid a thundering herd
+                initial_start=>now() + (random() / 2.0 + 0.5) * new_schedule_interval
+            )
         FROM generate_series(1, number_jobs-cnt);
     END IF;
 
