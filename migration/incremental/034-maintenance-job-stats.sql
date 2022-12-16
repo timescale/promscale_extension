@@ -19,13 +19,18 @@ BEGIN
        -- delete jobs with the old config style
        PERFORM public.delete_job(job_id)
        FROM timescaledb_information.jobs
-	WHERE proc_schema = '_prom_catalog' 
-	  AND proc_name = 'execute_maintenance_job' 
-	  AND NOT coalesce(config, '{}'::jsonb) ?& ARRAY['signal', 'type'];
-       PERFORM public.add_job('_prom_catalog.execute_maintenance_job', '30 min', config=>'{"signal": "metrics", "type": "retention"}');
-       PERFORM public.add_job('_prom_catalog.execute_maintenance_job', '30 min', config=>'{"signal": "metrics", "type": "retention"}');
-       PERFORM public.add_job('_prom_catalog.execute_maintenance_job', '30 min', config=>'{"signal": "traces", "type": "retention"}');
-       PERFORM public.add_job('_prom_catalog.execute_maintenance_job', '30 min', config=>'{"signal": "metrics", "type": "compression"}');
+        WHERE proc_schema = '_prom_catalog' 
+        AND proc_name = 'execute_maintenance_job' 
+        AND NOT coalesce(config, '{}'::jsonb) ?& ARRAY['signal', 'type'];
+       -- 2 metric retention jobs
+       PERFORM public.add_job('_prom_catalog.execute_maintenance_job', '30 min', config=>'{"signal": "metrics", "type": "retention"}', initial_start=>now() + random() * interval '30 min' + interval '1 min');
+       PERFORM public.add_job('_prom_catalog.execute_maintenance_job', '31 min', config=>'{"signal": "metrics", "type": "retention"}', initial_start=>now() + random() * interval '30 min' + interval '1 min');
+       -- 3 metric compression jobs
+       PERFORM public.add_job('_prom_catalog.execute_maintenance_job', '29 min', config=>'{"signal": "metrics", "type": "compression"}', initial_start=>now() + random() * interval '30 min' + interval '1 min');
+       PERFORM public.add_job('_prom_catalog.execute_maintenance_job', '30 min', config=>'{"signal": "metrics", "type": "compression"}', initial_start=>now() + random() * interval '30 min' + interval '1 min');
+       PERFORM public.add_job('_prom_catalog.execute_maintenance_job', '31 min', config=>'{"signal": "metrics", "type": "compression"}', initial_start=>now() + random() * interval '30 min' + interval '1 min');
+       -- 1 traces retention job
+       PERFORM public.add_job('_prom_catalog.execute_maintenance_job', '30 min', config=>'{"signal": "traces", "type": "retention"}', initial_start=>now() + random() * interval '30 min' + interval '1 min');
     END IF;
 END
 $$;

@@ -26,7 +26,7 @@ WHERE proc_schema = '_prom_catalog'
   AND config ->> 'signal' = 'metrics' 
   AND config ->> 'type' = 'retention';
 
-SELECT ok(COUNT(*) = 1, 'One metrics compression job by default.')
+SELECT ok(COUNT(*) = 3, 'Three metrics compression jobs by default.')
 FROM timescaledb_information.jobs 
 WHERE proc_schema = '_prom_catalog'
   AND config ->> 'signal' = 'metrics' 
@@ -53,7 +53,7 @@ WHERE proc_schema = '_prom_catalog'
 SELECT ok(COUNT(*) = 3, 'Only the new-style configurations should be present')
 FROM timescaledb_information.jobs 
 WHERE proc_schema = '_prom_catalog'
-  AND schedule_interval = '10 min';
+  AND (schedule_interval >= '10 min' OR schedule_interval < '15 min');
 
 -- Increase the number of jobs
 SELECT prom_api.config_maintenance_jobs(2, '15 min', '{"log_verbose": true}');
@@ -61,7 +61,7 @@ SELECT prom_api.config_maintenance_jobs(2, '15 min', '{"log_verbose": true}');
 SELECT ok(COUNT(*) = 6) FROM timescaledb_information.jobs 
 WHERE proc_schema = '_prom_catalog'
   AND config ?& ARRAY ['signal', 'type']
-  AND schedule_interval = '15 min'
+  AND (schedule_interval >= '15 min' OR schedule_interval < '17 min')
   AND coalesce(config ->> 'log_verbose', 'false')::boolean = true;
 
 -- Decrease the number of jobs
@@ -70,7 +70,7 @@ SELECT prom_api.config_maintenance_jobs(1, '16 min', '{"log_verbose": false}');
 SELECT ok(COUNT(*) = 3) FROM timescaledb_information.jobs 
 WHERE proc_schema = '_prom_catalog'
   AND config ?& ARRAY ['signal', 'type']
-  AND schedule_interval = '16 min'
+  AND (schedule_interval >= '16 min' OR schedule_interval < '18 min')
   AND coalesce(config ->> 'log_verbose', 'true')::boolean = false;
 
 SELECT throws_like(
