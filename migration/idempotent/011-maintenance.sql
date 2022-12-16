@@ -613,9 +613,11 @@ BEGIN
             public.add_job(
                 '_prom_catalog.execute_maintenance_job', 
                 -- shift schedules a little to avoid multiple jobs starting in a lockstep
+                -- new_schedule_interval + random[30s; 1m]
                 new_schedule_interval + (random() / 2.0 + 0.5) * interval '1 min', 
                 config=>final_config,
                 -- shift the inital start time to avoid a thundering herd
+                -- now + random[new_schedule_interval / 2; new_schedule_interval]
                 initial_start=>now() + (random() / 2.0 + 0.5) * new_schedule_interval
             )
         FROM generate_series(1, number_jobs-cnt);
