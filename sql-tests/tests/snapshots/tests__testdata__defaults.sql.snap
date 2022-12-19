@@ -19,7 +19,8 @@ from
     ('ha_lease_timeout'         , '1m'),
     ('ha_lease_refresh'         , '10s'),
     ('epoch_duration'           , (INTERVAL '12 hours')::text),
-    ('automatic_downsample'     , 'true')
+    ('downsample'               , 'true'),
+    ('downsample_old_data'      , 'false')
 ) x(key, value)
 ;
  key | value 

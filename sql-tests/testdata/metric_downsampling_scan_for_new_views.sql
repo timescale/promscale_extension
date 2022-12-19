@@ -4,25 +4,27 @@
 
 SELECT * FROM plan(3);
 
--- Scan should not error when there are no rollups.
-CALL _prom_catalog.scan_for_new_rollups(1, '{}'::jsonb);
+SELECT prom_api.set_downsample_old_data(true);
 
-CALL _prom_catalog.create_rollup('test', INTERVAL '5 minutes', INTERVAL '1 day');
+-- Scan should not error when there are no rollups.
+CALL _prom_catalog.scan_for_new_downsampling_views(1, '{}'::jsonb);
+
+CALL _prom_catalog.create_downsampling('ds_5m', INTERVAL '5 minutes', INTERVAL '1 day');
 
 -- Scan should not error when there are no metrics.
-CALL _prom_catalog.scan_for_new_rollups(1, '{}'::jsonb);
+CALL _prom_catalog.scan_for_new_downsampling_views(1, '{}'::jsonb);
 
 \i 'testdata/scripts/generate-test-metric.sql'
 
 -- Scan when there are metrics. This will create new rollups.
-CALL _prom_catalog.scan_for_new_rollups(1, '{}'::jsonb);
+CALL _prom_catalog.scan_for_new_downsampling_views(1, '{}'::jsonb);
 
-SELECT ok(count(*) = 2017) FROM ps_test.test;
+SELECT ok(count(*) = 2017) FROM ds_5m.test;
 
 -- Scan again when there aren't any new metrics.
-CALL _prom_catalog.scan_for_new_rollups(1, '{}'::jsonb);
+CALL _prom_catalog.scan_for_new_downsampling_views(1, '{}'::jsonb);
 
-SELECT ok(count(*) = 2017) FROM ps_test.test;
+SELECT ok(count(*) = 2017) FROM ds_5m.test;
 
 -- Add a new metric.
 DO $$
@@ -45,9 +47,9 @@ END;
 $$;
 
 -- Scan for newly added metric test_2.
-CALL _prom_catalog.scan_for_new_rollups(1, '{}'::jsonb);
+CALL _prom_catalog.scan_for_new_downsampling_views(1, '{}'::jsonb);
 
-SELECT ok(count(*) = 2017) FROM ps_test.test_2;
+SELECT ok(count(*) = 2017) FROM ds_5m.test_2;
 
 -- The end
 SELECT * FROM finish(true);
