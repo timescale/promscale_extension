@@ -2,7 +2,7 @@
 \set QUIET 1
 \i 'testdata/scripts/pgtap-1.2.0.sql'
 
-select * from plan(5);
+select * from plan(6);
 
 -- create one hypertable
 create table metric1(id int, t timestamptz not null, val double precision) with (autovacuum_enabled = 'off');
@@ -44,7 +44,7 @@ select isnt_empty(
 
 -- there ought not be any results from the view because no chunks are compressed
 select is_empty(
-    'select * from _ps_catalog.chunks_to_freeze',
+    'select * from _ps_catalog.compressed_chunks_to_freeze',
     'zero results when no chunks compressed'
 );
 
@@ -111,9 +111,14 @@ select results_eq(
 
 -- view should return the 15 chosen compressed chunks
 select results_eq(
-    'select id from _ps_catalog.chunks_to_freeze order by id',
+    'select id from _ps_catalog.compressed_chunks_to_freeze order by id',
     'select id from pg_temp._chosen_compressed_chunks order by id',
     'view should return the 15 chosen compressed chunks'
+);
+
+select lives_ok(
+    'select * from _ps_catalog.compressed_chunks_missing_stats',
+    'compressed_chunks_missing_stats view works'
 );
 
 /*
