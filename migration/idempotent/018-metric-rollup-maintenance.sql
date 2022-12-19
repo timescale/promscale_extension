@@ -4,8 +4,9 @@ $$
 DECLARE
     _refresh_interval INTERVAL;
     _active_chunk_interval INTERVAL;
-    _ignore_rollups_clause TEXT := '';
-    _refresh_rollups BOOLEAN := (SELECT prom_api.get_automatic_downsample()::BOOLEAN);
+    _ignore_downsampling_clause TEXT := '';
+    _refresh_downsampled_data BOOLEAN := (SELECT prom_api.get_downsampling_state()::BOOLEAN);
+    _should_refresh_clause TEXT := 'AND (SELECT should_refresh FROM _prom_catalog.downsample WHERE id = m.downsample_id) = TRUE';
     _safety_refresh_start_buffer INTERVAL := INTERVAL '0 minutes';
     r RECORD;
 
@@ -29,20 +30,24 @@ BEGIN
         _safety_refresh_start_buffer := INTERVAL '30 minutes';
     END IF;
 
-    IF NOT _refresh_rollups THEN
-        _ignore_rollups_clause := 'AND m.rollup_id IS NULL';
+    IF NOT _refresh_downsampled_data THEN
+        -- Do not refresh automatic-downsampling caggs.
+        _ignore_downsampling_clause := 'AND m.downsample_id IS NULL';
+        _should_refresh_clause := '';
     END IF;
 
     FOR r IN
         -- We need to refresh the custom caggs at the minimum.
-        -- The choice of not refreshing is applicable only on metric-rollups, depending on the value of _refresh_rollups.
+        -- The choice of not refreshing is applicable only on automatic-downsampling data, depending on the value of _refresh_downsampled_data.
         EXECUTE FORMAT('
             SELECT
                 m.table_schema,
                 m.table_name
             FROM _prom_catalog.metric m
-            WHERE m.is_view %s AND m.view_refresh_interval = $1::INTERVAL
-       ', _ignore_rollups_clause) USING _refresh_interval
+            WHERE
+                m.is_view
+                AND m.view_refresh_interval = $1::INTERVAL %s %s
+       ', _ignore_downsampling_clause, _should_refresh_clause) USING _refresh_interval
     LOOP
         -- Refresh on inactive chunks so we do not disturb ingestion.
         -- Refreshing from <now - (5 * refresh_interval)> to <now - (2 * refresh_interval)> gives a refresh range
@@ -61,7 +66,7 @@ LANGUAGE PLPGSQL;
 COMMENT ON PROCEDURE _prom_catalog.execute_caggs_refresh_policy IS 'execute_caggs_refresh_policy runs every refresh_interval passed in config. Its
 main aim is to refresh those Caggs that have been registered under _prom_catalog.metric and whose view_refresh_interval
 matches the given refresh_interval. It refreshes 2 kinds of Caggs:
-1. Caggs created by metric rollups
+1. Caggs created by metric downsampling
 2. Custom Caggs created by the user';
 
 CREATE OR REPLACE FUNCTION _prom_catalog.create_cagg_refresh_job_if_not_exists(_refresh_interval INTERVAL) RETURNS VOID
@@ -113,9 +118,8 @@ $$
 LANGUAGE PLPGSQL;
 COMMENT ON PROCEDURE _prom_catalog.execute_caggs_compression_policy IS 'execute_caggs_compression_policy is responsible to compress Caggs registered via
 register_metric_view() in _prom_catalog.metric. It goes through all the entries in the _prom_catalog.metric and tries to compress any Cagg that supports compression.
-These include metric-rollups and custom Caggs based downsampling.
-Note: execute_caggs_compression_policy runs every X interval and compresses only the inactive chunks of those Caggs which have timescaledb.compress = true.
-By default, these include metric-rollups.';
+These include automatic-downsampling of metrics and custom Caggs based downsampling.
+Note: execute_caggs_compression_policy runs every X interval and compresses only the inactive chunks of those Caggs which have timescaledb.compress = true.';
 
 CREATE OR REPLACE PROCEDURE _prom_catalog.execute_caggs_retention_policy(job_id int, config jsonb)
     SET search_path = pg_catalog, pg_temp
@@ -127,8 +131,8 @@ DECLARE
 
 BEGIN
     -- For retention, we have 2 cases:
-    -- Case 1: Retention for metric-rollups
-    -- These Caggs have a defined retention duration that is stored in the _prom_catalog.rollup
+    -- Case 1: Retention for automatic-downsampling of metrics
+    -- These Caggs have a defined retention duration that is stored in the _prom_catalog.downsample
     --
     -- Case 2: Retention for custom Caggs
     -- These Caggs do not have a well definied policy for retention. Hence, we will assume the
@@ -139,13 +143,13 @@ BEGIN
     -- Case 1.
     FOR r IN
         SELECT
-            format('%I.%I', rp.schema_name, m.table_name) AS cagg,
-            rp.retention as rollup_retention
+            format('%I.%I', dwn.schema_name, m.table_name) AS cagg,
+            dwn.retention as downsample_retention
         FROM _prom_catalog.metric m
-        INNER JOIN _prom_catalog.metric_rollup mr ON (m.id = mr.metric_id)
-        INNER JOIN _prom_catalog.rollup rp ON (mr.rollup_id = rp.id)
+        INNER JOIN _prom_catalog.metric_downsample md ON (md.metric_id = m.id)
+        INNER JOIN _prom_catalog.downsample dwn ON (md.downsample_id = dwn.id)
     LOOP
-        PERFORM public.drop_chunks(r.cagg, older_than => r.rollup_retention);
+        PERFORM public.drop_chunks(r.cagg, older_than => r.downsample_retention);
     END LOOP;
 
     -- Case 2.
@@ -153,7 +157,7 @@ BEGIN
         SELECT
             format('%I.%I', table_schema, metric_name) AS cagg,
             metric_name AS cagg_name -- Note: This is the name of cagg view.
-        FROM _prom_catalog.metric WHERE is_view AND rollup_id IS NULL
+        FROM _prom_catalog.metric WHERE is_view AND downsample_id IS NULL
     LOOP
         _retention := (SELECT _prom_catalog.get_metric_retention_period(r.cagg_name));
         PERFORM public.drop_chunks(r.cagg, older_than => _retention);
@@ -161,10 +165,10 @@ BEGIN
 END;
 $$
 LANGUAGE PLPGSQL;
-COMMENT ON PROCEDURE _prom_catalog.execute_caggs_retention_policy IS 'execute_caggs_retention_policy is responsible to perform retention behaviour on compress continuous aggregates registered via
+COMMENT ON PROCEDURE _prom_catalog.execute_caggs_retention_policy IS 'execute_caggs_retention_policy is responsible to perform retention behaviour on continuous aggregates registered via
 register_metric_view(). It loops through all entries in the _prom_catalog.metric that are Caggs and tries to delete the stale chunks of those Caggs.
-The staleness is determined by rollup_retention (for metric rollups) and default_retention_period of parent hypertable (for custom Caggs).
-These include metric-rollups and custom Caggs based downsampling.';
+The staleness is determined by _prom_catalog.downsample.retention (for metric downsampling) and default_retention_period of parent hypertable (for custom Caggs).
+These include automatic-downsampling for metrics and custom Caggs based downsampling.';
 
 DO $$
 DECLARE

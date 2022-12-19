@@ -18,7 +18,7 @@ SELECT * FROM plan(9);
 SELECT ok(COUNT(*) = 0, 'No old-style configurations are present at the beginning')
 FROM timescaledb_information.jobs
 WHERE proc_schema = '_prom_catalog'
-  AND NOT (proc_name = 'scan_for_new_rollups' OR proc_name = 'execute_caggs_compression_policy' OR proc_name = 'execute_caggs_retention_policy')
+  AND NOT (proc_name = 'scan_for_new_downsampling_views' OR proc_name = 'execute_caggs_compression_policy' OR proc_name = 'execute_caggs_retention_policy')
   AND NOT coalesce(config, '{}'::jsonb) ?& ARRAY ['signal', 'type'];
 
 SELECT ok(COUNT(*) = 2, 'Two metrics retention jobs by default.')
@@ -49,7 +49,7 @@ SELECT prom_api.config_maintenance_jobs(1, '10 min');
 SELECT ok(COUNT(*) = 0, 'Old-style config jobs should be deleted by config_maintenance_jobs')
 FROM timescaledb_information.jobs
 WHERE proc_schema = '_prom_catalog'
-  AND NOT (proc_name = 'scan_for_new_rollups' OR proc_name = 'execute_caggs_compression_policy' OR proc_name = 'execute_caggs_retention_policy')
+  AND NOT (proc_name = 'scan_for_new_downsampling_views' OR proc_name = 'execute_caggs_compression_policy' OR proc_name = 'execute_caggs_retention_policy')
   AND NOT coalesce(config, '{}'::jsonb) ?& ARRAY ['signal', 'type'];
 
 SELECT ok(COUNT(*) = 3, 'Only the new-style configurations should be present')

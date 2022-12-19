@@ -47,11 +47,6 @@ Executes a specified maintenance job type like dropping data according to retent
 ```
 procedure void **prom_api.execute_maintenance**(IN signal _ps_catalog.signal_type, IN job_type _ps_catalog.job_type, IN log_verbose boolean DEFAULT false)
 ```
-### prom_api.get_automatic_downsample
-Get automatic downsample state for metrics (a.k.a. metric rollups)
-```
-function boolean **prom_api.get_automatic_downsample**()
-```
 ### prom_api.get_default_chunk_interval
 Get the default chunk interval for all metrics
 ```
@@ -61,6 +56,16 @@ function interval **prom_api.get_default_chunk_interval**()
 get the default retention period for all metrics
 ```
 function interval **prom_api.get_default_metric_retention_period**()
+```
+### prom_api.get_downsample_old_data
+
+```
+function boolean **prom_api.get_downsample_old_data**()
+```
+### prom_api.get_downsampling_state
+Get automatic downsample state
+```
+function boolean **prom_api.get_downsampling_state**()
 ```
 ### prom_api.get_metric_chunk_interval
 Get the chunk interval for a specific metric, or the default chunk interval if not explicitly set
@@ -140,7 +145,7 @@ function void **prom_api.promscale_post_restore**()
 ### prom_api.register_metric_view
 
 ```
-function boolean **prom_api.register_metric_view**(schema_name text, view_name text, refresh_interval interval, if_not_exists boolean DEFAULT false, rollup_id bigint DEFAULT NULL::bigint)
+function boolean **prom_api.register_metric_view**(schema_name text, view_name text, refresh_interval interval, if_not_exists boolean DEFAULT false, downsample_id bigint DEFAULT NULL::bigint)
 ```
 ### prom_api.reset_metric_chunk_interval
 resets the chunk interval for a specific metric to using the default
@@ -162,11 +167,6 @@ resets the retention period for a specific metric to using the default
 ```
 function boolean **prom_api.reset_metric_retention_period**(schema_name text, metric_name text)
 ```
-### prom_api.set_automatic_downsample
-Set automatic downsample state for metrics (a.k.a. metric rollups). Metric rollups will be created only if this returns true
-```
-function boolean **prom_api.set_automatic_downsample**(_state boolean)
-```
 ### prom_api.set_compression_on_metric_table
 set a compression for a specific metric table
 ```
@@ -186,6 +186,16 @@ function boolean **prom_api.set_default_compression_setting**(compression_settin
 set the retention period for any metrics (existing and new) without an explicit override
 ```
 function boolean **prom_api.set_default_retention_period**(retention_period interval)
+```
+### prom_api.set_downsample_old_data
+
+```
+function void **prom_api.set_downsample_old_data**(_state boolean)
+```
+### prom_api.set_downsampling_state
+Set automatic-downsampling state for metrics. Downsampled data will be created only if this returns true
+```
+function void **prom_api.set_downsampling_state**(_state boolean)
 ```
 ### prom_api.set_metric_chunk_interval
 set a chunk interval for a specific metric (this overrides the default)
@@ -543,6 +553,11 @@ This function creates a refresh job only if no execute_caggs_refresh_policy() ex
 ```
 function void **_prom_catalog.create_cagg_refresh_job_if_not_exists**(_refresh_interval interval)
 ```
+### _prom_catalog.create_downsampling
+
+```
+procedure void **_prom_catalog.create_downsampling**(IN _schema_name text, IN _resolution interval, IN _retention interval)
+```
 ### _prom_catalog.create_exemplar_table_if_not_exists
 
 ```
@@ -563,10 +578,10 @@ function text **_prom_catalog.create_ingest_temp_table**(table_name text, schema
 ```
 function record **_prom_catalog.create_label_key**(new_key text, OUT id integer, OUT value_column_name name, OUT id_column_name name)
 ```
-### _prom_catalog.create_metric_rollup_view
+### _prom_catalog.create_metric_downsampling_view
 
 ```
-function boolean **_prom_catalog.create_metric_rollup_view**(_rollup_schema text, _metric_name text, _table_name text, _resolution interval)
+function boolean **_prom_catalog.create_metric_downsampling_view**(_schema text, _metric_name text, _table_name text, _resolution interval)
 ```
 ### _prom_catalog.create_metric_table
 
@@ -577,26 +592,6 @@ function record **_prom_catalog.create_metric_table**(metric_name_arg text, OUT 
 
 ```
 function boolean **_prom_catalog.create_metric_view**(metric_name text)
-```
-### _prom_catalog.create_rollup
-
-```
-procedure void **_prom_catalog.create_rollup**(IN _name text, IN _resolution interval, IN _retention interval)
-```
-### _prom_catalog.create_rollup_for_counter
-
-```
-procedure void **_prom_catalog.create_rollup_for_counter**(IN rollup_schema text, IN table_name text, IN resolution interval)
-```
-### _prom_catalog.create_rollup_for_gauge
-
-```
-procedure void **_prom_catalog.create_rollup_for_gauge**(IN rollup_schema text, IN table_name text, IN resolution interval)
-```
-### _prom_catalog.create_rollup_for_summary
-
-```
-procedure void **_prom_catalog.create_rollup_for_summary**(IN rollup_schema text, IN table_name text, IN resolution interval)
 ```
 ### _prom_catalog.create_series
 
@@ -623,15 +618,15 @@ procedure void **_prom_catalog.decompress_chunks_after**(IN metric_table text, I
 ```
 function void **_prom_catalog.delay_compression_job**(ht_table text, new_start timestamp with time zone)
 ```
+### _prom_catalog.delete_downsampling
+
+```
+procedure void **_prom_catalog.delete_downsampling**(IN _schema_name text)
+```
 ### _prom_catalog.delete_expired_series
 
 ```
 function void **_prom_catalog.delete_expired_series**(metric_schema text, metric_table text, metric_series_table text, ran_at timestamp with time zone, present_epoch bigint, last_updated_epoch timestamp with time zone)
-```
-### _prom_catalog.delete_rollup
-
-```
-procedure void **_prom_catalog.delete_rollup**(IN _rollup_name text)
 ```
 ### _prom_catalog.delete_series_catalog_row
 
@@ -647,6 +642,21 @@ function bigint **_prom_catalog.delete_series_from_metric**(name text, series_id
 
 ```
 procedure void **_prom_catalog.do_decompress_chunks_after**(IN metric_table text, IN min_time timestamp with time zone, IN transactional boolean DEFAULT false)
+```
+### _prom_catalog.downsample_counter
+
+```
+procedure void **_prom_catalog.downsample_counter**(IN _schema text, IN _table_name text, IN _resolution interval)
+```
+### _prom_catalog.downsample_gauge
+
+```
+procedure void **_prom_catalog.downsample_gauge**(IN _schema text, IN _table_name text, IN _resolution interval)
+```
+### _prom_catalog.downsample_summary
+
+```
+procedure void **_prom_catalog.downsample_summary**(IN _schema text, IN _table_name text, IN _resolution interval)
 ```
 ### _prom_catalog.drop_metric_chunk_data
 drop chunks from schema_name.metric_name containing data older than older_than.
@@ -666,9 +676,8 @@ function void **_prom_catalog.epoch_abort**(user_epoch bigint)
 ### _prom_catalog.execute_caggs_compression_policy
 execute_caggs_compression_policy is responsible to compress Caggs registered via
 register_metric_view() in _prom_catalog.metric. It goes through all the entries in the _prom_catalog.metric and tries to compress any Cagg that supports compression.
-These include metric-rollups and custom Caggs based downsampling.
+These include automatic-downsampling of metrics and custom Caggs based downsampling.
 Note: execute_caggs_compression_policy runs every X interval and compresses only the inactive chunks of those Caggs which have timescaledb.compress = true.
-By default, these include metric-rollups.
 ```
 procedure void **_prom_catalog.execute_caggs_compression_policy**(IN job_id integer, IN config jsonb)
 ```
@@ -676,16 +685,16 @@ procedure void **_prom_catalog.execute_caggs_compression_policy**(IN job_id inte
 execute_caggs_refresh_policy runs every refresh_interval passed in config. Its
 main aim is to refresh those Caggs that have been registered under _prom_catalog.metric and whose view_refresh_interval
 matches the given refresh_interval. It refreshes 2 kinds of Caggs:
-1. Caggs created by metric rollups
+1. Caggs created by metric downsampling
 2. Custom Caggs created by the user
 ```
 procedure void **_prom_catalog.execute_caggs_refresh_policy**(IN job_id integer, IN config jsonb)
 ```
 ### _prom_catalog.execute_caggs_retention_policy
-execute_caggs_retention_policy is responsible to perform retention behaviour on compress continuous aggregates registered via
+execute_caggs_retention_policy is responsible to perform retention behaviour on continuous aggregates registered via
 register_metric_view(). It loops through all entries in the _prom_catalog.metric that are Caggs and tries to delete the stale chunks of those Caggs.
-The staleness is determined by rollup_retention (for metric rollups) and default_retention_period of parent hypertable (for custom Caggs).
-These include metric-rollups and custom Caggs based downsampling.
+The staleness is determined by _prom_catalog.downsample.retention (for metric downsampling) and default_retention_period of parent hypertable (for custom Caggs).
+These include automatic-downsampling for metrics and custom Caggs based downsampling.
 ```
 procedure void **_prom_catalog.execute_caggs_retention_policy**(IN job_id integer, IN config jsonb)
 ```
@@ -1077,10 +1086,10 @@ function void **_prom_catalog.resurrect_series_ids**(metric_table text, series_i
 ```
 function bigint **_prom_catalog.safe_approximate_row_count**(table_name_input regclass)
 ```
-### _prom_catalog.scan_for_new_rollups
+### _prom_catalog.scan_for_new_downsampling_views
 
 ```
-procedure void **_prom_catalog.scan_for_new_rollups**(IN job_id integer, IN config jsonb)
+procedure void **_prom_catalog.scan_for_new_downsampling_views**(IN job_id integer, IN config jsonb)
 ```
 ### _prom_catalog.set_app_name
 
@@ -1111,6 +1120,11 @@ function void **_prom_catalog.unlock_for_vacuum_engine**()
 
 ```
 function void **_prom_catalog.unlock_metric_for_maintenance**(metric_id integer)
+```
+### _prom_catalog.update_downsampling_state_for
+
+```
+function void **_prom_catalog.update_downsampling_state_for**(_schema_name text, _should_refresh boolean)
 ```
 ### _prom_catalog.update_execute_everywhere_entry
 

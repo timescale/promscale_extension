@@ -4,27 +4,29 @@
 
 SELECT * FROM plan(10);
 
+SELECT prom_api.set_downsample_old_data(true);
+
 SELECT prom_api.set_default_chunk_interval(INTERVAL '1 hour');
 
 \i 'testdata/scripts/generate-test-metric.sql'
 
 -- Create metric rollups.
-CALL _prom_catalog.create_rollup('short', INTERVAL '5 minutes', INTERVAL '1 day');
-CALL _prom_catalog.create_rollup('long', INTERVAL '1 hour', INTERVAL '1 day');
+CALL _prom_catalog.create_downsampling('ds_5m', INTERVAL '5 minutes', INTERVAL '1 day');
+CALL _prom_catalog.create_downsampling('ds_1h', INTERVAL '1 hour', INTERVAL '1 day');
 
 -- Check refresh jobs.
 SELECT ok(EXISTS(SELECT 1 FROM timescaledb_information.jobs WHERE proc_name = 'execute_caggs_refresh_policy' AND schedule_interval = INTERVAL '5 minutes') = false);
 SELECT ok(EXISTS(SELECT 1 FROM timescaledb_information.jobs WHERE proc_name = 'execute_caggs_refresh_policy' AND schedule_interval = INTERVAL '1 hour') = false);
 
-CALL _prom_catalog.scan_for_new_rollups(1, '{}'::jsonb);
+CALL _prom_catalog.scan_for_new_downsampling_views(1, '{}'::jsonb);
 
 -- Check refresh jobs.
 SELECT ok(EXISTS(SELECT 1 FROM timescaledb_information.jobs WHERE proc_name = 'execute_caggs_refresh_policy' AND schedule_interval = INTERVAL '5 minutes') = true);
 SELECT ok(EXISTS(SELECT 1 FROM timescaledb_information.jobs WHERE proc_name = 'execute_caggs_refresh_policy' AND schedule_interval = INTERVAL '1 hour') = true);
 
 -- Count the samples in respective resolutions.
-SELECT ok(count(*) = 2017, 'samples in 5m metric-rollup') FROM ps_short.test;
-SELECT ok(count(*) = 169, 'samples in 1h metric-rollup') FROM ps_long.test;
+SELECT ok(count(*) = 2017, 'samples in 5m metric-rollup') FROM ds_5m.test;
+SELECT ok(count(*) = 169, 'samples in 1h metric-rollup') FROM ds_1h.test;
 
 -- Now, imagine that Prometheus adds data for last 2 hours.
 INSERT INTO prom_data.test
@@ -41,8 +43,8 @@ FROM generate_series(
 -- # TEST refreshing metric-rollups.
 
 -- Check samples before calling the refresh func.
-SELECT ok(count(*) = 2017, 'samples in 5m metric-rollup') FROM ps_short.test;
-SELECT ok(count(*) = 169, 'samples in 1h metric-rollup') FROM ps_long.test;
+SELECT ok(count(*) = 2017, 'samples in 5m metric-rollup') FROM ds_5m.test;
+SELECT ok(count(*) = 169, 'samples in 1h metric-rollup') FROM ds_1h.test;
 
 DO $$
 BEGIN
@@ -51,8 +53,8 @@ BEGIN
 END;
 $$;
 
-SELECT ok(count(*) = 2018, 'samples in 5m metric-rollup') FROM ps_short.test; -- Note: Only 1 sample increased, since refresh only accounts for 1 bucket
-SELECT ok(count(*) = 170, 'samples in 1h metric-rollup') FROM ps_long.test; -- Same as above.
+SELECT ok(count(*) = 2025, 'samples in 5m metric-rollup') FROM ds_5m.test; -- We refresh with start_buffer of 30 mins + 10 minutes (bucket refresh interval), which makes 7 samples.
+SELECT ok(count(*) = 170, 'samples in 1h metric-rollup') FROM ds_1h.test; -- Same as above.
 
 -- The end
 SELECT * FROM finish(true);
