@@ -14,4 +14,8 @@ trusted = true
 {%-endif%}
 # comma-separated list of previous versions this version can be upgraded from
 # directly. This is used to generate upgrade scripts.
+{%if is_pg_15 -%}
+# upgradeable_from = 
+{%else-%}
 # upgradeable_from = '0.0.0', '0.5.0', '0.5.1', '0.5.2', '0.5.3', '0.5.4', '0.6.0', '0.7.0'
+{%-endif%}

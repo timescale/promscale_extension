@@ -26,6 +26,7 @@ struct IdempotentWrapper<'a> {
 struct ControlFile {
     requires_timescaledb: bool,
     is_pg_12: bool,
+    is_pg_15: bool,
 }
 
 #[derive(Template)]
@@ -88,10 +89,12 @@ fn generate_control_file(manifest_dir: &str) {
         .map(|(k, _)| k.replace("CARGO_FEATURE_", "").to_ascii_lowercase())
         .collect();
     let is_pg_12 = features.contains(&"pg12".to_string());
+    let is_pg_15 = features.contains(&"pg15".to_string());
     let is_release_build = env::var("PROFILE").unwrap() == "release";
     let requires_timescaledb = is_release_build && !features.contains("pg_test");
     let control_file_contents = ControlFile {
         is_pg_12,
+        is_pg_15,
         requires_timescaledb,
     }
     .render()
