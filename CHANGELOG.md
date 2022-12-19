@@ -27,9 +27,11 @@ We use the following categories for changes:
   Improved the performance of these. [#547]
 - The metric compression job now only locks metrics which are known to have chunks
   that need to be compressed [#576]
+- Renamed `_ps_catalog.chunks_to_freeze` to `_ps_catalog.compressed_chunks_to_freeze` [#595]
 
 ### Added
 - Telemetry for active series and last updated [#534]
+- Added `_ps_catalog.compressed_chunks_missing_stats` view [#595]
 
 ### Fixed
 - Column conflict when creating a metric view with a label called `series`
