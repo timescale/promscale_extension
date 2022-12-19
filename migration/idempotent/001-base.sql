@@ -13,7 +13,8 @@ FROM
     ('ha_lease_timeout'         , '1m'),
     ('ha_lease_refresh'         , '10s'),
     ('epoch_duration'           , (INTERVAL '12 hours')::text),
-    ('automatic_downsample'     , 'true')
+    ('downsample'               , 'true'),
+    ('downsample_old_data'      , 'false') -- For beta release, we do not plan on refreshing old metric data.
 ) d(key, value)
 ;
 GRANT SELECT ON _prom_catalog.initial_default TO prom_reader;
@@ -2563,7 +2564,7 @@ LANGUAGE PLPGSQL;
 REVOKE ALL ON FUNCTION _prom_catalog.create_metric_view(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION _prom_catalog.create_metric_view(text) TO prom_writer;
 
-CREATE OR REPLACE FUNCTION prom_api.register_metric_view(schema_name text, view_name text, refresh_interval INTERVAL, if_not_exists BOOLEAN = false, rollup_id BIGINT = NULL)
+CREATE OR REPLACE FUNCTION prom_api.register_metric_view(schema_name text, view_name text, refresh_interval INTERVAL, if_not_exists BOOLEAN = false, downsample_id BIGINT = NULL)
     RETURNS BOOLEAN
     SECURITY DEFINER
     VOLATILE
@@ -2589,7 +2590,7 @@ BEGIN
         RAISE EXCEPTION 'cannot register metric view in prom_data schema';
     END IF;
 
-    IF rollup_id IS NOT NULL THEN
+    IF downsample_id IS NOT NULL THEN
         -- Check if the materialized view is at least created.
         PERFORM 1 FROM pg_views WHERE viewname = view_name AND schemaname = schema_name;
         IF NOT FOUND THEN
@@ -2640,8 +2641,8 @@ BEGIN
     END IF;
 
     -- insert into metric table
-    INSERT INTO _prom_catalog.metric (metric_name, table_name, table_schema, series_table, is_view, creation_completed, view_refresh_interval, rollup_id)
-    VALUES (register_metric_view.view_name, register_metric_view.view_name, register_metric_view.schema_name, metric_table_name, true, true, refresh_interval, register_metric_view.rollup_id)
+    INSERT INTO _prom_catalog.metric (metric_name, table_name, table_schema, series_table, is_view, creation_completed, view_refresh_interval, downsample_id)
+    VALUES (register_metric_view.view_name, register_metric_view.view_name, register_metric_view.schema_name, metric_table_name, true, true, refresh_interval, register_metric_view.downsample_id)
     ON CONFLICT DO NOTHING;
 
     IF NOT FOUND THEN
