@@ -40,6 +40,14 @@ fn upgrade_promscale_extension_all_versions() {
                     AND
                     split_part(source, '.', 2)::INT < 5
                 )
+                -- When running on PG15 skip all versions before 0.8.0 because they don't exist for PG15
+                AND NOT (
+                    current_setting('server_version_num')::integer >= 150000
+                    AND
+                    split_part(source, '.', 1)::INT = 0
+                    AND
+                    split_part(source, '.', 2)::INT < 8
+                )
                 AND source IN (SELECT version FROM pg_available_extension_versions WHERE name = 'promscale')
             "#, &[])
         .unwrap();
