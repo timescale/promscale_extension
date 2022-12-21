@@ -3437,7 +3437,8 @@ BEGIN
 END;
 $func$
 LANGUAGE PLPGSQL STABLE;
-GRANT EXECUTE ON FUNCTION _prom_catalog.metric_chunks_that_need_to_be_compressed(interval) TO prom_maintenance;
+-- prom_reader is needed so that the connector can use this for metrics it exposes
+GRANT EXECUTE ON FUNCTION _prom_catalog.metric_chunks_that_need_to_be_compressed(interval) TO prom_maintenance, prom_reader;
 
 --only for timescaledb 2.0 in 1.x we use compression policies
 CREATE OR REPLACE PROCEDURE _prom_catalog.execute_compression_policy(log_verbose boolean = false)
