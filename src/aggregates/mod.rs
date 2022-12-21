@@ -1,5 +1,6 @@
 use crate::aggregates::gapfill_delta::_prom_ext::GapfillDeltaTransition;
 
+mod counter;
 mod gapfill_delta;
 mod prom_delta;
 mod prom_increase;
