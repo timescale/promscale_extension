@@ -3,17 +3,30 @@ AS
 $$
 DECLARE
     _refresh_interval INTERVAL;
-    _refresh_rollups BOOLEAN := (SELECT prom_api.get_automatic_downsample()::BOOLEAN);
-    _active_chunk_interval INTERVAL := (SELECT _prom_catalog.get_default_chunk_interval()::INTERVAL * 2);
+    _active_chunk_interval INTERVAL;
     _ignore_rollups_clause TEXT := '';
+    _refresh_rollups BOOLEAN := (SELECT prom_api.get_automatic_downsample()::BOOLEAN);
+    _safety_refresh_start_buffer INTERVAL := INTERVAL '0 minutes';
     r RECORD;
 
 BEGIN
     SET LOCAL search_path = pg_catalog, pg_temp;
 
+    _active_chunk_interval := (SELECT _prom_catalog.get_default_chunk_interval()::INTERVAL * 2);
     _refresh_interval := (config ->> 'refresh_interval')::INTERVAL;
     IF _refresh_interval IS NULL THEN
         RAISE EXCEPTION 'refresh_interval cannot be null';
+    END IF;
+
+    IF ( SELECT _refresh_interval < INTERVAL '30 minutes' ) THEN
+        -- If refresh_interval is very small, we add a buffer time to start refreshing CAggs for a longer time-range.
+        -- This is because a small refresh, like 5 minutes, will need refresh every 5 minutes. Since we cover only 2 buckets
+        -- of refreshing data, a system with a lot of metrics and series might take > 10 minutes to refresh a 5 minute downsampling.
+        -- This will lead to data loss. Hence, we give a refresh buffer of 30 minutes early to start.
+        --
+        -- This problem is not seen in large downsampling resolutions like 1 hour, since the 2 buckets duration gives 2 hours
+        -- of time to complete refresh, which is usually sufficient.
+        _safety_refresh_start_buffer := INTERVAL '30 minutes';
     END IF;
 
     IF NOT _refresh_rollups THEN
@@ -32,7 +45,13 @@ BEGIN
        ', _ignore_rollups_clause) USING _refresh_interval
     LOOP
         -- Refresh on inactive chunks so we do not disturb ingestion.
-        CALL public.refresh_continuous_aggregate(format('%I.%I', r.table_schema, r.table_name), current_timestamp - _active_chunk_interval - 4 * _refresh_interval, current_timestamp - _active_chunk_interval - 2 * _refresh_interval);
+        -- Refreshing from <now - (5 * refresh_interval)> to <now - (2 * refresh_interval)> gives a refresh range
+        -- of 2 full buckets.
+        CALL public.refresh_continuous_aggregate(
+            format('%I.%I', r.table_schema, r.table_name),
+            current_timestamp - _active_chunk_interval - 5 * _refresh_interval - _safety_refresh_start_buffer,
+            current_timestamp - _active_chunk_interval - 2 * _refresh_interval
+        );
         COMMIT; -- Commit after every refresh to avoid high I/O & mem-buffering.
         SET LOCAL search_path = pg_catalog, pg_temp;
     END LOOP;
