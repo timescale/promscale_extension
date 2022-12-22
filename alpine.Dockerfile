@@ -4,7 +4,7 @@ ARG TIMESCALEDB_VERSION_FULL=2.9.0
 ARG PREVIOUS_IMAGE=timescaledev/promscale-extension:latest-ts2-pg${PG_VERSION}
 FROM timescale/timescaledb:${TIMESCALEDB_VERSION_FULL}-pg${PG_VERSION} as builder
 
-MAINTAINER Timescale https://www.timescale.com
+LABEL maintainer="Timescale https://www.timescale.com"
 ARG RUST_VERSION=1.64.0
 ARG PG_VERSION
 
@@ -15,6 +15,7 @@ RUN \
         gcc \
         libgcc \
         libc-dev \
+        clang-dev \
         clang-libs \
         make \
         git \
