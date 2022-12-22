@@ -92,7 +92,10 @@ select
             then 'select name, body from _ps_catalog.migration where name != ''001-extension.sql'' AND name != ''024-adjust_autovacuum.sql'' order by name, body;'
         -- ignore telemetry job errors
         when n.nspname = '_timescaledb_internal' and k.relname like 'job_errors'
-            then 'select * from _timescaledb_internal.job_errors where job_id != 1'
+            then $$
+                select * from _timescaledb_internal.job_errors 
+                where error_data->>'proc_name' NOT IN ('policy_job_error_retention', 'policy_telemetry')
+                $$
         when n.nspname = '_timescaledb_internal' and (k.relname like '_compressed_hypertable_%' or k.relname like 'compress_hyper_%_chunk')
             -- 1. Cannot order by tbl on compressed hypertables
             -- 2. Not every column should be in a snapshot. 
