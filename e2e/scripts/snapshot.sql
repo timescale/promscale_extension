@@ -96,6 +96,9 @@ select
                 select * from _timescaledb_internal.job_errors 
                 where error_data->>'proc_name' NOT IN ('policy_job_error_retention', 'policy_telemetry')
                 $$
+        --ignore the differences in initial_start column for scheduled jobs
+        when n.nspname = '_timescaledb_config' and k.relname like 'bgw_job'
+            then format('select to_jsonb(comp_tab) - ''initial_start''::text from (select id, * from %I.%I) comp_tab order by id', n.nspname, k.relname)
         when n.nspname = '_timescaledb_internal' and (k.relname like '_compressed_hypertable_%' or k.relname like 'compress_hyper_%_chunk')
             -- 1. Cannot order by tbl on compressed hypertables
             -- 2. Not every column should be in a snapshot. 
