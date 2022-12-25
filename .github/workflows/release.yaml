@@ -15,15 +15,19 @@ on:
 
 jobs:
   package:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.arch.runner }}
     env:
       RUST_VERSION: "1.64.0"
     strategy:
       fail-fast: false
       matrix:
         arch:
+        - cpu: aarch64
+          platform: arm64
+          runner: [self-hosted, Linux, ARM64]
         - cpu: x86_64
           platform: amd64
+          runner: ubuntu-latest
         os:
         - name: linux
           distro: debian
@@ -71,7 +75,15 @@ jobs:
         - version: "12"
         - version: "13"
         - version: "14"
-
+        exclude:
+          # The centos build doesn't work on arm64
+          - os:
+              distro: centos
+            arch:
+              platform: arm64
+          # exclude arm64 on the promscale_extension repo, and exclude amd64 in the promscale_extension_private repo
+          - arch:
+              platform: ${{ github.repository == 'timescale/promscale_extension' && 'arm64' || 'amd64' }}
     steps:
     - name: Install PackageCloud
       if: ${{ startsWith(github.ref, 'refs/tags') }}
@@ -79,6 +91,9 @@ jobs:
         sudo gem install package_cloud --no-doc
 
     - uses: actions/checkout@v3
+
+    - name: Install rust
+      uses: dtolnay/rust-toolchain@1.64.0
 
     - name: Gather Metadata
       id: metadata
@@ -106,11 +121,15 @@ jobs:
         echo "ghopts=${ghopts}" >> ${GITHUB_OUTPUT}
         echo "image=promscale-extension:${tag}.pg${{ matrix.postgres.version }}.${{ matrix.os.distro }}${{ matrix.os.version }}" >> ${GITHUB_OUTPUT}
 
-    - name: Setup QEMU
-      uses: docker/setup-qemu-action@v2
+    # This is necessary on self-hosted runners
+    - name: Create build context
+      run: |
+        docker context create builder
 
     - name: Setup Docker Buildx
       uses: docker/setup-buildx-action@v2
+      with:
+        endpoint: builder
 
     - name: Build Package
       uses: docker/build-push-action@v3
@@ -143,6 +162,8 @@ jobs:
         ls -la artifacts/*
 
     - name: Test package
+      # We can't test the package on arm64 because there is no timescaledb install for arm64
+      if: matrix.arch.platform != 'arm64'
       env:
         DISTRO: ${{ matrix.os.distro }}
         DISTRO_VERSION: ${{ matrix.os.version }}
@@ -226,8 +247,17 @@ jobs:
         cat dist/RELEASE_NOTES.md
 
     - name: Create Release
-      if: ${{ startsWith(github.ref, 'refs/tags') }}
+      if: ${{ startsWith(github.ref, 'refs/tags') && github.repository == 'timescale/promscale_extension' }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        gh release create -R timescale/promscale_extension --target ${GITHUB_SHA} ${{ needs.package.outputs.ghopts }} --notes-file dist/RELEASE_NOTES.md ${{ needs.package.outputs.version }} artifacts/*
+        gh release create --repo timescale/promscale_extension --target ${GITHUB_SHA} ${{ needs.package.outputs.ghopts }} --notes-file dist/RELEASE_NOTES.md ${{ needs.package.outputs.version }} artifacts/*
+
+    # Note: This assumes that the arm64 build reaches this point after the
+    # above `gh release create` command in the amd64 build
+    - name: Attach arm64 artifacts to release
+      if: ${{ startsWith(github.ref, 'refs/tags') && github.repository == 'timescale/promscale_extension_private' }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh release upload --repo timescale/promscale_extension ${{ needs.package.outputs.version }} artifacts/*

@@ -12,6 +12,7 @@ on:
 jobs:
   docker:
     runs-on: ubuntu-latest
+    if: github.repository == 'timescale/promscale_extension'
     outputs:
       branch_name: ${{steps.metadata.outputs.branch_name}}
       image_branch_name: ${{steps.metadata.outputs.image_branch_name}}
@@ -125,6 +126,7 @@ jobs:
 
   pick-connector-branch:
     name: picking connector's repo branch
+    if: github.repository == 'timescale/promscale_extension'
     runs-on: ubuntu-latest
     needs:
       - docker
@@ -165,7 +167,7 @@ jobs:
   # otherwise we have to keep updating them as we add or remove postgres versions etc.
   docker-result:
     name: docker result
-    if: always()
+    if: always() && github.repository == 'timescale/promscale_extension'
     needs:
       - docker
       - call-connector-e2e
