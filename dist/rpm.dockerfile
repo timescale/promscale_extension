@@ -52,6 +52,10 @@ if [ "${OS_VERSION}" != "9" ]; then
     if command -v dnf; then dnf -qy module disable postgresql; fi
 fi
 
+if ! rpm -q curl-minimal &> /dev/null; then
+   yum install -y curl
+fi
+
 # System dependencies
 yum install -y \
     gettext \
@@ -62,7 +66,6 @@ yum install -y \
     gcc \
     make \
     wget \
-    curl \
     openssl \
     openssl-devel \
     bash \
