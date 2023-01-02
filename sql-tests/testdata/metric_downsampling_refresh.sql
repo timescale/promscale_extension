@@ -11,8 +11,8 @@ SELECT prom_api.set_default_chunk_interval(INTERVAL '1 hour');
 \i 'testdata/scripts/generate-test-metric.sql'
 
 -- Create metric rollups.
-CALL _prom_catalog.create_downsampling('ds_5m', INTERVAL '5 minutes', INTERVAL '1 day');
-CALL _prom_catalog.create_downsampling('ds_1h', INTERVAL '1 hour', INTERVAL '1 day');
+CALL _prom_catalog.create_or_update_downsampling('ds_5m', INTERVAL '5 minutes', INTERVAL '1 day');
+CALL _prom_catalog.create_or_update_downsampling('ds_1h', INTERVAL '1 hour', INTERVAL '1 day');
 
 -- Check refresh jobs.
 SELECT ok(EXISTS(SELECT 1 FROM timescaledb_information.jobs WHERE proc_name = 'execute_caggs_refresh_policy' AND schedule_interval = INTERVAL '5 minutes') = false);

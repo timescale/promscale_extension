@@ -64,7 +64,9 @@ CALL
   1 | ds_5m       | 00:05:00   | 30 days   | t
 (1 row)
 
-psql:testdata/metric_downsampling.sql:41: NOTICE:  drop cascades to view ds_5m.test
+psql:testdata/metric_downsampling.sql:41: NOTICE:  drop cascades to 2 other objects
+DETAIL:  drop cascades to view ds_5m.test
+drop cascades to view ds_5m.q_test
 CALL
  id | schema_name | resolution | retention | should_refresh 
 ----+-------------+------------+-----------+----------------
