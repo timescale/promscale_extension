@@ -80,6 +80,28 @@ END;
 $$
 LANGUAGE PLPGSQL;
 
+-- This creates a view that acts as a interface between connector and the downsampled data while querying.
+-- We need this primarily for PromQL querying. Downsampled data does not contain the default column "value"
+-- that connector's SQL query needs, when querying a downsampling view. Hence, to avoid complexity of code
+-- on the connector side ("value" columns differs depending on metric type), we create a view that internally
+-- maps to the right column of downsampled data.
+CREATE OR REPLACE FUNCTION _prom_catalog.create_default_downsampling_query_view(_schema TEXT, _table_name TEXT, _default_column TEXT)
+RETURNS VOID
+    SET search_path = pg_catalog, pg_temp
+AS
+$$
+DECLARE
+    -- We prefix with q_ to avoid collision with names of materialized views. This prefix can be added
+    -- on the connector side.
+    query TEXT := 'CREATE OR REPLACE VIEW %1$I.q_%2$I AS SELECT time, series_id, %3$s AS value FROM %1$I.%2$I';
+
+BEGIN
+    EXECUTE FORMAT(query, _schema, _table_name, _default_column);
+END;
+$$
+LANGUAGE PLPGSQL;
+
+
 -- create_metric_downsampling_view decides which query should be used for downsampling the given metric depending of metric type
 -- and calls the respective creation function. It returns true if metric downsampling view was created.
 CREATE OR REPLACE FUNCTION _prom_catalog.create_metric_downsampling_view(_schema TEXT, _metric_name TEXT, _table_name TEXT, _resolution INTERVAL)
@@ -89,12 +111,20 @@ AS
 $$
 DECLARE
     _metric_type TEXT;
+    _default_query_column TEXT := 'sum / count';
 
 BEGIN
-   SELECT type INTO _metric_type FROM _prom_catalog.metadata WHERE metric_family = _metric_name;
-    IF _metric_type IS NULL THEN
-        RAISE DEBUG '[Downsampling] Skipping creation of metric downsampling for %. REASON: metric_type not found', _metric_name;
-        RETURN FALSE;
+    SELECT type INTO _metric_type FROM _prom_catalog.metadata WHERE metric_family = _metric_name;
+    IF (_metric_type IS NULL) THEN
+        -- Guess the metric type based on the metric/table suffix.
+        IF ( SELECT _metric_name like '%_bucket') THEN
+            _metric_type := 'HISTOGRAM';
+        ELSIF (SELECT (_metric_name like '%_sum') OR (_metric_name like '%_count')) THEN
+            _metric_type := 'COUNTER';
+        ELSE
+            _metric_type := 'GAUGE';
+        END IF;
+        RAISE WARNING '[Downsampling] Metric type of % missing. Guessed as %', _metric_name, _metric_type;
     END IF;
 
     CASE
@@ -102,12 +132,15 @@ BEGIN
             CALL _prom_catalog.downsample_gauge(_schema, _table_name, _resolution);
         WHEN _metric_type = 'COUNTER' OR _metric_type = 'HISTOGRAM' THEN
             CALL _prom_catalog.downsample_counter(_schema, _table_name, _resolution);
+            _default_query_column := 'last';
         WHEN _metric_type = 'SUMMARY' THEN
             CALL _prom_catalog.downsample_summary(_schema, _table_name, _resolution);
         ELSE
             RAISE WARNING '[Downsampling] Skipping creation of metric downsampling for %. REASON: invalid metric_type. Wanted {GAUGE, COUNTER, HISTOGRAM, SUMMARY}, received %', _metric_name, _metric_type;
+            RETURN FALSE;
     END CASE;
     CALL _prom_catalog.add_compression_clause_to_downsample_view(_schema, _table_name);
+    PERFORM _prom_catalog.create_default_downsampling_query_view(_schema, _table_name, _default_query_column);
     RETURN TRUE;
 END;
 $$
@@ -194,26 +227,44 @@ END;
 $$
 LANGUAGE PLPGSQL;
 
-CREATE OR REPLACE PROCEDURE _prom_catalog.create_downsampling(_schema_name TEXT, _resolution INTERVAL, _retention INTERVAL)
+-- apply_downsample_config does 2 things:
+-- 1. Create new downsampling configurations based on the given config
+-- 2. Update the existing downsampling config in terms of retention, enabling/disabling downsampling config
+CREATE OR REPLACE FUNCTION _prom_catalog.apply_downsample_config(config jsonb)
+RETURNS VOID
     SET search_path = pg_catalog, pg_temp
 AS
 $$
-    DECLARE
-        _exists BOOLEAN;
+DECLARE
+    _input _prom_catalog.downsample[];
+    _schema_name TEXT;
 
-    BEGIN
-        SELECT EXISTS( SELECT 1 FROM _prom_catalog.downsample WHERE schema_name = _schema_name) INTO _exists;
-        IF _exists THEN
-            RAISE EXCEPTION 'ERROR: cannot downsample metric for %. REASON: already exists.', _schema_name;
-        END IF;
-        -- We do not use IF NOT EXISTS (below) since we want to stop creation process if the schema already exists.
-        -- This forces the user to delete the conflicting schema before proceeding ahead.
-        EXECUTE FORMAT('CREATE SCHEMA %I', _schema_name);
-        INSERT INTO _prom_catalog.downsample(schema_name, resolution, retention, should_refresh) VALUES (_schema_name, _resolution, _retention, TRUE);
-    END;
+BEGIN
+    SELECT array_agg(x) INTO STRICT _input FROM jsonb_populate_recordset(NULL::_prom_catalog.downsample, config) x;
+
+    FOR _schema_name IN
+        SELECT a.schema_name FROM unnest(_input) a WHERE NOT EXISTS(
+            SELECT 1 FROM _prom_catalog.downsample d WHERE d.schema_name = a.schema_name
+        )
+    LOOP
+        EXECUTE format('create schema %I', _schema_name);
+    END LOOP;
+
+    -- Insert or update the retention duration and enable the downsampling if disabled.
+    INSERT INTO _prom_catalog.downsample (schema_name, resolution, retention, should_refresh)
+        SELECT a.schema_name, a.resolution, a.retention, TRUE FROM unnest(_input) a
+            ON CONFLICT (schema_name) DO UPDATE
+                SET
+                    retention = excluded.retention,
+                    should_refresh = TRUE;
+
+    -- Disable downsampling if existing configs does not exists in the incoming config.
+    UPDATE _prom_catalog.downsample SET should_refresh = false WHERE schema_name NOT IN (
+        SELECT schema_name FROM unnest(_input)
+    );
+END;
 $$
 LANGUAGE PLPGSQL;
-GRANT EXECUTE ON PROCEDURE _prom_catalog.create_downsampling(text, interval, interval) TO prom_writer;
 
 -- delete_downsampling deletes everything related to the given downsampling schema name. It does the following in order:
 -- 1. Delete the entries in _prom_catalog.downsample
