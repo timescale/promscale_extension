@@ -11,8 +11,8 @@ SELECT prom_api.set_default_chunk_interval(INTERVAL '1 hour');
 \i 'testdata/scripts/generate-test-metric.sql'
 
 -- Create metric rollups.
-CALL _prom_catalog.create_downsampling('ds_5m', INTERVAL '5 minutes', INTERVAL '1 day');
-CALL _prom_catalog.create_downsampling('ds_1h', INTERVAL '1 hour', INTERVAL '1 day');
+CALL _prom_catalog.create_or_update_downsampling('ds_5m', INTERVAL '5 minutes', INTERVAL '1 day');
+CALL _prom_catalog.create_or_update_downsampling('ds_1h', INTERVAL '1 hour', INTERVAL '1 day');
 
 CALL _prom_catalog.scan_for_new_downsampling_views(1, '{}'::jsonb);
 

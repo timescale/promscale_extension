@@ -553,10 +553,10 @@ This function creates a refresh job only if no execute_caggs_refresh_policy() ex
 ```
 function void **_prom_catalog.create_cagg_refresh_job_if_not_exists**(_refresh_interval interval)
 ```
-### _prom_catalog.create_downsampling
+### _prom_catalog.create_default_downsampling_query_view
 
 ```
-procedure void **_prom_catalog.create_downsampling**(IN _schema_name text, IN _resolution interval, IN _retention interval)
+function void **_prom_catalog.create_default_downsampling_query_view**(_schema text, _table_name text, _default_column text)
 ```
 ### _prom_catalog.create_exemplar_table_if_not_exists
 
@@ -592,6 +592,11 @@ function record **_prom_catalog.create_metric_table**(metric_name_arg text, OUT 
 
 ```
 function boolean **_prom_catalog.create_metric_view**(metric_name text)
+```
+### _prom_catalog.create_or_update_downsampling
+
+```
+procedure void **_prom_catalog.create_or_update_downsampling**(IN _schema_name text, IN _resolution interval, IN _retention interval)
 ```
 ### _prom_catalog.create_series
 
@@ -1121,10 +1126,10 @@ function void **_prom_catalog.unlock_for_vacuum_engine**()
 ```
 function void **_prom_catalog.unlock_metric_for_maintenance**(metric_id integer)
 ```
-### _prom_catalog.update_downsampling_state_for
+### _prom_catalog.update_downsampling_state
 
 ```
-function void **_prom_catalog.update_downsampling_state_for**(_schema_name text, _should_refresh boolean)
+function void **_prom_catalog.update_downsampling_state**(_schema_name text, _should_refresh boolean)
 ```
 ### _prom_catalog.update_execute_everywhere_entry
 

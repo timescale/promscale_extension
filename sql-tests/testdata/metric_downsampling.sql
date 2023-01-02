@@ -12,7 +12,7 @@ END;
 $$;
 
 -- Create a metric downsampling.
-CALL _prom_catalog.create_downsampling('ds_5m', INTERVAL '5 minutes', INTERVAL '30 days');
+CALL _prom_catalog.create_or_update_downsampling('ds_5m', INTERVAL '5 minutes', INTERVAL '30 days');
 
 -- Ensure the state after downsampling cfg is created.
 SELECT * from _prom_catalog.downsample;

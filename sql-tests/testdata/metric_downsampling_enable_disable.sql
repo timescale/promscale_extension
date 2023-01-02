@@ -10,7 +10,7 @@ SELECT prom_api.set_default_chunk_interval(INTERVAL '1 hour');
 
 \i 'testdata/scripts/generate-test-metric.sql'
 
-CALL _prom_catalog.create_downsampling('ds_5m', INTERVAL '5 minutes', INTERVAL '1 day');
+CALL _prom_catalog.create_or_update_downsampling('ds_5m', INTERVAL '5 minutes', INTERVAL '1 day');
 
 SELECT * FROM _prom_catalog.downsample;
 

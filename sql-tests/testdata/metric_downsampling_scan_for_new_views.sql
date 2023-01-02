@@ -9,7 +9,7 @@ SELECT prom_api.set_downsample_old_data(true);
 -- Scan should not error when there are no rollups.
 CALL _prom_catalog.scan_for_new_downsampling_views(1, '{}'::jsonb);
 
-CALL _prom_catalog.create_downsampling('ds_5m', INTERVAL '5 minutes', INTERVAL '1 day');
+CALL _prom_catalog.create_or_update_downsampling('ds_5m', INTERVAL '5 minutes', INTERVAL '1 day');
 
 -- Scan should not error when there are no metrics.
 CALL _prom_catalog.scan_for_new_downsampling_views(1, '{}'::jsonb);
