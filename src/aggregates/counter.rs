@@ -2,32 +2,43 @@ use pgx::*;
 
 #[pg_schema]
 mod _prom_ext {
-    use pgx::error;
     use pgx::Internal;
     use pgx::*;
 
     use crate::aggregate_utils::in_aggregate_context;
-    use crate::aggregates::{GapfillDeltaTransition, Milliseconds};
     use crate::palloc::{Inner, InternalAsValue, ToInternal};
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize, PostgresType, Debug)]
+    #[pgx(sql = false)]
+    pub struct RateState {
+        first: (i64, f64),
+        prior: (i64, f64),
+        resets: i64,
+        reset_sum: f64,
+    }
+
+    impl RateState {
+        pub fn new(t: i64, v: f64) -> Self {
+            RateState {
+                first: (t, v),
+                prior: (t, v),
+                resets: 0,
+                reset_sum: 0.0,
+            }
+        }
+    }
 
     #[allow(clippy::too_many_arguments)]
     #[pg_extern(immutable, parallel_safe, create_or_replace)]
-    pub fn counter_transition(
+    pub fn rate_transition(
         state: Internal,
-        lowest_time: TimestampWithTimeZone,
-        greatest_time: TimestampWithTimeZone,
-        step_size: Milliseconds,
-        range: Milliseconds, // the size of a window to calculate over
         sample_time: TimestampWithTimeZone,
         sample_value: f64,
         fc: pg_sys::FunctionCallInfo,
     ) -> Internal {
-        counter_transition_inner(
+        rate_transition_inner(
             unsafe { state.to_inner() },
-            lowest_time.into(),
-            greatest_time.into(),
-            step_size,
-            range,
             sample_time.into(),
             sample_value,
             fc,
@@ -36,86 +47,92 @@ mod _prom_ext {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn counter_transition_inner(
-        state: Option<Inner<GapfillDeltaTransition>>,
-        lowest_time: i64,
-        greatest_time: i64,
-        step_size: Milliseconds,
-        range: Milliseconds, // the size of a window to calculate over
+    fn rate_transition_inner(
+        state: Option<Inner<RateState>>,
         sample_time: i64,
         sample_value: f64,
         fc: pg_sys::FunctionCallInfo,
-    ) -> Option<Inner<GapfillDeltaTransition>> {
+    ) -> Option<Inner<RateState>> {
         unsafe {
             in_aggregate_context(fc, || {
-                if sample_time < lowest_time || sample_time > greatest_time {
-                    error!(
-                        "input time {} not in bounds [{}, {}]",
-                        sample_time, lowest_time, greatest_time
-                    )
-                }
-
                 let mut state = state.unwrap_or_else(|| {
-                    let state: Inner<_> = GapfillDeltaTransition::new(
-                        lowest_time,
-                        greatest_time,
-                        range,
-                        step_size,
-                        true,
-                        true,
-                    )
-                    .into();
+                    let state: Inner<_> = RateState::new(sample_time, sample_value).into();
                     state
                 });
 
-                state.add_data_point(sample_time, sample_value);
+                if sample_value < state.prior.1 {
+                    state.resets += 1;
+                    state.reset_sum += state.prior.1;
+                }
+
+                state.prior = (sample_time, sample_value);
 
                 Some(state)
             })
         }
     }
 
-    /// Backwards compatibility
-    #[no_mangle]
-    pub extern "C" fn pg_finfo_counter_rate_transition() -> &'static pg_sys::Pg_finfo_record {
-        const V1_API: pg_sys::Pg_finfo_record = pg_sys::Pg_finfo_record { api_version: 1 };
-        &V1_API
-    }
-
-    #[no_mangle]
-    unsafe extern "C" fn counter_rate_transition(
-        fcinfo: pg_sys::FunctionCallInfo,
-    ) -> pg_sys::Datum {
-        counter_transition_wrapper(fcinfo)
-    }
-
     #[pg_extern(immutable, parallel_safe, create_or_replace)]
-    pub fn counter_extrapolate_final(state: Internal) -> Option<Vec<Option<f64>>> {
-        counter_extrapolate_final_inner(unsafe { state.to_inner() })
+    pub fn counter_reset_sum_final(state: Internal) -> Option<f64> {
+        counter_reset_sum_final_inner(unsafe { state.to_inner() })
     }
 
-    pub fn counter_extrapolate_final_inner(
-        state: Option<Inner<GapfillDeltaTransition>>,
-    ) -> Option<Vec<Option<f64>>> {
-        state.map(|mut s| s.as_vec())
+    pub fn counter_reset_sum_final_inner(state: Option<Inner<RateState>>) -> Option<f64> {
+        state.map(|state| state.reset_sum)
     }
 
     extension_sql!(
         r#"
-    CREATE OR REPLACE AGGREGATE _prom_ext.counter(
-        lowest_time TIMESTAMPTZ,
-        greatest_time TIMESTAMPTZ,
-        step_size BIGINT,
-        range BIGINT,
+    CREATE OR REPLACE AGGREGATE _prom_ext.counter_reset_sum(
         sample_time TIMESTAMPTZ,
         sample_value DOUBLE PRECISION)
     (
-        sfunc=_prom_ext.counter_transition,
+        sfunc=_prom_ext.rate_transition,
         stype=internal,
-        finalfunc=_prom_ext.counter_extrapolate_final
+        finalfunc=_prom_ext.counter_reset_sum_final
     );
     "#,
-        name = "create_counter_aggregate",
-        requires = [counter_transition, counter_extrapolate_final]
+        name = "create_counter_reset_sum",
+        requires = [rate_transition, counter_reset_sum_final]
     );
+}
+
+#[cfg(any(test, feature = "pg_test"))]
+#[pg_schema]
+mod tests {
+
+    use pgx::*;
+
+    fn setup() {
+        Spi::run(
+            r#"
+            CREATE TABLE crs_test_table(t TIMESTAMPTZ, v DOUBLE PRECISION);
+            INSERT INTO crs_test_table (t, v) VALUES
+                ('2000-01-02T15:00:00+00:00',0),
+                ('2000-01-02T15:05:00+00:00',12),
+                ('2000-01-02T15:10:00+00:00',24),
+                ('2000-01-02T15:15:00+00:00',36),
+                ('2000-01-02T15:20:00+00:00',48),
+                ('2000-01-02T15:25:00+00:00',60),
+                ('2000-01-02T15:30:00+00:00',0),
+                ('2000-01-02T15:35:00+00:00',12),
+                ('2000-01-02T15:40:00+00:00',24),
+                ('2000-01-02T15:45:00+00:00',36),
+                ('2000-01-02T15:50:00+00:00',48);
+        "#,
+        );
+    }
+
+    #[pg_test]
+    fn test_counter_reset_sum_all() {
+        setup();
+        let result = Spi::get_one::<f64>(
+            r#"
+            SELECT _prom_ext.counter_reset_sum(t, v order by t)
+            FROM crs_test_table
+            ;"#,
+        )
+        .expect("SQL query failed");
+        assert_eq!(result, 60_f64);
+    }
 }
