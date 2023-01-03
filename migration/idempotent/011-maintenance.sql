@@ -545,6 +545,49 @@ END
 $$ LANGUAGE PLPGSQL;
 GRANT EXECUTE ON PROCEDURE _prom_catalog.execute_maintenance_job(int, jsonb) TO prom_maintenance;
 
+CREATE OR REPLACE FUNCTION _prom_catalog.add_job(proc regproc, schedule_interval interval, config jsonb = NULL) 
+    RETURNS INTEGER 
+    --security definer to add jobs as the logged-in user
+    SECURITY DEFINER
+    VOLATILE
+    SET search_path = pg_catalog, pg_temp
+AS $func$
+BEGIN
+    IF  NOT _prom_catalog.is_timescaledb_oss()
+        AND _prom_catalog.get_timescale_major_version() >= 2
+        AND _prom_catalog.get_timescale_minor_version() >= 9
+    THEN
+        RETURN 
+            public.add_job(
+                proc, 
+                schedule_interval, 
+                config=>config,
+                -- shift the inital start time to avoid a thundering herd
+                -- now + random[schedule_interval / 2; schedule_interval]
+                initial_start=>now() + (random() / 2.0 + 0.5) * schedule_interval,
+                fixed_schedule=>false
+            );
+    ELSE
+        RETURN 
+            public.add_job(
+                proc, 
+                schedule_interval, 
+                config=>config,
+                -- shift the inital start time to avoid a thundering herd
+                -- now + random[schedule_interval / 2; schedule_interval]
+                initial_start=>now() + (random() / 2.0 + 0.5) * schedule_interval
+                -- fixed schedule didn't exist prior to TS 2.9
+            );
+    END IF;
+END
+$func$
+LANGUAGE PLPGSQL;
+--redundant given schema settings but extra caution for security definers
+REVOKE ALL ON FUNCTION _prom_catalog.add_job(regproc, interval, jsonb) FROM public;
+GRANT EXECUTE ON FUNCTION _prom_catalog.add_job(regproc, interval, jsonb) TO prom_admin;
+COMMENT ON FUNCTION _prom_catalog.add_job(regproc, interval, jsonb)
+IS 'A wrapper around public.add_job that introduces jitter to job start times and schedules.';
+
 CREATE OR REPLACE FUNCTION prom_api.config_maintenance_jobs(number_jobs int, new_schedule_interval interval, new_config jsonb = NULL)
     RETURNS BOOLEAN
     --security definer to add jobs as the logged-in user
@@ -610,15 +653,12 @@ BEGIN
 
     IF cnt < number_jobs THEN
         PERFORM 
-            public.add_job(
+            _prom_catalog.add_job(
                 '_prom_catalog.execute_maintenance_job', 
                 -- shift schedules a little to avoid multiple jobs starting in a lockstep
                 -- new_schedule_interval + random[30s; 1m]
                 new_schedule_interval + (random() / 2.0 + 0.5) * interval '1 min', 
-                config=>final_config,
-                -- shift the inital start time to avoid a thundering herd
-                -- now + random[new_schedule_interval / 2; new_schedule_interval]
-                initial_start=>now() + (random() / 2.0 + 0.5) * new_schedule_interval
+                config=>final_config
             )
         FROM generate_series(1, number_jobs-cnt);
     END IF;

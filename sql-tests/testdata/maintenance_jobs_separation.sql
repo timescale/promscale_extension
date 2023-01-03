@@ -39,8 +39,8 @@ WHERE proc_schema = '_prom_catalog'
   AND config ->> 'type' = 'retention';
 
 -- Add two old-style configurations
-SELECT public.add_job('_prom_catalog.execute_maintenance_job', '30 min');
-SELECT public.add_job('_prom_catalog.execute_maintenance_job', '30 min');
+SELECT _prom_catalog.add_job('_prom_catalog.execute_maintenance_job', '30 min');
+SELECT _prom_catalog.add_job('_prom_catalog.execute_maintenance_job', '30 min');
 
 -- Run config maintenance reconfiguration
 SELECT prom_api.config_maintenance_jobs(1, '10 min');

@@ -39,6 +39,10 @@ fn sql_tests(full_resource: &str) {
         init_conn
             .simple_query("CREATE EXTENSION promscale;")
             .expect("Unable to create extension promscale.");
+
+        init_conn
+            .simple_query("SELECT 1;")
+            .expect("Health-check query failed");
     }
 
     let resource = if let Some((_, rest)) = full_resource.split_once('/') {

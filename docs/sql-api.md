@@ -492,6 +492,11 @@ the specified span_id.
 ```
 function TABLE(trace_id trace_id, parent_span_id bigint, span_id bigint, dist integer, path bigint[]) **ps_trace.upstream_spans**(_trace_id trace_id, _span_id bigint, _max_dist integer DEFAULT NULL::integer)
 ```
+### _prom_catalog.add_job
+A wrapper around public.add_job that introduces jitter to job start times and schedules.
+```
+function integer **_prom_catalog.add_job**(proc regproc, schedule_interval interval, config jsonb DEFAULT NULL::jsonb)
+```
 ### _prom_catalog.attach_series_partition
 
 ```
