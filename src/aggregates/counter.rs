@@ -13,7 +13,7 @@ mod _prom_ext {
     #[pgx(sql = false)]
     pub struct RateState {
         first: (i64, f64),
-        prior: (i64, f64),
+        last: (i64, f64),
         resets: i64,
         reset_sum: f64,
     }
@@ -22,7 +22,7 @@ mod _prom_ext {
         pub fn new(t: i64, v: f64) -> Self {
             RateState {
                 first: (t, v),
-                prior: (t, v),
+                last: (t, v),
                 resets: 0,
                 reset_sum: 0.0,
             }
@@ -60,12 +60,12 @@ mod _prom_ext {
                     state
                 });
 
-                if sample_value < state.prior.1 {
+                if sample_value < state.last.1 {
                     state.resets += 1;
-                    state.reset_sum += state.prior.1;
+                    state.reset_sum += state.last.1;
                 }
 
-                state.prior = (sample_time, sample_value);
+                state.last = (sample_time, sample_value);
 
                 Some(state)
             })
