@@ -119,6 +119,13 @@ fn incremental_freeze_test() {
             "032-remove-non-empty-span-name-constraint.sql",
             "1bc2088a9738f36d8e6006b5ad066f02",
         ),
+        // ↓↓↓ frozen in 0.8.0 ↓↓↓
+        ("033-metric-view.sql", "1ccfdea3afcf307b99dead265cb4b531"),
+        (
+            "034-maintenance-job-stats.sql",
+            "e152bb4e1c43bb816d2504b445b48bfc",
+        ),
+        ("035-remove-func.sql", "9b4e7161e6d633d9e13ea0763acf4c6f"),
         // ↓↓↓ frozen in x.x.x ↓↓↓
     ];
     for (filename, expected) in frozen_files {

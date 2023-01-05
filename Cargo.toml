@@ -3,7 +3,7 @@ members = ["test-common", "e2e", "sql-tests", "gendoc", "pgtap-parse"]
 
 [package]
 name = "promscale"
-version = "0.7.1-dev"
+version = "0.8.0"
 edition = "2018"
 
 [lib]

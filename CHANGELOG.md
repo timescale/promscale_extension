@@ -14,6 +14,8 @@ We use the following categories for changes:
 
 ## [Unreleased]
 
+## [0.8.0 - 2023-01-05]
+
 ### Changed
 
 - Maintenance jobs were separated from one another. The bejaviour of the old 
