@@ -119,15 +119,21 @@ RUN \
     cd /pgextwlist && \
     make
 
-# FROM ${PREVIOUS_IMAGE} as prev_img
+# A temp workaround to bootstrap the line of pg15 images
+FROM ${PREVIOUS_IMAGE} as prev_img_12
+FROM ${PREVIOUS_IMAGE} as prev_img_13
+FROM ${PREVIOUS_IMAGE} as prev_img_14
+FROM builder           as prev_img_15
+
+FROM prev_img_${PG_VERSION} as prev_img
 
 # COPY over the new files to the image. Done as a seperate stage so we don't
 # ship the build tools.
 FROM timescale/timescaledb:${TIMESCALEDB_VERSION_FULL}-pg${PG_VERSION}
 ARG PG_VERSION
 
-# COPY --from=prev_img /usr/local/lib/postgresql/promscale*   /usr/local/lib/postgresql
-# COPY --from=prev_img /usr/local/share/postgresql/extension/promscale* /usr/local/share/postgresql/extension
+COPY --from=prev_img /usr/local/lib/postgresql/promscale*   /usr/local/lib/postgresql
+COPY --from=prev_img /usr/local/share/postgresql/extension/promscale* /usr/local/share/postgresql/extension
 
 COPY --from=builder /build/promscale/target/release/promscale-pg${PG_VERSION}/usr/local/lib/postgresql /usr/local/lib/postgresql
 COPY --from=builder /build/promscale/target/release/promscale-pg${PG_VERSION}/usr/local/share/postgresql /usr/local/share/postgresql
