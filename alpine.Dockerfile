@@ -2,7 +2,7 @@
 ARG PG_VERSION=14
 ARG TIMESCALEDB_VERSION_FULL=2.9.1
 ARG PREVIOUS_IMAGE=timescaledev/promscale-extension:latest-ts2-pg${PG_VERSION}
-FROM timescaledev/timescaledb:nightly-pg${PG_VERSION} as builder
+FROM timescale/timescaledb:${TIMESCALEDB_VERSION_FULL}-pg${PG_VERSION} as builder
 
 LABEL maintainer="Timescale https://www.timescale.com"
 ARG RUST_VERSION=1.64.0
@@ -103,7 +103,7 @@ RUN --mount=type=secret,uid=70,gid=70,id=AWS_ACCESS_KEY_ID --mount=type=secret,u
 RUN env
 RUN sccache --show-stats
 
-FROM timescaledev/timescaledb:nightly-pg${PG_VERSION} as pgextwlist-builder
+FROM timescale/timescaledb:${TIMESCALEDB_VERSION_FULL}-pg${PG_VERSION} as pgextwlist-builder
 
 RUN \
     apk add --no-cache --virtual .build-deps \
@@ -123,7 +123,7 @@ RUN \
 
 # COPY over the new files to the image. Done as a seperate stage so we don't
 # ship the build tools.
-FROM timescaledev/timescaledb:nightly-pg${PG_VERSION}
+FROM timescale/timescaledb:${TIMESCALEDB_VERSION_FULL}-pg${PG_VERSION}
 ARG PG_VERSION
 
 # COPY --from=prev_img /usr/local/lib/postgresql/promscale*   /usr/local/lib/postgresql
