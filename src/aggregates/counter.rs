@@ -153,7 +153,7 @@ mod tests {
         "#,
         );
     }
-    
+
     #[pg_test]
     fn test_counter_reset_sum_1() {
         setup();
@@ -164,7 +164,7 @@ mod tests {
             WHERE t < '2000-01-02T15:05:00+00:00'
             ;"#,
         )
-            .expect("SQL query failed");
+        .expect("SQL query failed");
         assert_eq!(result, 0_f64);
     }
 
@@ -178,10 +178,10 @@ mod tests {
             WHERE t < '2000-01-02T15:20:00+00:00'
             ;"#,
         )
-            .expect("SQL query failed");
+        .expect("SQL query failed");
         assert_eq!(result, 24_f64);
     }
-    
+
     #[pg_test]
     fn test_counter_reset_sum_3() {
         setup();
@@ -192,10 +192,10 @@ mod tests {
             WHERE t < '2000-01-02T15:40:00+00:00'
             ;"#,
         )
-            .expect("SQL query failed");
+        .expect("SQL query failed");
         assert_eq!(result, 84_f64);
     }
-    
+
     #[pg_test]
     fn test_counter_reset_sum_4() {
         setup();
@@ -205,7 +205,7 @@ mod tests {
             FROM cr_test_table
             ;"#,
         )
-            .expect("SQL query failed");
+        .expect("SQL query failed");
         assert_eq!(result, 108_f64);
     }
 
@@ -219,7 +219,7 @@ mod tests {
             WHERE t < '2000-01-02T15:05:00+00:00'
             ;"#,
         )
-            .expect("SQL query failed");
+        .expect("SQL query failed");
         assert_eq!(result, 0_i64);
     }
 
@@ -233,7 +233,7 @@ mod tests {
             WHERE t < '2000-01-02T15:20:00+00:00'
             ;"#,
         )
-            .expect("SQL query failed");
+        .expect("SQL query failed");
         assert_eq!(result, 1_i64);
     }
 
@@ -247,7 +247,7 @@ mod tests {
             WHERE t < '2000-01-02T15:40:00+00:00'
             ;"#,
         )
-            .expect("SQL query failed");
+        .expect("SQL query failed");
         assert_eq!(result, 2_i64);
     }
 
@@ -260,7 +260,7 @@ mod tests {
             FROM cr_test_table
             ;"#,
         )
-            .expect("SQL query failed");
+        .expect("SQL query failed");
         assert_eq!(result, 3_i64);
     }
 }
