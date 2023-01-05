@@ -153,9 +153,51 @@ mod tests {
         "#,
         );
     }
+    
+    #[pg_test]
+    fn test_counter_reset_sum_1() {
+        setup();
+        let result = Spi::get_one::<f64>(
+            r#"
+            SELECT _prom_ext.counter_reset_sum(t, v order by t)
+            FROM cr_test_table
+            WHERE t < '2000-01-02T15:05:00+00:00'
+            ;"#,
+        )
+            .expect("SQL query failed");
+        assert_eq!(result, 0_f64);
+    }
 
     #[pg_test]
-    fn test_counter_reset_sum_all() {
+    fn test_counter_reset_sum_2() {
+        setup();
+        let result = Spi::get_one::<f64>(
+            r#"
+            SELECT _prom_ext.counter_reset_sum(t, v order by t)
+            FROM cr_test_table
+            WHERE t < '2000-01-02T15:20:00+00:00'
+            ;"#,
+        )
+            .expect("SQL query failed");
+        assert_eq!(result, 24_f64);
+    }
+    
+    #[pg_test]
+    fn test_counter_reset_sum_3() {
+        setup();
+        let result = Spi::get_one::<f64>(
+            r#"
+            SELECT _prom_ext.counter_reset_sum(t, v order by t)
+            FROM cr_test_table
+            WHERE t < '2000-01-02T15:40:00+00:00'
+            ;"#,
+        )
+            .expect("SQL query failed");
+        assert_eq!(result, 84_f64);
+    }
+    
+    #[pg_test]
+    fn test_counter_reset_sum_4() {
         setup();
         let result = Spi::get_one::<f64>(
             r#"
@@ -163,12 +205,54 @@ mod tests {
             FROM cr_test_table
             ;"#,
         )
-        .expect("SQL query failed");
+            .expect("SQL query failed");
         assert_eq!(result, 108_f64);
     }
 
     #[pg_test]
-    fn test_counter_reset_count_all() {
+    fn test_counter_reset_count_1() {
+        setup();
+        let result = Spi::get_one::<i64>(
+            r#"
+            SELECT _prom_ext.counter_reset_count(t, v order by t)
+            FROM cr_test_table
+            WHERE t < '2000-01-02T15:05:00+00:00'
+            ;"#,
+        )
+            .expect("SQL query failed");
+        assert_eq!(result, 0_i64);
+    }
+
+    #[pg_test]
+    fn test_counter_reset_count_2() {
+        setup();
+        let result = Spi::get_one::<i64>(
+            r#"
+            SELECT _prom_ext.counter_reset_count(t, v order by t)
+            FROM cr_test_table
+            WHERE t < '2000-01-02T15:20:00+00:00'
+            ;"#,
+        )
+            .expect("SQL query failed");
+        assert_eq!(result, 1_i64);
+    }
+
+    #[pg_test]
+    fn test_counter_reset_count_3() {
+        setup();
+        let result = Spi::get_one::<i64>(
+            r#"
+            SELECT _prom_ext.counter_reset_count(t, v order by t)
+            FROM cr_test_table
+            WHERE t < '2000-01-02T15:40:00+00:00'
+            ;"#,
+        )
+            .expect("SQL query failed");
+        assert_eq!(result, 2_i64);
+    }
+
+    #[pg_test]
+    fn test_counter_reset_count_4() {
         setup();
         let result = Spi::get_one::<i64>(
             r#"
@@ -176,7 +260,7 @@ mod tests {
             FROM cr_test_table
             ;"#,
         )
-        .expect("SQL query failed");
+            .expect("SQL query failed");
         assert_eq!(result, 3_i64);
     }
 }
