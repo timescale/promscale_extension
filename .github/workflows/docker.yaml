@@ -21,10 +21,10 @@ jobs:
         pgversion:
         - 15
         - 14
-        # - 13
-        # - 12
+        - 13
+        - 12
         tsversion:
-        - 2.9.1-dev
+        - 2.9.1
         base:
         - ha
         - alpine
