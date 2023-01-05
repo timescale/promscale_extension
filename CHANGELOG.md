@@ -29,6 +29,7 @@ We use the following categories for changes:
   that need to be compressed [#576]
 - Renamed `_ps_catalog.chunks_to_freeze` to `_ps_catalog.compressed_chunks_to_freeze` [#595]
 - All docker images upgraded to use TimescaleDB 2.9 [#598]
+- The extension is updated to add support PostgreSQL 15. [#590]
 
 ### Added
 - Telemetry for active series and last updated [#534]

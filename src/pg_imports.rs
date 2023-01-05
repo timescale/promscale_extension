@@ -4,6 +4,11 @@
 
 use pgx::*;
 
+#[cfg(any(feature = "pg15"))]
+pub type PgString = pg_sys::String;
+#[cfg(any(feature = "pg12", feature = "pg13", feature = "pg14"))]
+pub type PgString = pg_sys::Value;
+
 #[derive(Default, Debug)]
 pub struct FuncDetail {
     pub func_oid: pg_sys::Oid,

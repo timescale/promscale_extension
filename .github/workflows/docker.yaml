@@ -19,6 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         pgversion:
+        - 15
         - 14
         - 13
         - 12
@@ -83,17 +84,17 @@ jobs:
           cache-from: type=gha,scope=${{matrix.base}}-${{matrix.pgversion}}-${{matrix.tsversion}}
           cache-to: type=gha,mode=max,scope=${{matrix.base}}-${{matrix.pgversion}}-${{matrix.tsversion}}
 
-      - name: Run end-to-end tests
-        run: cargo test -p e2e
-        env:
-          TS_DOCKER_IMAGE: ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.image_branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
-          RUST_LOG: info
-
       - name: Run SQL tests
         run: cargo test -p sql-tests
         env:
           TS_DOCKER_IMAGE: ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.image_branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
           USE_DOCKER: true
+
+      - name: Run end-to-end tests
+        run: cargo test -p e2e
+        env:
+          TS_DOCKER_IMAGE: ghcr.io/timescale/dev_promscale_extension:${{steps.metadata.outputs.image_branch_name}}-ts${{matrix.tsversion}}-pg${{matrix.pgversion}}${{steps.metadata.outputs.build_type_suffix}}
+          RUST_LOG: info
 
       - name: Check SQL Documentation
         if: ${{ matrix.pgversion == 14 && matrix.base == 'ha' }}

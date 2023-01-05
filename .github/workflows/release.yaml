@@ -71,6 +71,7 @@ jobs:
         - version: "12"
         - version: "13"
         - version: "14"
+        - version: "15"
 
     steps:
     - name: Install PackageCloud
@@ -143,6 +144,9 @@ jobs:
         ls -la artifacts/*
 
     - name: Test package
+      # No TS packages are available for PG15 on Ubuntu bionic to run our smoke test with.
+      # TODO remove this once we drop support for Bionic
+      if: ${{ format('{0}-{1}-pg{2}', matrix.os.distro, matrix.os.version, matrix.postgres.version) != 'ubuntu-bionic-pg15' }}
       env:
         DISTRO: ${{ matrix.os.distro }}
         DISTRO_VERSION: ${{ matrix.os.version }}
