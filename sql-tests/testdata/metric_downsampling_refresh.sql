@@ -11,8 +11,12 @@ SELECT prom_api.set_default_chunk_interval(INTERVAL '1 hour');
 \i 'testdata/scripts/generate-test-metric.sql'
 
 -- Create metric rollups.
-CALL _prom_catalog.create_or_update_downsampling('ds_5m', INTERVAL '5 minutes', INTERVAL '1 day');
-CALL _prom_catalog.create_or_update_downsampling('ds_1h', INTERVAL '1 hour', INTERVAL '1 day');
+SELECT _prom_catalog.apply_downsample_config($$
+    [
+        {"schema_name": "ds_5m", "ds_interval": "5m", "retention": "1d"},
+        {"schema_name": "ds_1h", "ds_interval": "1h", "retention": "1d"}
+    ]
+$$::jsonb);
 
 -- Check refresh jobs.
 SELECT ok(EXISTS(SELECT 1 FROM timescaledb_information.jobs WHERE proc_name = 'execute_caggs_refresh_policy' AND schedule_interval = INTERVAL '5 minutes') = false);
@@ -24,7 +28,7 @@ CALL _prom_catalog.scan_for_new_downsampling_views(1, '{}'::jsonb);
 SELECT ok(EXISTS(SELECT 1 FROM timescaledb_information.jobs WHERE proc_name = 'execute_caggs_refresh_policy' AND schedule_interval = INTERVAL '5 minutes') = true);
 SELECT ok(EXISTS(SELECT 1 FROM timescaledb_information.jobs WHERE proc_name = 'execute_caggs_refresh_policy' AND schedule_interval = INTERVAL '1 hour') = true);
 
--- Count the samples in respective resolutions.
+-- Count the samples in respective downsampling configs.
 SELECT ok(count(*) = 2017, 'samples in 5m metric-rollup') FROM ds_5m.test;
 SELECT ok(count(*) = 169, 'samples in 1h metric-rollup') FROM ds_1h.test;
 

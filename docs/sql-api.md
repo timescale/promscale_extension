@@ -62,10 +62,10 @@ function interval **prom_api.get_default_metric_retention_period**()
 ```
 function boolean **prom_api.get_downsample_old_data**()
 ```
-### prom_api.get_downsampling_state
+### prom_api.get_global_downsampling_state
 Get automatic downsample state
 ```
-function boolean **prom_api.get_downsampling_state**()
+function boolean **prom_api.get_global_downsampling_state**()
 ```
 ### prom_api.get_metric_chunk_interval
 Get the chunk interval for a specific metric, or the default chunk interval if not explicitly set
@@ -192,10 +192,10 @@ function boolean **prom_api.set_default_retention_period**(retention_period inte
 ```
 function void **prom_api.set_downsample_old_data**(_state boolean)
 ```
-### prom_api.set_downsampling_state
+### prom_api.set_global_downsampling_state
 Set automatic-downsampling state for metrics. Downsampled data will be created only if this returns true
 ```
-function void **prom_api.set_downsampling_state**(_state boolean)
+function void **prom_api.set_global_downsampling_state**(_state boolean)
 ```
 ### prom_api.set_metric_chunk_interval
 set a chunk interval for a specific metric (this overrides the default)
@@ -517,6 +517,11 @@ function TABLE(trace_id trace_id, parent_span_id bigint, span_id bigint, dist in
 ```
 procedure void **_prom_catalog.add_compression_clause_to_downsample_view**(IN _schema text, IN _table_name text)
 ```
+### _prom_catalog.apply_downsample_config
+
+```
+function void **_prom_catalog.apply_downsample_config**(config jsonb)
+```
 ### _prom_catalog.attach_series_partition
 
 ```
@@ -581,7 +586,7 @@ function record **_prom_catalog.create_label_key**(new_key text, OUT id integer,
 ### _prom_catalog.create_metric_downsampling_view
 
 ```
-function boolean **_prom_catalog.create_metric_downsampling_view**(_schema text, _metric_name text, _table_name text, _resolution interval)
+function boolean **_prom_catalog.create_metric_downsampling_view**(_schema text, _metric_name text, _table_name text, _interval interval)
 ```
 ### _prom_catalog.create_metric_table
 
@@ -592,11 +597,6 @@ function record **_prom_catalog.create_metric_table**(metric_name_arg text, OUT 
 
 ```
 function boolean **_prom_catalog.create_metric_view**(metric_name text)
-```
-### _prom_catalog.create_or_update_downsampling
-
-```
-procedure void **_prom_catalog.create_or_update_downsampling**(IN _schema_name text, IN _resolution interval, IN _retention interval)
 ```
 ### _prom_catalog.create_series
 
@@ -651,17 +651,17 @@ procedure void **_prom_catalog.do_decompress_chunks_after**(IN metric_table text
 ### _prom_catalog.downsample_counter
 
 ```
-procedure void **_prom_catalog.downsample_counter**(IN _schema text, IN _table_name text, IN _resolution interval)
+procedure void **_prom_catalog.downsample_counter**(IN _schema text, IN _table_name text, IN _interval interval)
 ```
 ### _prom_catalog.downsample_gauge
 
 ```
-procedure void **_prom_catalog.downsample_gauge**(IN _schema text, IN _table_name text, IN _resolution interval)
+procedure void **_prom_catalog.downsample_gauge**(IN _schema text, IN _table_name text, IN _interval interval)
 ```
 ### _prom_catalog.downsample_summary
 
 ```
-procedure void **_prom_catalog.downsample_summary**(IN _schema text, IN _table_name text, IN _resolution interval)
+procedure void **_prom_catalog.downsample_summary**(IN _schema text, IN _table_name text, IN _interval interval)
 ```
 ### _prom_catalog.drop_metric_chunk_data
 drop chunks from schema_name.metric_name containing data older than older_than.
@@ -1125,11 +1125,6 @@ function void **_prom_catalog.unlock_for_vacuum_engine**()
 
 ```
 function void **_prom_catalog.unlock_metric_for_maintenance**(metric_id integer)
-```
-### _prom_catalog.update_downsampling_state
-
-```
-function void **_prom_catalog.update_downsampling_state**(_schema_name text, _should_refresh boolean)
 ```
 ### _prom_catalog.update_execute_everywhere_entry
 

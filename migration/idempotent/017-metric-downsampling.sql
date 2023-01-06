@@ -1,5 +1,5 @@
 -- Metric downsampling by metric type
-CREATE OR REPLACE PROCEDURE _prom_catalog.downsample_gauge(_schema TEXT, _table_name TEXT, _resolution INTERVAL)
+CREATE OR REPLACE PROCEDURE _prom_catalog.downsample_gauge(_schema TEXT, _table_name TEXT, _interval INTERVAL)
     SET search_path = pg_catalog, pg_temp
 AS
 $$
@@ -18,12 +18,12 @@ BEGIN
                 max(value) as max
             FROM prom_data.%2$I
             GROUP BY public.time_bucket(%4$L, time), series_id WITH NO DATA
-    ', _schema, _table_name, 'UTC', _resolution::text);
+    ', _schema, _table_name, 'UTC', _interval::text);
 END;
 $$
 LANGUAGE plpgsql;
 
-CREATE OR REPLACE PROCEDURE _prom_catalog.downsample_counter(_schema TEXT, _table_name TEXT, _resolution INTERVAL)
+CREATE OR REPLACE PROCEDURE _prom_catalog.downsample_counter(_schema TEXT, _table_name TEXT, _interval INTERVAL)
     SET search_path = pg_catalog, pg_temp
 AS
 $$
@@ -41,12 +41,12 @@ BEGIN
                 _prom_catalog.irate(array_agg(value)) irate
             FROM prom_data.%2$I
             GROUP BY public.time_bucket(%4$L, time), series_id WITH NO DATA
-    ', _schema, _table_name, 'UTC', _resolution::text);
+    ', _schema, _table_name, 'UTC', _interval::text);
 END;
 $$
 LANGUAGE PLPGSQL;
 
-CREATE OR REPLACE PROCEDURE _prom_catalog.downsample_summary(_schema TEXT, _table_name TEXT, _resolution INTERVAL)
+CREATE OR REPLACE PROCEDURE _prom_catalog.downsample_summary(_schema TEXT, _table_name TEXT, _interval INTERVAL)
     SET search_path = pg_catalog, pg_temp
 AS
 $$
@@ -63,7 +63,7 @@ BEGIN
                 count(value) as count
             FROM prom_data.%2$I
             GROUP BY public.time_bucket(%4$L, time), series_id WITH NO DATA
-    ', _schema, _table_name, 'UTC', _resolution::text);
+    ', _schema, _table_name, 'UTC', _interval::text);
 END;
 $$
 LANGUAGE PLPGSQL;
@@ -104,7 +104,7 @@ LANGUAGE PLPGSQL;
 
 -- create_metric_downsampling_view decides which query should be used for downsampling the given metric depending of metric type
 -- and calls the respective creation function. It returns true if metric downsampling view was created.
-CREATE OR REPLACE FUNCTION _prom_catalog.create_metric_downsampling_view(_schema TEXT, _metric_name TEXT, _table_name TEXT, _resolution INTERVAL)
+CREATE OR REPLACE FUNCTION _prom_catalog.create_metric_downsampling_view(_schema TEXT, _metric_name TEXT, _table_name TEXT, _interval INTERVAL)
     RETURNS BOOLEAN
     SET search_path = pg_catalog, pg_temp
 AS
@@ -129,12 +129,12 @@ BEGIN
 
     CASE
         WHEN _metric_type = 'GAUGE' THEN
-            CALL _prom_catalog.downsample_gauge(_schema, _table_name, _resolution);
+            CALL _prom_catalog.downsample_gauge(_schema, _table_name, _interval);
         WHEN _metric_type = 'COUNTER' OR _metric_type = 'HISTOGRAM' THEN
-            CALL _prom_catalog.downsample_counter(_schema, _table_name, _resolution);
+            CALL _prom_catalog.downsample_counter(_schema, _table_name, _interval);
             _default_query_column := 'last';
         WHEN _metric_type = 'SUMMARY' THEN
-            CALL _prom_catalog.downsample_summary(_schema, _table_name, _resolution);
+            CALL _prom_catalog.downsample_summary(_schema, _table_name, _interval);
         ELSE
             RAISE WARNING '[Downsampling] Skipping creation of metric downsampling for %. REASON: invalid metric_type. Wanted {GAUGE, COUNTER, HISTOGRAM, SUMMARY}, received %', _metric_name, _metric_type;
             RETURN FALSE;
@@ -146,7 +146,7 @@ END;
 $$
 LANGUAGE PLPGSQL;
 
--- scan_for_new_downsampling_views is called in regular intervals to scan for either new metrics or for new downsampling resolutions
+-- scan_for_new_downsampling_views is called in regular intervals to scan for either new metrics or for new downsampling configs
 -- and create metric downsampling for them.
 CREATE OR REPLACE PROCEDURE _prom_catalog.scan_for_new_downsampling_views(job_id int, config jsonb)
 AS
@@ -162,7 +162,7 @@ BEGIN
     -- Note: We cannot use SET in the procedure declaration because we do transaction control
     -- and we can _only_ use SET LOCAL in a procedure which _does_ transaction control
     SET LOCAL search_path = pg_catalog, pg_temp;
-    IF ( SELECT prom_api.get_downsampling_state()::BOOLEAN IS FALSE ) THEN
+    IF ( SELECT prom_api.get_global_downsampling_state()::BOOLEAN IS FALSE ) THEN
         RETURN;
     END IF;
 
@@ -176,7 +176,7 @@ BEGIN
                 SELECT 1 FROM _prom_catalog.metric_downsample md WHERE md.downsample_id = d.id AND md.metric_id = mt.id
             ) ORDER BY mt.id -- Get metric names that have a pending downsampling creation.
         LOOP
-            SELECT INTO downsampling_view_created _prom_catalog.create_metric_downsampling_view(d.schema_name, m.metric_name, m.table_name, d.resolution);
+            SELECT INTO downsampling_view_created _prom_catalog.create_metric_downsampling_view(d.schema_name, m.metric_name, m.table_name, d.ds_interval);
             IF downsampling_view_created THEN
                 INSERT INTO _prom_catalog.metric_downsample(downsample_id, metric_id, refresh_pending) VALUES (d.id, m.id, TRUE);
                 downsampling_view_count := downsampling_view_count + 1;
@@ -199,7 +199,7 @@ BEGIN
             md.id as metric_downsample_id,
             dwn.schema_name as schema_name,
             mt.table_name as table_name,
-            dwn.resolution as resolution,
+            dwn.ds_interval as ds_interval,
             dwn.id as downsample_id
         FROM _prom_catalog.metric_downsample md
                  INNER JOIN _prom_catalog.downsample dwn ON (md.downsample_id = dwn.id)
@@ -219,7 +219,7 @@ BEGIN
         -- 2. In case of non-graceful shutdown, we will successfully register the non-registered downsampling viws the
         --      next time this procedure is called. Earlier, this was done using temp table, which did not
         --      provide this guarantee
-        PERFORM prom_api.register_metric_view(d.schema_name, d.table_name, d.resolution, false, d.downsample_id);
+        PERFORM prom_api.register_metric_view(d.schema_name, d.table_name, d.ds_interval, false, d.downsample_id);
         COMMIT;
         SET LOCAL search_path = pg_catalog, pg_temp;
     END LOOP;
@@ -230,6 +230,7 @@ LANGUAGE PLPGSQL;
 -- apply_downsample_config does 2 things:
 -- 1. Create new downsampling configurations based on the given config
 -- 2. Update the existing downsampling config in terms of retention, enabling/disabling downsampling config
+-- The given config must be an array of <schema_name, ds_interval, retention>
 CREATE OR REPLACE FUNCTION _prom_catalog.apply_downsample_config(config jsonb)
 RETURNS VOID
     SET search_path = pg_catalog, pg_temp
@@ -251,8 +252,8 @@ BEGIN
     END LOOP;
 
     -- Insert or update the retention duration and enable the downsampling if disabled.
-    INSERT INTO _prom_catalog.downsample (schema_name, resolution, retention, should_refresh)
-        SELECT a.schema_name, a.resolution, a.retention, TRUE FROM unnest(_input) a
+    INSERT INTO _prom_catalog.downsample (schema_name, ds_interval, retention, should_refresh)
+        SELECT a.schema_name, a.ds_interval, a.retention, TRUE FROM unnest(_input) a
             ON CONFLICT (schema_name) DO UPDATE
                 SET
                     retention = excluded.retention,
@@ -265,6 +266,7 @@ BEGIN
 END;
 $$
 LANGUAGE PLPGSQL;
+GRANT EXECUTE ON FUNCTION _prom_catalog.apply_downsample_config(jsonb) TO prom_writer;
 
 -- delete_downsampling deletes everything related to the given downsampling schema name. It does the following in order:
 -- 1. Delete the entries in _prom_catalog.downsample
@@ -291,42 +293,27 @@ $$
 LANGUAGE PLPGSQL;
 GRANT EXECUTE ON PROCEDURE _prom_catalog.delete_downsampling(text) TO prom_writer;
 
-CREATE OR REPLACE FUNCTION _prom_catalog.update_downsampling_state(_schema_name TEXT, _should_refresh BOOLEAN)
-    RETURNS VOID
-    SET search_path = pg_catalog, pg_temp
-AS
-$$
-BEGIN
-    UPDATE _prom_catalog.downsample SET should_refresh = _should_refresh WHERE schema_name = _schema_name;
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'No entry found for schema %', _schema_name;
-    END IF;
-END;
-$$
-LANGUAGE PLPGSQL;
-GRANT EXECUTE ON FUNCTION _prom_catalog.update_downsampling_state(TEXT, BOOLEAN) TO prom_admin;
-
-CREATE OR REPLACE FUNCTION prom_api.set_downsampling_state(_state BOOLEAN)
+CREATE OR REPLACE FUNCTION prom_api.set_global_downsampling_state(_state BOOLEAN)
 RETURNS VOID
 SET search_path = pg_catalog, pg_temp
 AS $$
     SELECT _prom_catalog.set_default_value('downsample', _state::text);
 $$
 LANGUAGE SQL;
-COMMENT ON FUNCTION prom_api.set_downsampling_state(BOOLEAN)
+COMMENT ON FUNCTION prom_api.set_global_downsampling_state(BOOLEAN)
     IS 'Set automatic-downsampling state for metrics. Downsampled data will be created only if this returns true';
-GRANT EXECUTE ON FUNCTION prom_api.set_downsampling_state(BOOLEAN) TO prom_admin;
+GRANT EXECUTE ON FUNCTION prom_api.set_global_downsampling_state(BOOLEAN) TO prom_admin;
 
-CREATE OR REPLACE FUNCTION prom_api.get_downsampling_state()
+CREATE OR REPLACE FUNCTION prom_api.get_global_downsampling_state()
 RETURNS BOOLEAN
 SET search_path = pg_catalog, pg_temp
 AS $$
     SELECT _prom_catalog.get_default_value('downsample')::boolean;
 $$
 LANGUAGE SQL;
-COMMENT ON FUNCTION prom_api.get_downsampling_state()
+COMMENT ON FUNCTION prom_api.get_global_downsampling_state()
     IS 'Get automatic downsample state';
-GRANT EXECUTE ON FUNCTION prom_api.get_downsampling_state() TO prom_admin;
+GRANT EXECUTE ON FUNCTION prom_api.get_global_downsampling_state() TO prom_admin;
 
 CREATE OR REPLACE FUNCTION prom_api.set_downsample_old_data(_state BOOLEAN)
 RETURNS VOID
