@@ -119,13 +119,7 @@ RUN \
     cd /pgextwlist && \
     make
 
-# A temp workaround to bootstrap the line of pg15 images
-FROM ${PREVIOUS_IMAGE} as prev_img_12
-FROM ${PREVIOUS_IMAGE} as prev_img_13
-FROM ${PREVIOUS_IMAGE} as prev_img_14
-FROM builder           as prev_img_15
-
-FROM prev_img_${PG_VERSION} as prev_img
+FROM ${PREVIOUS_IMAGE} as prev_img
 
 # COPY over the new files to the image. Done as a seperate stage so we don't
 # ship the build tools.
