@@ -101,11 +101,11 @@ $$
         PERFORM _ps_catalog.apply_telemetry('metrics_default_chunk_interval', result);
 
         -- Metric downsampling.
-        SELECT prom_api.get_automatic_downsample()::TEXT INTO result;
-        PERFORM _ps_catalog.apply_telemetry('metrics_automatic_downsampling_enabled', result);
+        SELECT prom_api.get_global_downsampling_state()::TEXT INTO result;
+        PERFORM _ps_catalog.apply_telemetry('metrics_downsampling_enabled', result);
 
-        SELECT array_agg(resolution || ':' || retention)::TEXT INTO result FROM _prom_catalog.rollup; -- Example: {00:05:00:720:00:00,01:00:00:8760:00:00} => {HH:MM:SS}
-        PERFORM _ps_catalog.apply_telemetry('metrics_automatic_downsampling_resolutions', result);
+        SELECT array_agg(ds_interval || ':' || retention)::TEXT INTO result FROM _prom_catalog.downsample; -- Example: {00:05:00:720:00:00,01:00:00:8760:00:00} => {HH:MM:SS}
+        PERFORM _ps_catalog.apply_telemetry('metrics_downsampling_configs', result);
 
         IF ( SELECT count(*)>0 FROM _prom_catalog.metric WHERE metric_name = 'prometheus_tsdb_head_series' ) THEN
             -- Calculate active series in Promscale. This is done by taking the help of the Prometheus metric 'prometheus_tsdb_head_series'.

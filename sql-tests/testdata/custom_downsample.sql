@@ -29,7 +29,7 @@ SELECT register_metric_view('custom', 'test', INTERVAL '30 minutes');
 SELECT ok(count(*) = 337, 'samples in custom downsample') FROM custom.test;
 
 
--- # Test compressing metric-rollups.
+-- # Test compressing metric downsampling.
 
 \i 'testdata/scripts/test-helpers.sql'
 
@@ -46,7 +46,7 @@ ALTER MATERIALIZED VIEW custom.test SET (timescaledb.compress = true);
 CALL _prom_catalog.execute_caggs_compression_policy(2, '{}'::jsonb);
 SELECT ok(compressed_chunks_exist('custom.test') = true);
 
--- # Test retaining metric-rollups.
+-- # Test retaining metric downsampling.
 
 SELECT ok(count(*) > 0) FROM (SELECT show_chunks('custom.test')) a;
 

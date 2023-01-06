@@ -45,7 +45,7 @@ FROM generate_series(
 -- # TEST refreshing custom downsample.
 
 -- Check samples before calling the refresh func.
-SELECT ok(count(*) = 344, 'samples in custom downsample before refresh') FROM custom.test; -- Samples increased even before calling refresh func. My guess is that this is due to timescaledb.materalized behaviour.
+SELECT ok(count(*) = 344, 'samples in custom downsample before refresh') FROM custom.test; -- Samples increased even before calling refresh func. My guess is that this is due to timescaledb.materialized behaviour.
 
 CALL _prom_catalog.execute_caggs_refresh_policy(1, json_build_object('refresh_interval', interval '30 minutes')::jsonb);
 

@@ -52,7 +52,7 @@ WHERE proc_schema = '_prom_catalog'
   AND NOT (proc_name = 'scan_for_new_downsampling_views' OR proc_name = 'execute_caggs_compression_policy' OR proc_name = 'execute_caggs_retention_policy')
   AND NOT coalesce(config, '{}'::jsonb) ?& ARRAY ['signal', 'type'];
 
-SELECT ok(COUNT(*) = 3, 'Only the new-style configurations should be present')
+SELECT ok(COUNT(*) = 6, 'Only the new-style configurations should be present')
 FROM timescaledb_information.jobs
 WHERE proc_schema = '_prom_catalog'
   AND (schedule_interval >= '10 min' OR schedule_interval < '15 min');

@@ -6,17 +6,21 @@ SELECT * FROM plan(3);
 
 SELECT prom_api.set_downsample_old_data(true);
 
--- Scan should not error when there are no rollups.
+-- Scan should not error when there are no downsampling configs.
 CALL _prom_catalog.scan_for_new_downsampling_views(1, '{}'::jsonb);
 
-CALL _prom_catalog.create_or_update_downsampling('ds_5m', INTERVAL '5 minutes', INTERVAL '1 day');
+SELECT _prom_catalog.apply_downsample_config($$
+    [
+        {"schema_name": "ds_5m", "ds_interval": "5m", "retention": "1d"}
+    ]
+$$::jsonb);
 
 -- Scan should not error when there are no metrics.
 CALL _prom_catalog.scan_for_new_downsampling_views(1, '{}'::jsonb);
 
 \i 'testdata/scripts/generate-test-metric.sql'
 
--- Scan when there are metrics. This will create new rollups.
+-- Scan when there are metrics. This will create new downsampling configuration.
 CALL _prom_catalog.scan_for_new_downsampling_views(1, '{}'::jsonb);
 
 SELECT ok(count(*) = 2017) FROM ds_5m.test;
