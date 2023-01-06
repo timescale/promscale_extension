@@ -1,11 +1,11 @@
 CREATE TABLE _prom_catalog.downsample (
     id             SERIAL PRIMARY KEY,
     schema_name    TEXT NOT NULL,
-    resolution     INTERVAL NOT NULL,
+    ds_interval     INTERVAL NOT NULL,
     retention      INTERVAL NOT NULL,
     should_refresh BOOLEAN DEFAULT FALSE,
     UNIQUE(schema_name),
-    UNIQUE(resolution) -- To avoid ds_1m and ds_60s, though technically, both are the same.
+    UNIQUE(ds_interval) -- To avoid ds_1m and ds_60s, as technically, both are the same.
 );
 GRANT SELECT ON TABLE _prom_catalog.downsample TO prom_reader;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE _prom_catalog.downsample TO prom_writer;

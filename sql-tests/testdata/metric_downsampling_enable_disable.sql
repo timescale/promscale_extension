@@ -2,7 +2,7 @@
 \set QUIET 1
 \i 'testdata/scripts/pgtap-1.2.0.sql'
 
-SELECT * FROM plan(3);
+SELECT * FROM plan(4);
 
 SELECT prom_api.set_downsample_old_data(true);
 
@@ -10,15 +10,19 @@ SELECT prom_api.set_default_chunk_interval(INTERVAL '1 hour');
 
 \i 'testdata/scripts/generate-test-metric.sql'
 
-CALL _prom_catalog.create_or_update_downsampling('ds_5m', INTERVAL '5 minutes', INTERVAL '1 day');
+SELECT _prom_catalog.apply_downsample_config($$
+    [
+        {"schema_name": "ds_5m", "ds_interval": "5m", "retention": "1d"}
+    ]
+$$::jsonb);
 
-SELECT * FROM _prom_catalog.downsample;
+SELECT ok(schema_name = 'ds_5m') FROM _prom_catalog.downsample WHERE ds_interval = INTERVAL '5 minutes' AND retention = INTERVAL '1 day';
 
 CALL _prom_catalog.scan_for_new_downsampling_views(1, '{}'::jsonb);
 
 SELECT ok(count(*) = 2017, 'samples in 5m metric-rollup') FROM ds_5m.test;
 
-SELECT _prom_catalog.update_downsampling_state('ds_5m', false); -- This will make avoid refreshing for ds_5m downsampling.
+SELECT _prom_catalog.apply_downsample_config($$[]$$::jsonb); -- This will make avoid refreshing for ds_5m downsampling.
 
 -- Add new samples.
 INSERT INTO prom_data.test
@@ -36,8 +40,11 @@ CALL _prom_catalog.execute_caggs_refresh_policy(1, json_build_object('refresh_in
 
 SELECT ok(count(*) = 2017, 'samples in 5m metric-rollup') FROM ds_5m.test; -- Samples should be same.
 
-
-SELECT _prom_catalog.update_downsampling_state('ds_5m', true); -- Now, refreshing caggs should increase samples.
+SELECT _prom_catalog.apply_downsample_config($$
+    [
+        {"schema_name": "ds_5m", "ds_interval": "5m", "retention": "1d"}
+    ]
+$$::jsonb); -- This will enable the existing ds_5m. Now, refreshing caggs should increase samples.
 
 CALL _prom_catalog.execute_caggs_refresh_policy(1, json_build_object('refresh_interval', interval '5 minutes')::jsonb);
 

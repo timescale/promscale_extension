@@ -5,7 +5,7 @@ DECLARE
     _refresh_interval INTERVAL;
     _active_chunk_interval INTERVAL;
     _ignore_downsampling_clause TEXT := '';
-    _refresh_downsampled_data BOOLEAN := (SELECT prom_api.get_downsampling_state()::BOOLEAN);
+    _refresh_downsampled_data BOOLEAN := (SELECT prom_api.get_global_downsampling_state()::BOOLEAN);
     _should_refresh_clause TEXT := 'AND (SELECT should_refresh FROM _prom_catalog.downsample WHERE id = m.downsample_id) = TRUE';
     _safety_refresh_start_buffer INTERVAL := INTERVAL '0 minutes';
     r RECORD;
@@ -16,7 +16,7 @@ BEGIN
     _active_chunk_interval := (SELECT _prom_catalog.get_default_chunk_interval()::INTERVAL * 2);
     _refresh_interval := (config ->> 'refresh_interval')::INTERVAL;
     IF _refresh_interval IS NULL THEN
-        RAISE EXCEPTION 'refresh_interval cannot be null';
+        RAISE EXCEPTION 'Caggs refresh policy: refresh_interval cannot be null';
     END IF;
 
     IF ( SELECT _refresh_interval < INTERVAL '30 minutes' ) THEN
@@ -25,7 +25,7 @@ BEGIN
         -- of refreshing data, a system with a lot of metrics and series might take > 10 minutes to refresh a 5 minute downsampling.
         -- This will lead to data loss. Hence, we give a refresh buffer of 30 minutes early to start.
         --
-        -- This problem is not seen in large downsampling resolutions like 1 hour, since the 2 buckets duration gives 2 hours
+        -- This problem is not seen in large downsampling intervals like 1 hour, since the 2 buckets duration gives 2 hours
         -- of time to complete refresh, which is usually sufficient.
         _safety_refresh_start_buffer := INTERVAL '30 minutes';
     END IF;
@@ -99,6 +99,11 @@ DECLARE
     r RECORD;
 
 BEGIN
+    IF NOT (SELECT prom_api.get_global_downsampling_state()::BOOLEAN) THEN
+        -- Do not compress any Cagg if downsampling state is false.
+        RETURN;
+    END IF;
+
     FOR r IN
         SELECT
             format('%I.%I', m.table_schema, m.table_name) AS compressible_cagg,
