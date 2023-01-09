@@ -449,7 +449,11 @@ fn available_extension_versions(client: &mut Client) -> (Version, Version, Versi
     versions.sort();
     let first = versions[0].to_owned();
     let last = versions.pop().unwrap();
-    let prior = versions.pop().unwrap();
+    let prior = versions
+        .into_iter()
+        .filter(|vsn| vsn.pre.is_empty())
+        .last()
+        .unwrap();
     (first, last, prior)
 }
 
