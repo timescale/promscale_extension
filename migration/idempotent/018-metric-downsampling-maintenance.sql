@@ -16,7 +16,7 @@ BEGIN
     _active_chunk_interval := (SELECT _prom_catalog.get_default_chunk_interval()::INTERVAL * 2);
     _refresh_interval := (config ->> 'refresh_interval')::INTERVAL;
     IF _refresh_interval IS NULL THEN
-        RAISE EXCEPTION 'Caggs refresh policy: refresh_interval cannot be null';
+        RAISE EXCEPTION 'Caggs refresh policy with job_id %: refresh_interval cannot be null', job_id;
     END IF;
 
     IF ( SELECT _refresh_interval < INTERVAL '30 minutes' ) THEN

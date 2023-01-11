@@ -4,6 +4,8 @@
 
 SELECT * FROM plan(14);
 
+SELECT prom_api.set_global_downsampling_state(true);
+
 -- Ensure the state before creating downsampling data.
 SELECT ok(count(*) = 0) from _prom_catalog.downsample;
 SELECT ok(EXISTS(SELECT 1 FROM information_schema.schemata WHERE schema_name = 'ds_5m') = false);

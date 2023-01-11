@@ -13,7 +13,7 @@ FROM
     ('ha_lease_timeout'         , '1m'),
     ('ha_lease_refresh'         , '10s'),
     ('epoch_duration'           , (INTERVAL '12 hours')::text),
-    ('downsample'               , 'true'),
+    ('downsample'               , 'false'),
     ('downsample_old_data'      , 'false') -- For beta release, we do not plan on refreshing old metric data.
 ) d(key, value)
 ;
@@ -2598,13 +2598,13 @@ BEGIN
         END IF;
 
         IF refresh_interval IS NULL THEN
-            RAISE EXCEPTION 'refresh_interval must not be null for rollup views';
+            RAISE EXCEPTION 'refresh_interval must not be null for automatic-dowmsampling views';
         END IF;
 
-        -- We do not do the checks offered by get_first_level_view_on_metric() for metric-rollups
+        -- We do not do the checks offered by get_first_level_view_on_metric() for automatic metric downsampling
         -- because those checks are not meant for Caggs with timescaledb.materialized_only = true.
         --
-        -- Since metric-rollups are an internal creation of Caggs, we should be fine with not doing
+        -- Since automatic metric downsampling are an internal creation of Caggs, we should be fine with not doing
         -- "strict" safety checks.
         metric_table_name := view_name;
         agg_name := view_name;
@@ -2634,7 +2634,7 @@ BEGIN
     END IF;
 
     IF refresh_interval IS NULL THEN
-        -- When a non-metric-rollup Cagg is created, we should inform the user that he needs to create a refresh policy himself.
+        -- When a non automatic metric downsampling Cagg is created, we should inform the user that he needs to create a refresh policy himself.
         RAISE NOTICE 'Automatic refresh is disabled since refresh_interval is NULL. Please create refresh policy for this Cagg';
     ELSE
         PERFORM _prom_catalog.create_cagg_refresh_job_if_not_exists(refresh_interval);

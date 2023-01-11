@@ -4,6 +4,7 @@
 
 SELECT * FROM plan(3);
 
+SELECT prom_api.set_global_downsampling_state(true);
 SELECT prom_api.set_downsample_old_data(true);
 
 -- Scan should not error when there are no downsampling configs.

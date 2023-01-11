@@ -116,7 +116,7 @@ DECLARE
 BEGIN
     SELECT type INTO _metric_type FROM _prom_catalog.metadata WHERE metric_family = _metric_name;
     IF (_metric_type IS NULL) THEN
-        -- Guess the metric type based on the metric/table suffix.
+        -- Guess the metric type based on the metric_name suffix.
         IF ( SELECT _metric_name like '%_bucket') THEN
             _metric_type := 'HISTOGRAM';
         ELSIF (SELECT (_metric_name like '%_sum') OR (_metric_name like '%_count')) THEN
@@ -124,7 +124,7 @@ BEGIN
         ELSE
             _metric_type := 'GAUGE';
         END IF;
-        RAISE WARNING '[Downsampling] Metric type of % missing. Guessed as %', _metric_name, _metric_type;
+        RAISE WARNING '[Downsampling] Metric type of % missing. Guessed the metric-type as %', _metric_name, _metric_type;
     END IF;
 
     CASE
@@ -194,6 +194,7 @@ BEGIN
     SET LOCAL search_path = pg_catalog, pg_temp;
 
     -- Refresh and register the newly added downsampling views.
+    -- The code below works with non-graceful shutdowns.
     FOR d IN
         SELECT
             md.id as metric_downsample_id,
@@ -207,7 +208,6 @@ BEGIN
         WHERE md.refresh_pending ORDER BY mt.id
     LOOP
         IF refresh_existing_data THEN
-            -- For beta release, we do not plan to refresh existing data.
             CALL public.refresh_continuous_aggregate(format('%I.%I', d.schema_name, d.table_name), NULL, NULL);
         END IF;
 
@@ -216,7 +216,7 @@ BEGIN
         -- Perform the downsampling view registration only after we have initial data. This helps in 2 ways:
         -- 1. Prevent execute_caggs_refresh_policy() from refreshing the materialized view even before it is
         --      refreshed for the first time ,i.e., from start to end of the hypertable
-        -- 2. In case of non-graceful shutdown, we will successfully register the non-registered downsampling viws the
+        -- 2. In case of non-graceful shutdown, we will successfully register the non-registered downsampling views the
         --      next time this procedure is called. Earlier, this was done using temp table, which did not
         --      provide this guarantee
         PERFORM prom_api.register_metric_view(d.schema_name, d.table_name, d.ds_interval, false, d.downsample_id);

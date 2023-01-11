@@ -4,8 +4,8 @@
 
 SELECT * FROM plan(4);
 
+SELECT prom_api.set_global_downsampling_state(true);
 SELECT prom_api.set_downsample_old_data(true);
-
 SELECT prom_api.set_default_chunk_interval(INTERVAL '1 hour');
 
 \i 'testdata/scripts/generate-test-metric.sql'

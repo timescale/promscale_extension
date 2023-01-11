@@ -4,6 +4,8 @@
 
 SELECT * FROM plan(6);
 
+SELECT prom_api.set_global_downsampling_state(true); -- We need global downsampling state for compression to work.
+
 SELECT prom_api.set_default_chunk_interval(INTERVAL '1 hour');
 
 SELECT prom_api.set_default_retention_period(INTERVAL '1 day');
