@@ -1515,7 +1515,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "test-common",
- "test-generator 0.3.0 (git+https://github.com/JamesGuthrie/test-generator)",
+ "test-generator",
  "uluru",
 ]
 
@@ -2032,7 +2032,7 @@ dependencies = [
  "insta",
  "pgtap-parse",
  "test-common",
- "test-generator 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "test-generator",
 ]
 
 [[package]]
@@ -2147,20 +2147,9 @@ dependencies = [
 
 [[package]]
 name = "test-generator"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea97be90349ab3574f6e74d1566e1c5dd3a4bc74b89f4af4cc10ca010af103c0"
-dependencies = [
- "glob",
- "proc-macro2 0.4.30",
- "quote 0.6.13",
- "syn 0.15.44",
-]
-
-[[package]]
-name = "test-generator"
-version = "0.3.0"
-source = "git+https://github.com/JamesGuthrie/test-generator#82e799979980962aec1aa324ec6e0e4cad781f41"
+checksum = "5b23be2add79223226e1cb6446cb3e37506a5927089870687a0f1149bb7a073a"
 dependencies = [
  "glob",
  "proc-macro2 0.4.30",
