@@ -1,3 +1,11 @@
+> **Warning**
+>
+> Promscale has been discontinued and is deprecated.
+>
+> The code in this repository is no longer maintained.
+>
+> [Learn more](https://github.com/timescale/promscale/issues/1836).
+
 # Promscale Extension
 
 From Promscale version 0.11.0, this [Postgres extension](https://www.postgresql.org/docs/12/extend-extensions.html)
