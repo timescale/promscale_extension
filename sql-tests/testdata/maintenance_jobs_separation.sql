@@ -15,27 +15,28 @@ CALL _prom_catalog.execute_maintenance_job(0, '{"signal": "metrics", "type": "co
 SELECT * FROM plan(9);
 
 -- No old-style configurations are present at the beginning
-SELECT ok(COUNT(*) = 0, 'No old-style configurations are present at the beginning') 
-FROM timescaledb_information.jobs 
-WHERE proc_schema = '_prom_catalog' 
+SELECT ok(COUNT(*) = 0, 'No old-style configurations are present at the beginning')
+FROM timescaledb_information.jobs
+WHERE proc_schema = '_prom_catalog'
+  AND NOT (proc_name = 'scan_for_new_downsampling_views' OR proc_name = 'execute_caggs_compression_policy' OR proc_name = 'execute_caggs_retention_policy')
   AND NOT coalesce(config, '{}'::jsonb) ?& ARRAY ['signal', 'type'];
 
 SELECT ok(COUNT(*) = 2, 'Two metrics retention jobs by default.')
-FROM timescaledb_information.jobs 
+FROM timescaledb_information.jobs
 WHERE proc_schema = '_prom_catalog'
-  AND config ->> 'signal' = 'metrics' 
+  AND config ->> 'signal' = 'metrics'
   AND config ->> 'type' = 'retention';
 
 SELECT ok(COUNT(*) = 3, 'Three metrics compression jobs by default.')
-FROM timescaledb_information.jobs 
+FROM timescaledb_information.jobs
 WHERE proc_schema = '_prom_catalog'
-  AND config ->> 'signal' = 'metrics' 
+  AND config ->> 'signal' = 'metrics'
   AND config ->> 'type' = 'compression';
 
 SELECT ok(COUNT(*) = 1, 'And one traces retention job by default.')
-FROM timescaledb_information.jobs 
+FROM timescaledb_information.jobs
 WHERE proc_schema = '_prom_catalog'
-  AND config ->> 'signal' = 'traces' 
+  AND config ->> 'signal' = 'traces'
   AND config ->> 'type' = 'retention';
 
 -- Add two old-style configurations
@@ -46,19 +47,20 @@ SELECT _prom_catalog.add_job('_prom_catalog.execute_maintenance_job', '30 min');
 SELECT prom_api.config_maintenance_jobs(1, '10 min');
 
 SELECT ok(COUNT(*) = 0, 'Old-style config jobs should be deleted by config_maintenance_jobs')
-FROM timescaledb_information.jobs 
-WHERE proc_schema = '_prom_catalog' 
+FROM timescaledb_information.jobs
+WHERE proc_schema = '_prom_catalog'
+  AND NOT (proc_name = 'scan_for_new_downsampling_views' OR proc_name = 'execute_caggs_compression_policy' OR proc_name = 'execute_caggs_retention_policy')
   AND NOT coalesce(config, '{}'::jsonb) ?& ARRAY ['signal', 'type'];
 
-SELECT ok(COUNT(*) = 3, 'Only the new-style configurations should be present')
-FROM timescaledb_information.jobs 
+SELECT ok(COUNT(*) = 6, 'Only the new-style configurations should be present')
+FROM timescaledb_information.jobs
 WHERE proc_schema = '_prom_catalog'
   AND (schedule_interval >= '10 min' OR schedule_interval < '15 min');
 
 -- Increase the number of jobs
 SELECT prom_api.config_maintenance_jobs(2, '15 min', '{"log_verbose": true}');
 
-SELECT ok(COUNT(*) = 6) FROM timescaledb_information.jobs 
+SELECT ok(COUNT(*) = 6) FROM timescaledb_information.jobs
 WHERE proc_schema = '_prom_catalog'
   AND config ?& ARRAY ['signal', 'type']
   AND (schedule_interval >= '15 min' OR schedule_interval < '17 min')
@@ -67,7 +69,7 @@ WHERE proc_schema = '_prom_catalog'
 -- Decrease the number of jobs
 SELECT prom_api.config_maintenance_jobs(1, '16 min', '{"log_verbose": false}');
 
-SELECT ok(COUNT(*) = 3) FROM timescaledb_information.jobs 
+SELECT ok(COUNT(*) = 3) FROM timescaledb_information.jobs
 WHERE proc_schema = '_prom_catalog'
   AND config ?& ARRAY ['signal', 'type']
   AND (schedule_interval >= '16 min' OR schedule_interval < '18 min')

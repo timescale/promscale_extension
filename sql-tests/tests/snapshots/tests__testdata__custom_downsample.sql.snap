@@ -1,0 +1,46 @@
+---
+source: sql-tests/tests/tests.rs
+expression: query_result
+---
+ plan 
+------
+ 1..4
+(1 row)
+
+ set_default_chunk_interval 
+----------------------------
+ t
+(1 row)
+
+ set_default_retention_period 
+------------------------------
+ t
+(1 row)
+
+psql:testdata/custom_downsample.sql:24: NOTICE:  refreshing continuous aggregate "test"
+HINT:  Use WITH NO DATA if you do not want to refresh the continuous aggregate on creation.
+ register_metric_view 
+----------------------
+ t
+(1 row)
+
+                 ok                  
+-------------------------------------
+ ok 1 - samples in custom downsample
+(1 row)
+
+  ok  
+------
+ ok 2
+(1 row)
+
+  ok  
+------
+ ok 3
+(1 row)
+
+ finish 
+--------
+(0 rows)
+
+

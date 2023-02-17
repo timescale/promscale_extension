@@ -57,6 +57,16 @@ get the default retention period for all metrics
 ```
 function interval **prom_api.get_default_metric_retention_period**()
 ```
+### prom_api.get_downsample_old_data
+
+```
+function boolean **prom_api.get_downsample_old_data**()
+```
+### prom_api.get_global_downsampling_state
+Get automatic downsample state
+```
+function boolean **prom_api.get_global_downsampling_state**()
+```
 ### prom_api.get_metric_chunk_interval
 Get the chunk interval for a specific metric, or the default chunk interval if not explicitly set
 ```
@@ -135,7 +145,7 @@ function void **prom_api.promscale_post_restore**()
 ### prom_api.register_metric_view
 
 ```
-function boolean **prom_api.register_metric_view**(schema_name text, view_name text, if_not_exists boolean DEFAULT false)
+function boolean **prom_api.register_metric_view**(schema_name text, view_name text, refresh_interval interval, if_not_exists boolean DEFAULT false, downsample_id bigint DEFAULT NULL::bigint)
 ```
 ### prom_api.reset_metric_chunk_interval
 resets the chunk interval for a specific metric to using the default
@@ -176,6 +186,16 @@ function boolean **prom_api.set_default_compression_setting**(compression_settin
 set the retention period for any metrics (existing and new) without an explicit override
 ```
 function boolean **prom_api.set_default_retention_period**(retention_period interval)
+```
+### prom_api.set_downsample_old_data
+
+```
+function void **prom_api.set_downsample_old_data**(_state boolean)
+```
+### prom_api.set_global_downsampling_state
+Set automatic-downsampling state for metrics. Downsampled data will be created only if this returns true
+```
+function void **prom_api.set_global_downsampling_state**(_state boolean)
 ```
 ### prom_api.set_metric_chunk_interval
 set a chunk interval for a specific metric (this overrides the default)
@@ -492,10 +512,20 @@ the specified span_id.
 ```
 function TABLE(trace_id trace_id, parent_span_id bigint, span_id bigint, dist integer, path bigint[]) **ps_trace.upstream_spans**(_trace_id trace_id, _span_id bigint, _max_dist integer DEFAULT NULL::integer)
 ```
+### _prom_catalog.add_compression_clause_to_downsample_view
+
+```
+procedure void **_prom_catalog.add_compression_clause_to_downsample_view**(IN _schema text, IN _table_name text)
+```
 ### _prom_catalog.add_job
 A wrapper around public.add_job that introduces jitter to job start times and schedules.
 ```
 function integer **_prom_catalog.add_job**(proc regproc, schedule_interval interval, config jsonb DEFAULT NULL::jsonb)
+```
+### _prom_catalog.apply_downsample_config
+
+```
+function void **_prom_catalog.apply_downsample_config**(config jsonb)
 ```
 ### _prom_catalog.attach_series_partition
 
@@ -522,6 +552,22 @@ procedure void **_prom_catalog.compress_old_chunks**(IN _hypertable_schema_name 
 ```
 function integer **_prom_catalog.count_jsonb_keys**(j jsonb)
 ```
+### _prom_catalog.counter_reset_sum
+
+```
+function double precision **_prom_catalog.counter_reset_sum**(v double precision[])
+```
+### _prom_catalog.create_cagg_refresh_job_if_not_exists
+Creates a Cagg refresh job that refreshes all Caggs registered by register_metric_view().
+This function creates a refresh job only if no execute_caggs_refresh_policy() exists currently with the given refresh_interval.
+```
+function void **_prom_catalog.create_cagg_refresh_job_if_not_exists**(_refresh_interval interval)
+```
+### _prom_catalog.create_default_downsampling_query_view
+
+```
+function void **_prom_catalog.create_default_downsampling_query_view**(_schema text, _table_name text, _default_column text)
+```
 ### _prom_catalog.create_exemplar_table_if_not_exists
 
 ```
@@ -541,6 +587,11 @@ function text **_prom_catalog.create_ingest_temp_table**(table_name text, schema
 
 ```
 function record **_prom_catalog.create_label_key**(new_key text, OUT id integer, OUT value_column_name name, OUT id_column_name name)
+```
+### _prom_catalog.create_metric_downsampling_view
+
+```
+function boolean **_prom_catalog.create_metric_downsampling_view**(_schema text, _metric_name text, _table_name text, _interval interval)
 ```
 ### _prom_catalog.create_metric_table
 
@@ -577,6 +628,11 @@ procedure void **_prom_catalog.decompress_chunks_after**(IN metric_table text, I
 ```
 function void **_prom_catalog.delay_compression_job**(ht_table text, new_start timestamp with time zone)
 ```
+### _prom_catalog.delete_downsampling
+
+```
+procedure void **_prom_catalog.delete_downsampling**(IN _schema_name text)
+```
 ### _prom_catalog.delete_expired_series
 
 ```
@@ -597,6 +653,21 @@ function bigint **_prom_catalog.delete_series_from_metric**(name text, series_id
 ```
 procedure void **_prom_catalog.do_decompress_chunks_after**(IN metric_table text, IN min_time timestamp with time zone, IN transactional boolean DEFAULT false)
 ```
+### _prom_catalog.downsample_counter
+
+```
+procedure void **_prom_catalog.downsample_counter**(IN _schema text, IN _table_name text, IN _interval interval)
+```
+### _prom_catalog.downsample_gauge
+
+```
+procedure void **_prom_catalog.downsample_gauge**(IN _schema text, IN _table_name text, IN _interval interval)
+```
+### _prom_catalog.downsample_summary
+
+```
+procedure void **_prom_catalog.downsample_summary**(IN _schema text, IN _table_name text, IN _interval interval)
+```
 ### _prom_catalog.drop_metric_chunk_data
 drop chunks from schema_name.metric_name containing data older than older_than.
 ```
@@ -611,6 +682,31 @@ procedure void **_prom_catalog.drop_metric_chunks**(IN schema_name text, IN metr
 ABORT an INSERT transaction due to the ID epoch being out of date
 ```
 function void **_prom_catalog.epoch_abort**(user_epoch bigint)
+```
+### _prom_catalog.execute_caggs_compression_policy
+execute_caggs_compression_policy is responsible to compress Caggs registered via
+register_metric_view() in _prom_catalog.metric. It goes through all the entries in the _prom_catalog.metric and tries to compress any Cagg that supports compression.
+These include automatic-downsampling of metrics and custom Caggs based downsampling.
+Note: execute_caggs_compression_policy runs every X interval and compresses only the inactive chunks of those Caggs which have timescaledb.compress = true.
+```
+procedure void **_prom_catalog.execute_caggs_compression_policy**(IN job_id integer, IN config jsonb)
+```
+### _prom_catalog.execute_caggs_refresh_policy
+execute_caggs_refresh_policy runs every refresh_interval passed in config. Its
+main aim is to refresh those Caggs that have been registered under _prom_catalog.metric and whose view_refresh_interval
+matches the given refresh_interval. It refreshes 2 kinds of Caggs:
+1. Caggs created by metric downsampling
+2. Custom Caggs created by the user
+```
+procedure void **_prom_catalog.execute_caggs_refresh_policy**(IN job_id integer, IN config jsonb)
+```
+### _prom_catalog.execute_caggs_retention_policy
+execute_caggs_retention_policy is responsible to perform retention behaviour on continuous aggregates registered via
+register_metric_view(). It loops through all entries in the _prom_catalog.metric that are Caggs and tries to delete the stale chunks of those Caggs.
+The staleness is determined by _prom_catalog.downsample.retention (for metric downsampling) and default_retention_period of parent hypertable (for custom Caggs).
+These include automatic-downsampling for metrics and custom Caggs based downsampling.
+```
+procedure void **_prom_catalog.execute_caggs_retention_policy**(IN job_id integer, IN config jsonb)
 ```
 ### _prom_catalog.execute_compression_policy
 compress data according to the policy. This procedure should be run regularly in a cron job
@@ -847,6 +943,11 @@ function bigint **_prom_catalog.insert_metric_metadatas**(t timestamp with time 
 ```
 function bigint **_prom_catalog.insert_metric_row**(metric_table text, time_array timestamp with time zone[], value_array double precision[], series_id_array bigint[])
 ```
+### _prom_catalog.irate
+
+```
+function double precision **_prom_catalog.irate**(v double precision[])
+```
 ### _prom_catalog.is_multinode
 
 ```
@@ -994,6 +1095,11 @@ function void **_prom_catalog.resurrect_series_ids**(metric_table text, series_i
 
 ```
 function bigint **_prom_catalog.safe_approximate_row_count**(table_name_input regclass)
+```
+### _prom_catalog.scan_for_new_downsampling_views
+
+```
+procedure void **_prom_catalog.scan_for_new_downsampling_views**(IN job_id integer, IN config jsonb)
 ```
 ### _prom_catalog.set_app_name
 

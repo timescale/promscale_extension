@@ -12,7 +12,9 @@ FROM
     ('trace_retention_period'   , (30 * INTERVAL '1 days')::text),
     ('ha_lease_timeout'         , '1m'),
     ('ha_lease_refresh'         , '10s'),
-    ('epoch_duration'           , (INTERVAL '12 hours')::text)
+    ('epoch_duration'           , (INTERVAL '12 hours')::text),
+    ('downsample'               , 'false'),
+    ('downsample_old_data'      , 'false') -- For beta release, we do not plan on refreshing old metric data.
 ) d(key, value)
 ;
 GRANT SELECT ON _prom_catalog.initial_default TO prom_reader;
@@ -2562,7 +2564,7 @@ LANGUAGE PLPGSQL;
 REVOKE ALL ON FUNCTION _prom_catalog.create_metric_view(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION _prom_catalog.create_metric_view(text) TO prom_writer;
 
-CREATE OR REPLACE FUNCTION prom_api.register_metric_view(schema_name text, view_name text, if_not_exists BOOLEAN = false)
+CREATE OR REPLACE FUNCTION prom_api.register_metric_view(schema_name text, view_name text, refresh_interval INTERVAL, if_not_exists BOOLEAN = false, downsample_id BIGINT = NULL)
     RETURNS BOOLEAN
     SECURITY DEFINER
     VOLATILE
@@ -2580,7 +2582,7 @@ BEGIN
     AND    table_name   = register_metric_view.view_name;
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'cannot register non-existent metric view in specified schema';
+        RAISE EXCEPTION 'cannot register non-existent metric view with name % in specified schema %', view_name, schema_name;
     END IF;
 
     -- cannot register view in data schema
@@ -2588,21 +2590,41 @@ BEGIN
         RAISE EXCEPTION 'cannot register metric view in prom_data schema';
     END IF;
 
-    -- check if view is based on a metric from prom_data
-    -- we check for two levels so we can support 2-step continuous aggregates
-    SELECT v.view_schema, v.view_name, v.metric_table_name
-    INTO agg_schema, agg_name, metric_table_name
-    FROM _prom_catalog.get_first_level_view_on_metric(schema_name, view_name) v;
+    IF downsample_id IS NOT NULL THEN
+        -- Check if the materialized view is at least created.
+        PERFORM 1 FROM pg_views WHERE viewname = view_name AND schemaname = schema_name;
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'No materialized view like %.% found', schema_name, view_name;
+        END IF;
 
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'view not based on a metric table from prom_data schema';
+        IF refresh_interval IS NULL THEN
+            RAISE EXCEPTION 'refresh_interval must not be null for automatic-dowmsampling views';
+        END IF;
+
+        -- We do not do the checks offered by get_first_level_view_on_metric() for automatic metric downsampling
+        -- because those checks are not meant for Caggs with timescaledb.materialized_only = true.
+        --
+        -- Since automatic metric downsampling are an internal creation of Caggs, we should be fine with not doing
+        -- "strict" safety checks.
+        metric_table_name := view_name;
+        agg_name := view_name;
+        agg_schema := schema_name;
+    ELSE
+        -- check if view is based on a metric from prom_data
+        -- we check for two levels so we can support 2-step continuous aggregates
+        SELECT v.view_schema, v.view_name, v.metric_table_name
+        INTO agg_schema, agg_name, metric_table_name
+        FROM _prom_catalog.get_first_level_view_on_metric(schema_name, view_name) v;
+
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'view with name % not based on a metric table from prom_data schema', view_name;
+        END IF;
     END IF;
 
     -- check if the view contains necessary columns with the correct types
-    SELECT count(*) FROM information_schema.columns
-    INTO column_count
+    SELECT count(*) INTO column_count FROM information_schema.columns
     WHERE table_schema = register_metric_view.schema_name
-    AND table_name   = register_metric_view.view_name
+    AND table_name = register_metric_view.view_name
     AND ((column_name = 'time' AND data_type = 'timestamp with time zone')
     OR (column_name = 'series_id' AND data_type = 'bigint')
     OR data_type = 'double precision');
@@ -2611,9 +2633,16 @@ BEGIN
         RAISE EXCEPTION 'view must contain time (data type: timestamp with time zone), series_id (data type: bigint), and at least one column with double precision data type';
     END IF;
 
+    IF refresh_interval IS NULL THEN
+        -- When a non automatic metric downsampling Cagg is created, we should inform the user that he needs to create a refresh policy himself.
+        RAISE NOTICE 'Automatic refresh is disabled since refresh_interval is NULL. Please create refresh policy for this Cagg';
+    ELSE
+        PERFORM _prom_catalog.create_cagg_refresh_job_if_not_exists(refresh_interval);
+    END IF;
+
     -- insert into metric table
-    INSERT INTO _prom_catalog.metric (metric_name, table_name, table_schema, series_table, is_view, creation_completed)
-    VALUES (register_metric_view.view_name, register_metric_view.view_name, register_metric_view.schema_name, metric_table_name, true, true)
+    INSERT INTO _prom_catalog.metric (metric_name, table_name, table_schema, series_table, is_view, creation_completed, view_refresh_interval, downsample_id)
+    VALUES (register_metric_view.view_name, register_metric_view.view_name, register_metric_view.schema_name, metric_table_name, true, true, refresh_interval, register_metric_view.downsample_id)
     ON CONFLICT DO NOTHING;
 
     IF NOT FOUND THEN
@@ -2638,8 +2667,8 @@ END
 $func$
 LANGUAGE PLPGSQL;
 --redundant given schema settings but extra caution for security definers
-REVOKE ALL ON FUNCTION prom_api.register_metric_view(text, text, boolean) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION prom_api.register_metric_view(text, text, boolean) TO prom_admin;
+REVOKE ALL ON FUNCTION prom_api.register_metric_view(text, text, interval, boolean, bigint) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION prom_api.register_metric_view(text, text, interval, boolean, bigint) TO prom_admin;
 
 CREATE OR REPLACE FUNCTION prom_api.unregister_metric_view(schema_name text, view_name text, if_exists BOOLEAN = false)
     RETURNS BOOLEAN

@@ -1,0 +1,46 @@
+---
+source: sql-tests/tests/tests.rs
+expression: query_result
+---
+ plan 
+------
+ 1..5
+(1 row)
+
+psql:testdata/custom_downsample_refresh.sql:20: NOTICE:  refreshing continuous aggregate "test"
+HINT:  Use WITH NO DATA if you do not want to refresh the continuous aggregate on creation.
+  ok  
+------
+ ok 1
+(1 row)
+
+ register_metric_view 
+----------------------
+ t
+(1 row)
+
+  ok  
+------
+ ok 2
+(1 row)
+
+                 ok                  
+-------------------------------------
+ ok 3 - samples in custom downsample
+(1 row)
+
+                         ok                         
+----------------------------------------------------
+ ok 4 - samples in custom downsample before refresh
+(1 row)
+
+                        ok                         
+---------------------------------------------------
+ ok 5 - samples in custom downsample after refresh
+(1 row)
+
+ finish 
+--------
+(0 rows)
+
+

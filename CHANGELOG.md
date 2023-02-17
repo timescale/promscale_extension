@@ -14,6 +14,10 @@ We use the following categories for changes:
 
 ## [Unreleased]
 
+### Added
+- Support to create and delete metric downsampling based on metric types [#538]
+- Support for maintenance of metric downsampling [#554]
+
 ## [0.8.0 - 2023-01-05]
 
 ### Changed
@@ -38,8 +42,7 @@ We use the following categories for changes:
 - Added `_ps_catalog.compressed_chunks_missing_stats` view [#595]
 
 ### Fixed
-- Column conflict when creating a metric view with a label called `series`
-  [#559]
+- Column conflict when creating a metric view with a label called `series` [#559]
 
 ## [0.7.0 - 2022-10-03]
 
