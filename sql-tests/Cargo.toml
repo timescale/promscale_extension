@@ -5,7 +5,7 @@ edition = "2021"
 
 [dev-dependencies]
 insta = "1.14.0"
-test-generator = "0.3.0"
+test-generator = "0.3.1"
 test-common = { path = "../test-common" }
 pgtap-parse = { path = "../pgtap-parse" }
 
